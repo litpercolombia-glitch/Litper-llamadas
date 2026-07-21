@@ -266,3 +266,29 @@ SKILLS_SEED = [
         "created_at": _iso_now(), "updated_at": _iso_now(),
     },
 ]
+
+
+# 6 preferred ElevenLabs voices seeded on boot (owner's confirmed voice_ids).
+VOICES_SEED = [
+    {"id": _new_uid(), "name": "Sofía CO", "elevenlabs_voice_id": "scn1gPWkdVd8FhODJoei",
+     "language": "es-CO", "country": "CO", "is_default": True,
+     "description": "Voz principal Colombia — cálida, cercana.",
+     "created_at": _iso_now(), "updated_at": _iso_now()},
+    {"id": _new_uid(), "name": "Sofía EC", "elevenlabs_voice_id": "wmXH34EF7LAsKTjOZWWt",
+     "language": "es-EC", "country": "EC", "is_default": True,
+     "description": "Voz principal Ecuador.",
+     "created_at": _iso_now(), "updated_at": _iso_now()},
+    {"id": _new_uid(), "name": "Voz 3", "elevenlabs_voice_id": "MqSrMUk8EHh32HBKytrG",
+     "language": "es", "country": "OTHER", "is_default": False, "description": "",
+     "created_at": _iso_now(), "updated_at": _iso_now()},
+    {"id": _new_uid(), "name": "Voz 4", "elevenlabs_voice_id": "57D8YIbQSuE3REDPO6Vm",
+     "language": "es", "country": "OTHER", "is_default": False, "description": "",
+     "created_at": _iso_now(), "updated_at": _iso_now()},
+    {"id": _new_uid(), "name": "Voz 5", "elevenlabs_voice_id": "86V9x9hrQds83qf7zaGn",
+     "language": "es", "country": "OTHER", "is_default": False, "description": "",
+     "created_at": _iso_now(), "updated_at": _iso_now()},
+    {"id": _new_uid(), "name": "Voz 6", "elevenlabs_voice_id": "VmejBeYhbrcTPwDniox7",
+     "language": "es", "country": "OTHER", "is_default": False, "description": "",
+     "created_at": _iso_now(), "updated_at": _iso_now()},
+]
+

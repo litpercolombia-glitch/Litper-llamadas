@@ -45,6 +45,29 @@ class ElevenLabsClient:
         except Exception as e:  # noqa: BLE001
             return {"ok": False, "configured": True, "error": str(e), "voices": []}
 
+    async def synthesize(self, voice_id: str, text: str,
+                         model_id: str = "eleven_multilingual_v2") -> tuple[bytes | None, str | None]:
+        """POST /text-to-speech/{voice_id} → returns (audio_bytes, error)."""
+        if not self.configured:
+            return None, "ELEVENLABS_API_KEY no configurada"
+        url = f"{self.base_url}/text-to-speech/{voice_id}"
+        payload = {
+            "text": text,
+            "model_id": model_id,
+            "voice_settings": {"stability": 0.5, "similarity_boost": 0.75},
+        }
+        try:
+            async with httpx.AsyncClient(timeout=30) as cli:
+                r = await cli.post(url, headers={**self._headers(),
+                                                 "Content-Type": "application/json",
+                                                 "Accept": "audio/mpeg"},
+                                   json=payload)
+            if 200 <= r.status_code < 300:
+                return r.content, None
+            return None, f"HTTP {r.status_code}: {r.text[:200]}"
+        except Exception as e:  # noqa: BLE001
+            return None, str(e)
+
 
 def get_client() -> ElevenLabsClient:
     return ElevenLabsClient()

@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import "@/index.css";
+import { useTheme } from "@/components/ThemeToggle";
 
 import DashboardPage  from "@/pages/Dashboard";
 import CopilotPage    from "@/pages/Copilot";
@@ -16,11 +17,8 @@ import NumbersPage    from "@/pages/Numbers";
 import NovedadesPage  from "@/pages/Novedades";
 
 function App() {
-  useEffect(() => {
-    // Force dark tactical theme
-    document.documentElement.classList.add("dark");
-    document.title = "Litper Connect Hub";
-  }, []);
+  useTheme();  // initialises html.matrix-night / matrix-day from localStorage
+  useEffect(() => { document.title = "Litper Connect Hub"; }, []);
 
   return (
     <BrowserRouter>

@@ -1,7 +1,9 @@
 """Routes: /voices — CRUD for AI phone-call voice profiles (ElevenLabs)."""
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response
 from typing import List
+from pydantic import BaseModel
 
 from db import get_db
 from deps import require_api_key
@@ -91,3 +93,19 @@ async def default_for_country(country: str):
             summary="List voices available in the connected ElevenLabs account.")
 async def elevenlabs_available():
     return await get_eleven().list_voices()
+
+
+class PreviewIn(BaseModel):
+    voice_id: str
+    text: str = "Hola, le llamo de Litper. ¿Puede confirmar la recogida de su pedido en oficina?"
+
+
+@router.post("/preview",
+             summary="Synthesize a sample line with ElevenLabs and return the audio (audio/mpeg).",
+             responses={200: {"content": {"audio/mpeg": {}}}})
+async def preview(payload: PreviewIn):
+    audio, err = await get_eleven().synthesize(payload.voice_id, payload.text)
+    if err:
+        raise HTTPException(502, detail=err)
+    return Response(content=audio, media_type="audio/mpeg",
+                    headers={"Cache-Control": "no-store"})

@@ -1,0 +1,30 @@
+{
+  "summary": "Litper Connect Hub v1.3 backend testing: all 24 new tests passed covering voices seed, ElevenLabs integration, TTS preview (success + invalid), new /metrics schema (norte/funnel/whatsapp/operacion/costos/trend/filters), chatea_pro /me, agent tool_calls, and regression seeds (novedades=18, skills=4, auth guard, health).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/voices", "issue": "Field is named 'elevenlabs_voice_id' (not 'voice_id' as review request implies). Not a bug but a naming inconsistency to note for frontend."},
+      {"endpoint": "/api/metrics -> norte.roi_cop", "issue": "No 'target' field (only value/recovered_value_cop/margin_recovered_cop/total_cost_cop/status). Acceptable if ROI is treated as computed value with no fixed target."},
+      {"endpoint": "/api/metrics -> norte.rto_reduction", "issue": "Uses 'baseline' + 'current' instead of 'target'. Accepted; document schema."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/test_hub_v13.py", "/app/test_reports/pytest/v13.xml"],
+  "action_items": [
+    "Consider standardising voice_id field name across API and docs (currently elevenlabs_voice_id).",
+    "Document that norte.roi_cop has no target and norte.rto_reduction uses baseline/current semantics."
+  ],
+  "critical_code_review_comments": [
+    "TTS preview correctly returns audio/mpeg with body > 1KB and proper 502 on invalid voice.",
+    "ElevenLabs live integration confirmed working (real API key returns voices list).",
+    "New /metrics schema is comprehensive and includes 14-day trend arrays as specified.",
+    "Cost env vars exposed via response.costos.config as required.",
+    "Agent tool_calls are inside steps[].tool_calls (nested) — frontend should traverse this structure."
+  ],
+  "updated_files": ["/app/backend/tests/test_hub_v13.py"],
+  "success_rate": {"backend": "100%"},
+  "seed_data_creation": "None new; used existing seeded voices/queue.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "test_hub_v13.py covers v1.3 additions. Original test_hub.py (25 tests) still exists for regression. Voice field naming quirk (elevenlabs_voice_id) and norte.roi_cop lacking target field are known design choices, not bugs."
+}

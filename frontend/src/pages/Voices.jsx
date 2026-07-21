@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Layout from "../components/Layout";
 import { api } from "../lib/api";
 import { Button } from "../components/ui/button";
@@ -9,7 +9,7 @@ import {
 } from "../components/ui/select";
 import { Switch } from "../components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
-import { Microphone, Plus, TrashSimple, Star } from "@phosphor-icons/react";
+import { Microphone, Plus, TrashSimple, Star, SpeakerHigh, StopCircle } from "@phosphor-icons/react";
 import { toast } from "sonner";
 
 const COUNTRIES = ["CO", "EC", "CL", "OTHER"];
@@ -23,6 +23,8 @@ export default function VoicesPage() {
   const [available, setAvailable] = useState({ ok: false, voices: [] });
   const [form, setForm] = useState(EMPTY);
   const [open, setOpen] = useState(false);
+  const [playing, setPlaying] = useState(null);
+  const audioRef = useRef(null);
 
   const load = async () => {
     const [v, a] = await Promise.all([
@@ -156,9 +158,10 @@ export default function VoicesPage() {
           </div>
         )}
         {voices.map(v => (
-          <div key={v.id} className={`border rounded-sm p-5 ${
-            v.is_default ? "border-white/40 bg-zinc-900" : "border-zinc-800 bg-zinc-900/50"
-          }`} data-testid={`voice-card-${v.id}`}>
+          <div key={v.id} className={`metal-surface tilt-card p-5 ${
+            v.is_default ? "border-2" : ""
+          }`} style={v.is_default ? { borderColor: "var(--accent)" } : {}}
+               data-testid={`voice-card-${v.id}`}>
             <div className="flex items-start justify-between mb-3">
               <div>
                 <h3 className="text-lg font-semibold text-white">{v.name}</h3>
@@ -173,7 +176,14 @@ export default function VoicesPage() {
             <div className="text-[10px] uppercase tracking-widest font-mono text-zinc-500 mb-1">Voice ID</div>
             <div className="font-mono text-xs text-zinc-300 break-all mb-3">{v.elevenlabs_voice_id}</div>
             {v.description && <p className="text-sm text-zinc-400 mb-3">{v.description}</p>}
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
+              <Button variant="outline" size="sm" onClick={() => preview(v)}
+                data-testid={`voice-preview-${v.id}`}
+                className="border-zinc-700 bg-transparent rounded-sm text-xs">
+                {playing === v.id
+                  ? <><StopCircle size={12} className="mr-1" /> Detener</>
+                  : <><SpeakerHigh size={12} className="mr-1" /> Probar voz</>}
+              </Button>
               {!v.is_default && (
                 <Button variant="outline" size="sm" onClick={() => setDefault(v)}
                   data-testid={`voice-set-default-${v.id}`}

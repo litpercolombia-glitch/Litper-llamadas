@@ -14,6 +14,8 @@ import {
   Robot, PaperPlaneRight, Plus, TrashSimple, Wrench,
   CheckCircle, WarningCircle, User, Lightning, Sparkle
 } from "@phosphor-icons/react";
+import MatrixRain from "../components/MatrixRain";
+import ThemeToggle from "../components/ThemeToggle";
 
 function ToolCard({ tc }) {
   const ok = tc.result?.ok !== false && !tc.result?.error;
@@ -200,6 +202,7 @@ export default function CopilotPage() {
 
   return (
     <div className="min-h-screen flex bg-zinc-950 text-zinc-100">
+      <MatrixRain />
       <Sidebar />
       <ThreadsPanel threads={threads} activeId={activeId}
         onSelect={setActiveId} onNew={newThread} onDelete={removeThread} />
@@ -235,6 +238,7 @@ export default function CopilotPage() {
                 <Switch checked={autoMode} onCheckedChange={setAutoMode}
                   data-testid="copilot-auto-toggle" />
               </div>
+              <ThemeToggle />
             </div>
           </div>
         </header>

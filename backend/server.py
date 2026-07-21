@@ -86,11 +86,18 @@ async def _ensure_seed():
         )
 
     # Seed copilot skills (idempotent by trigger)
-    from data import SKILLS_SEED
+    from data import SKILLS_SEED, VOICES_SEED
     for s in SKILLS_SEED:
         await db.copilot_skills.update_one(
             {"trigger": s["trigger"]},
             {"$setOnInsert": {**s, "is_seed": True}},
+            upsert=True,
+        )
+    # Seed the 6 preferred ElevenLabs voices (idempotent by voice_id)
+    for v in VOICES_SEED:
+        await db.voice_profiles.update_one(
+            {"elevenlabs_voice_id": v["elevenlabs_voice_id"]},
+            {"$setOnInsert": v},
             upsert=True,
         )
 
