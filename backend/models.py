@@ -91,6 +91,12 @@ class Attempt(BaseModel):
     result: Optional[str] = None
     executed_at: Optional[str] = None
     notes: Optional[str] = None
+    # Populated by webhooks (Twilio + ElevenLabs)
+    call_sid: Optional[str] = None
+    duration_seconds: Optional[int] = None
+    recording_url: Optional[str] = None
+    transcript: Optional[str] = None
+    summary: Optional[str] = None
 
 
 class CallSchedule(BaseModel):

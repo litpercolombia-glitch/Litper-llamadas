@@ -59,6 +59,31 @@ export default function VoicesPage() {
     catch (e) { toast.error(e.message); }
   };
 
+  const playPreview = async (v) => {
+    if (playing === v.id && audioRef.current) {
+      audioRef.current.pause();
+      setPlaying(null);
+      return;
+    }
+    try {
+      setPlaying(v.id);
+      const r = await api.post("/voices/preview",
+        { voice_id: v.elevenlabs_voice_id,
+          text: "Hola, le llamo de Litper. ¿Puede confirmar la recogida de su pedido en oficina?" },
+        { responseType: "blob", timeout: 30000 });
+      const url = URL.createObjectURL(r.data);
+      if (audioRef.current) audioRef.current.pause();
+      const a = new Audio(url);
+      audioRef.current = a;
+      a.onended = () => { setPlaying(null); URL.revokeObjectURL(url); };
+      a.onerror = () => { setPlaying(null); toast.error("Error reproduciendo audio."); };
+      await a.play();
+    } catch (e) {
+      setPlaying(null);
+      toast.error(e?.response?.data?.detail || "No se pudo generar el audio.");
+    }
+  };
+
   return (
     <Layout title="Voces de IA" subtitle={`${voices.length}/6 voces registradas · Selección por país`}
       actions={
