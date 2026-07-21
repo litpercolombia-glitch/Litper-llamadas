@@ -17,7 +17,7 @@ load_dotenv(ROOT_DIR / ".env")
 
 # Import after loading .env so os.environ is populated
 from db import get_db, close as close_db  # noqa: E402
-from data import CARRIERS_SEED  # noqa: E402
+from data import CARRIERS_SEED, NOVEDADES_SEED  # noqa: E402
 import scheduler  # noqa: E402
 
 from routes.health import router as health_router  # noqa: E402
@@ -31,6 +31,12 @@ from routes.metrics import router as metrics_router  # noqa: E402
 from routes.webhooks import router as webhooks_router  # noqa: E402
 from routes.translate import router as translate_router  # noqa: E402
 from routes.connectors import router as connectors_router  # noqa: E402
+from routes.voices import router as voices_router  # noqa: E402
+from routes.numbers import router as numbers_router  # noqa: E402
+from routes.novedades import router as novedades_router  # noqa: E402
+from routes.copilot import router as copilot_router  # noqa: E402
+from routes.skills import router as skills_router  # noqa: E402
+from routes.files import router as files_router  # noqa: E402
 
 logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
@@ -45,7 +51,9 @@ async def _ensure_seed():
     for c in [("chatea_pro", "Chatea Pro (WhatsApp)"),
               ("dropi", "Dropi (Fulfillment)"),
               ("whatsapp_business", "WhatsApp Business (Meta Cloud)"),
-              ("supabase", "Supabase Postgres")]:
+              ("supabase", "Supabase Postgres"),
+              ("elevenlabs", "ElevenLabs (Voz IA)"),
+              ("twilio", "Twilio (Caller ID)")]:
         await db.integration_connectors.update_one(
             {"key": c[0]},
             {"$setOnInsert": {"key": c[0], "name": c[1], "status": "unconfigured",
@@ -60,6 +68,31 @@ async def _ensure_seed():
     await db.call_schedules.create_index("queue_id", unique=True)
     await db.customer_tasks.create_index("id", unique=True)
     await db.message_log.create_index("created_at")
+    await db.voice_profiles.create_index("id", unique=True)
+    await db.connected_numbers.create_index("phone_number", unique=True)
+    await db.carrier_novedades.create_index([("carrier", 1), ("estatus_carrier", 1)],
+                                            unique=True)
+    await db.chat_threads.create_index("id", unique=True)
+    await db.chat_messages.create_index([("thread_id", 1), ("created_at", 1)])
+    await db.copilot_skills.create_index("id", unique=True)
+    await db.uploaded_files.create_index("id", unique=True)
+
+    # Seed novedades (idempotent by carrier+estatus_carrier)
+    for n in NOVEDADES_SEED:
+        await db.carrier_novedades.update_one(
+            {"carrier": n["carrier"], "estatus_carrier": n["estatus_carrier"]},
+            {"$set": n},
+            upsert=True,
+        )
+
+    # Seed copilot skills (idempotent by trigger)
+    from data import SKILLS_SEED
+    for s in SKILLS_SEED:
+        await db.copilot_skills.update_one(
+            {"trigger": s["trigger"]},
+            {"$setOnInsert": {**s, "is_seed": True}},
+            upsert=True,
+        )
 
 
 @asynccontextmanager
@@ -102,6 +135,7 @@ from fastapi import APIRouter  # noqa: E402
 api = APIRouter(prefix="/api")
 
 api.include_router(health_router)
+api.include_router(novedades_router)  # must be BEFORE carriers to avoid /{slug} match
 api.include_router(carriers_router)
 api.include_router(orders_router)
 api.include_router(queue_router)
@@ -112,6 +146,12 @@ api.include_router(metrics_router)
 api.include_router(webhooks_router)
 api.include_router(translate_router)
 api.include_router(connectors_router)
+api.include_router(voices_router)
+api.include_router(numbers_router)
+api.include_router(novedades_router)
+api.include_router(copilot_router)
+api.include_router(skills_router)
+api.include_router(files_router)
 
 
 @api.get("/", tags=["health"], summary="Root health.")

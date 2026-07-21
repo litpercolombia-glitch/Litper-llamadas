@@ -38,7 +38,7 @@ export default function ConnectorsPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {conns.map((c) => {
           const st = STATUS_STYLES[c.status] || STATUS_STYLES.unconfigured;
-          const testable = c.key === "chatea_pro" || c.key === "supabase";
+          const testable = ["chatea_pro", "supabase", "elevenlabs", "twilio"].includes(c.key);
           return (
             <div key={c.key} className={`border rounded-sm p-5 ${st.cls}`}
                  data-testid={`connector-${c.key}`}>
@@ -63,6 +63,24 @@ export default function ConnectorsPage() {
                 <>
                   <div className="text-[10px] uppercase tracking-widest font-mono text-zinc-500 mb-1">URL</div>
                   <div className="text-xs font-mono text-zinc-300 break-all mb-3">{c.metadata.url}</div>
+                </>
+              )}
+              {c.metadata?.workspace_name && (
+                <>
+                  <div className="text-[10px] uppercase tracking-widest font-mono text-zinc-500 mb-1">Workspace</div>
+                  <div className="text-sm text-zinc-100 mb-3">{c.metadata.workspace_name}</div>
+                </>
+              )}
+              {c.metadata?.voices_count != null && (
+                <>
+                  <div className="text-[10px] uppercase tracking-widest font-mono text-zinc-500 mb-1">Voces disponibles</div>
+                  <div className="text-sm text-zinc-100 mb-3">{c.metadata.voices_count}</div>
+                </>
+              )}
+              {c.metadata?.verified_count != null && (
+                <>
+                  <div className="text-[10px] uppercase tracking-widest font-mono text-zinc-500 mb-1">Caller IDs verificados</div>
+                  <div className="text-sm text-zinc-100 mb-3">{c.metadata.verified_count}</div>
                 </>
               )}
               {c.last_checked_at && (

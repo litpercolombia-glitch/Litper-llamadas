@@ -52,15 +52,16 @@ curl -H "X-API-Key: $PUBLIC_API_KEY" $BACKEND_URL/api/queue
 |---|---|
 | `MONGO_URL`, `DB_NAME` | MongoDB connection (already provisioned) |
 | `PUBLIC_API_KEY` | Shared secret for every public endpoint |
-| `CHATEA_PRO_API_KEY` | Chatea Pro (WhatsApp) API key |
-| `CHATEA_PRO_BASE_URL` | Base URL of the Chatea Pro API |
-| `CHATEA_PRO_SEND_MESSAGE_PATH` | Path for free-text sends (overridable) |
-| `CHATEA_PRO_SEND_TEMPLATE_PATH` | Path for template sends |
-| `CHATEA_PRO_TEST_PATH` | Path used by `POST /connectors/chatea_pro/test` |
-| `SUPABASE_URL` / `SUPABASE_ANON_KEY` | Reachability probe |
-| `SUPABASE_SERVICE_KEY` | Enables server-side writes (leave blank to disable sync) |
+| `EMERGENT_LLM_KEY` | Universal LLM key for the Copilot agent (Claude Sonnet 4.6) |
+| `CHATEA_PRO_API_KEY` | Chatea Pro (WhatsApp) API key — confirmed working |
+| `CHATEA_PRO_BASE_URL` | Default `https://chateapro.app/api` |
+| `CHATEA_PRO_*_PATH` | Individual endpoint paths (all overridable) |
+| `ELEVENLABS_API_KEY` | ElevenLabs voice-listing API key (leave blank until owner fills) |
+| `ELEVENLABS_BASE_URL` | Default `https://api.elevenlabs.io/v1` |
+| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` | Twilio credentials (leave blank until owner fills) |
+| `TWILIO_STATUS_CALLBACK_BASE` | Public HTTPS base URL for Twilio verification callbacks (optional) |
+| `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_KEY` | Optional Postgres mirror |
 | `TRANSLATION_PROVIDER` | `library` (default) or `llm` |
-| `LLM_API_KEY` | If provider=`llm`, LLM key (falls back to library if blank) |
 | `DEFAULT_TIMEZONE` | Fallback tz for cadence scheduling |
 | `SCHEDULER_TICK_MINUTES` | APScheduler cadence dispatcher interval |
 
@@ -72,6 +73,29 @@ curl -H "X-API-Key: $PUBLIC_API_KEY" $BACKEND_URL/api/queue
 
 ### Health
 - `GET /health` — liveness probe. *No auth.*
+
+### Copilot (Agentic AI Console)
+- `GET  /threads` · `POST /threads` · `PATCH /threads/{id}` · `DELETE /threads/{id}`
+- `GET  /threads/{id}/messages`
+- `POST /agent/run { thread_id?, text, skill_id?, auto_mode?, file_ids? }` —
+  runs the agentic loop (LLM plans, calls tools, feeds results back, stops when
+  done). Returns `{ thread_id, final_text, steps: [{ assistant_text, tool_calls }] }`.
+- `GET  /skills` · `POST /skills` · `PUT /skills/{id}` · `DELETE /skills/{id}` —
+  reusable prompts/workflows for the agent. 4 skills are seeded:
+  `revisar-cola`, `recuperar-rojos`, `redactar-whatsapp`, `novedades-carrier`.
+- `POST /files` (multipart) — upload CSV/XLSX/PDF/image; CSV/XLSX are parsed and
+  columns + preview rows stored. `GET /files`, `GET /files/{id}`, `DELETE /files/{id}`.
+
+**Agent tools registered:** `get_queue`, `get_orders`, `get_carriers`,
+`get_carrier_novedades`, `schedule_cadence`, `register_attempt_result`,
+`send_whatsapp` (real Chatea Pro), `list_whatsapp_templates`, `create_task`,
+`list_tasks`, `get_metrics`, `translate`, `list_voices`, `list_numbers`,
+`import_orders_from_file`.
+
+LLM: `claude-sonnet-4-6` via the Emergent Universal Key (`EMERGENT_LLM_KEY`).
+Falls back to `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` if set. Tool-call protocol
+is JSON-in-fenced-`tool`-blocks; results feed back as `tool_result` blocks. Max
+6 iterations per user turn.
 
 ### Carriers
 - `GET /carriers` — 12 Colombian carriers with office-claim rules.
@@ -110,10 +134,17 @@ curl -H "X-API-Key: $PUBLIC_API_KEY" $BACKEND_URL/api/queue
 - Attempts 1-4 = `call`. Attempt 5 = `whatsapp` (final).
 - Skips Colombian holidays.
 
-### WhatsApp (Chatea Pro)
+### WhatsApp (Chatea Pro — real endpoints wired)
 - `POST /whatsapp/send` — free text (`text`) or template (`template_name` +
-  `template_params`).
+  `template_params`). Under the hood:
+    1. `GET /subscriber/get-info?phone_number=…` → look up subscriber
+    2. `POST /subscriber/create` if not found
+    3. `POST /subscriber/send-text` or `POST /subscriber/send-whatsapp-template`
 - `GET /whatsapp/messages` — log of everything sent/received.
+- `POST /connectors/chatea_pro/test` — pings `GET /me` and stores the workspace
+  name (visible in the Conectores UI).
+
+Base URL and every path are env-overridable in `backend/.env` (`CHATEA_PRO_*`).
 
 ### Tasks (customer tickets)
 - `POST /tasks` — types: `cambio_direccion`, `factura`, `mas_dias`,
@@ -124,6 +155,32 @@ curl -H "X-API-Key: $PUBLIC_API_KEY" $BACKEND_URL/api/queue
 ### Metrics
 - `GET /metrics` — dashboard KPIs (queue by status, attempts 24h, contact
   rate, tasks open, messages sent).
+
+### Voices (ElevenLabs voice picker)
+- `GET /voices` · `POST /voices` · `PUT /voices/{id}` · `DELETE /voices/{id}` —
+  register up to **6 voice profiles** (`name`, `elevenlabs_voice_id`,
+  `language`, `country`, `is_default`).
+- `GET /voices/default/{country}` — the default voice for a country (falls back
+  to any available).
+- `GET /voices/elevenlabs/available` — passthrough of the ElevenLabs `/voices`
+  endpoint (when `ELEVENLABS_API_KEY` is set); frontend uses this to render a
+  dropdown of the account's voices.
+
+### Numbers (Twilio Verified Caller IDs)
+- `POST /numbers/verify/start { phone_number, country, friendly_name? }` —
+  calls Twilio `POST /OutgoingCallerIds.json`; returns the 6-digit
+  `validation_code` to show to the user. Twilio then places a verification call.
+- `POST /numbers/verify/confirm { phone_number }` — polls Twilio's list and
+  marks the local record as `verified` when it appears.
+- `GET /numbers` — local list of connected caller IDs.
+- `POST /numbers/import` — mark an already-verified Twilio number as connected.
+- `GET /numbers/twilio/verified` — passthrough list of ALL verified caller IDs
+  in the Twilio account.
+
+### Carriers · Novedades (status → action reference)
+- `GET /carriers/novedades?carrier=&categoria=` — reference table. Categories:
+  `RECLAMO_EN_OFICINA`, `DEVOLUCION`, `NOVEDAD`, `TRANSITO`, `ENTREGADO`,
+  `OTRO`. 18 rows seeded (owner has the full 426-row dataset to load later).
 
 ### Webhooks (no `X-API-Key` — providers can't inject custom headers)
 - `POST /webhooks/chatea` — inbound WhatsApp events. Auto-classifies replies
@@ -138,8 +195,11 @@ curl -H "X-API-Key: $PUBLIC_API_KEY" $BACKEND_URL/api/queue
 
 ### Connectors
 - `GET /connectors` — status of Chatea Pro / Dropi / WhatsApp Business /
-  Supabase (from `integration_connectors`).
-- `POST /connectors/chatea_pro/test` — pings Chatea Pro and records the result.
+  Supabase / ElevenLabs / Twilio (from `integration_connectors`).
+- `POST /connectors/chatea_pro/test` — GET `/me` (validates token, extracts
+  workspace name).
+- `POST /connectors/elevenlabs/test` — lists voices to verify the key.
+- `POST /connectors/twilio/test` — lists verified caller IDs to verify creds.
 - `POST /connectors/supabase/test` — reachability probe.
 
 ---
@@ -192,12 +252,17 @@ Postgres tables (`orders`, `call_queue`, `customer_tasks`, `message_log`,
 
 | Route | Page |
 |---|---|
-| `/`           | Metrics dashboard |
+| `/`           | **Litper Copilot** — Marcus, the agentic AI console (chat + tool calls) |
+| `/skills`     | Habilidades — CRUD for reusable agent workflows |
+| `/metrics`    | Metrics dashboard |
 | `/queue`      | Queue table with semaphore + filters |
 | `/cadence`    | 5-attempt plan timeline + register results |
 | `/tasks`      | Customer tickets CRUD |
 | `/messages`   | WhatsApp message log |
+| `/voices`     | ElevenLabs voice profiles (max 6) |
+| `/numbers`    | Twilio verified caller IDs (self-service) |
 | `/carriers`   | 12 carriers with rules |
+| `/novedades`  | Carrier-status → action reference table |
 | `/connectors` | Integration status + test buttons |
 
 UI is Spanish (LATAM). Theme: dark tactical Command Center.
@@ -206,12 +271,17 @@ UI is Spanish (LATAM). Theme: dark tactical Command Center.
 
 ## Notes on Chatea Pro
 
-Public API documentation for Chatea Pro is not openly discoverable at time of
-build. This Hub therefore exposes the client behind a fully configurable
-abstraction (`CHATEA_PRO_BASE_URL` + `CHATEA_PRO_SEND_MESSAGE_PATH` +
-`CHATEA_PRO_SEND_TEMPLATE_PATH` + `CHATEA_PRO_TEST_PATH`). Correct the endpoint
-paths in `.env` — no code changes required. The default payload shape follows
-Meta's WhatsApp Cloud API convention.
+Confirmed real endpoints (env-overridable):
+```
+GET  /me                                → token + workspace probe
+GET  /subscriber/get-info?phone_number  → find subscriber
+POST /subscriber/create                 → create if not found
+POST /subscriber/send-text              → free-text WhatsApp
+POST /subscriber/send-whatsapp-template → template WhatsApp
+POST /whatsapp-template/list            → list templates
+```
+
+Auth: `Authorization: Bearer $CHATEA_PRO_API_KEY`.
 
 Use `POST /api/connectors/chatea_pro/test` (or the "Probar conexión" button in
-the Conectores page) to ping and confirm your configuration.
+Conectores) to validate the token — it returns the workspace name from `/me`.

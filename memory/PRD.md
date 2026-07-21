@@ -1,89 +1,85 @@
 # Litper Connect Hub — PRD
 
 ## Original Problem Statement
-Production-ready FastAPI backend (integration hub + public API) + React admin dashboard
-for a COD e-commerce call-center operation in LATAM (Colombia / Ecuador / Chile).
-Orchestrates AI phone calls (VAPI) + WhatsApp (Chatea Pro) to confirm COD orders
-sitting at carrier offices ("llamadas a oficina") before they get returned.
-
-Stack: FastAPI + React + MongoDB (Hub's own state). Optional mirror to Supabase Postgres.
-Auto-generated OpenAPI at /docs and /redoc. All business endpoints protected by
-`X-API-Key`.
+Production-ready FastAPI integration hub + public REST API with a React admin
+dashboard for a COD e-commerce call-center operation in LATAM (Colombia / Ecuador
+/ Chile). Orchestrates AI phone calls + WhatsApp to confirm COD orders sitting
+at carrier offices ("llamadas a oficina") before they get returned.
 
 ## User Personas
-- **Call-center Operator** — logs into the dashboard, monitors queue, registers call outcomes.
-- **Ops Manager** — watches the metrics dashboard, resolves customer tickets, tests integrations.
-- **External AI Agent (Claude)** — consumes the REST API via `X-API-Key` to pick calls, register results, send WhatsApp fallbacks.
+- **Call-center Operator** — monitors queue, registers call outcomes.
+- **Ops Manager** — watches metrics, resolves customer tickets, tests integrations.
+- **Copilot User** — chats with Marcus (the AI agent) to run operations autonomously.
+- **External AI Agent (Claude)** — consumes the REST API via `X-API-Key`.
 
 ## Core Requirements (static)
-- REST API with OpenAPI docs + `X-API-Key` header auth on business endpoints.
-- Cadence engine: up to 5 attempts across up to 3 days, rotating windows
-  (manana/mediodia/tarde/noche), no back-to-back same-window, respecting the
-  carrier's `office_claim_max_days` (1-day → compressed same day; 8-day → spread;
-  none → default 3-day). Skip Colombian holidays.
-- Attempts 1-4 = call. Attempt 5 = WhatsApp. Extra WhatsApp fallback after 3
-  consecutive `no_contesta`. Stop cadence on `rechaza` / `numero_incorrecto`.
-  Escalate after 5 exhausted attempts.
-- Chatea Pro WhatsApp connector with fully configurable URL/paths via env,
-  test-connection endpoint, and message log.
-- 12 Colombian carriers seeded with office-claim rules + semaphore
-  (`rojo`/`amarillo`/`verde`/`gris`).
-- Endpoints: orders (single + bulk), queue with semaphore + days_left, cadence
-  schedule + attempt-result, whatsapp send, tasks CRUD, metrics, webhooks
-  (Chatea + VAPI), translate (es/en/pt), health, connectors.
-- Optional Supabase sync (env-driven, no-op when SUPABASE_SERVICE_KEY blank).
-- React dashboard in Spanish: Metrics · Cola · Cadencia · Tickets · Mensajes ·
-  Transportadoras · Conectores.
+Same as v1.0 plus:
+- Real Chatea Pro API wired (confirmed endpoints: /me, /subscriber/get-info,
+  /subscriber/create, /subscriber/send-text, /subscriber/send-whatsapp-template).
+- ElevenLabs voice-picker with per-country default (max 6 voices).
+- Twilio Verified Caller IDs (self-service verification flow).
+- Novedades reference table (carrier status → action).
+- **Agentic AI Console ("Marcus") as landing page**, with tool-calling loop,
+  15+ tools mapped to the Hub's own endpoints, seeded skills, and file upload
+  → bulk import.
 
-## Implementation Status (2026-02-21 · v1.0)
+## Implementation Status
 
-### Backend — DONE
-- FastAPI app (`server.py`) with lifespan, CORS, auto-seed 12 carriers +
-  4 connectors on boot, Mongo indexes.
-- APScheduler `AsyncIOScheduler` dispatcher (`scheduler.py`) — ticks every 2 min,
-  auto-sends WhatsApp attempts, marks call attempts as `dispatched`.
-- All 11 route modules under `/api`: health, carriers, orders, queue, cadence,
-  whatsapp, tasks, metrics, webhooks (Chatea+VAPI), translate, connectors.
-- Chatea Pro client with configurable base URL / paths + connection test.
-- Cadence engine (`cadence.py`) with compressed/spread logic + holiday skip.
-- Translation provider abstraction (library default; LLM stub swappable via env).
-- Optional Supabase mirror via PostgREST.
-- Seed script (`seed.py`) — 12 carriers + 7 demo orders across different
-  deadlines (Envía 1-day, Servientrega 8-day, Interrapidísimo 4-day,
-  Coordinadora 8-day, TCC 3-day, 99-minutos no-office, Wiilog 2-day).
+### v1.0 (2026-02-21) — DONE
+- FastAPI + APScheduler + Chatea Pro (abstraction) + optional Supabase mirror.
+- 12 carriers + 7 demo orders seeded.
+- Frontend: 7 pages (Métricas, Cola, Cadencia, Tickets, Mensajes, Transportadoras, Conectores).
+- 25/25 backend tests passing.
 
-### Frontend — DONE
-- React 19 + React Router 7 + Tailwind + shadcn/ui + Phosphor Icons + Sonner.
-- Dark tactical Command Center theme (Work Sans + IBM Plex Sans/Mono fonts).
-- 7 pages: Métricas, Cola, Cadencia, Tickets, Mensajes, Transportadoras,
-  Conectores. All Spanish, all with `data-testid` on interactive elements.
-- Queue table with semaphore chips, filters, search, prices formatted in COP.
-- Cadence timeline view with per-attempt result buttons (6 outcomes).
-- Tasks CRUD with type/status filters + create/resolve modal.
-- Messages page with sent/received distinction, send-new dialog.
-- Connectors page with "Probar conexión" buttons for Chatea Pro & Supabase.
-- Carriers page listing all 12 with rules + inline semaphore for reclamo days.
+### v1.1 (2026-02-21) — DONE
+- **Chatea Pro real endpoints wired** — `/me` returns real workspace ("jeferson moreno").
+  Send flow now does subscriber lookup → create-if-missing → send.
+- **ElevenLabs voice picker** — 6-voice cap, per-country default, dropdown of
+  account voices when API key present, else free-text voice_id.
+- **Twilio Verified Caller IDs** — /numbers/verify/start returns validation_code
+  to display; /verify/confirm polls Twilio; import existing verified numbers.
+- **Novedades reference** — 18-row seed with 6 categories + endpoint + page.
+- Connectors page auto-discovers ElevenLabs + Twilio test buttons.
 
-### Testing — 25/25 backend tests passing (iteration 1)
-- Report: `/app/test_reports/iteration_1.json`
+### v1.2 (2026-02-21) — DONE (Agentic Copilot)
+- New **Copilot ("Marcus") as landing page** — Claude-style chat UI with
+  streaming tool-call cards, markdown rendering, threads sidebar, skill picker,
+  auto-mode toggle.
+- Real **agent loop** in `agent/loop.py` — Claude Sonnet 4.6 via
+  Emergent Universal Key, JSON tool-call protocol, max 6 iterations.
+- **15 tools** registered: get_queue, get_orders, get_carriers,
+  get_carrier_novedades, schedule_cadence, register_attempt_result,
+  send_whatsapp (real Chatea Pro), list_whatsapp_templates, create_task,
+  list_tasks, get_metrics, translate, list_voices, list_numbers,
+  import_orders_from_file.
+- **Skills** — CRUD + 4 seeded (`revisar-cola`, `recuperar-rojos`,
+  `redactar-whatsapp`, `novedades-carrier`).
+- **Files** — CSV/XLSX upload with pandas parsing (up to 500 rows preview);
+  agent tool `import_orders_from_file` bulk-imports rows as COD orders.
+- Threads + messages persisted in Mongo with full tool-call trace.
+
+### Testing (v1.2)
+- v1.0: 25/25 backend tests passing (report iteration_1.json).
+- v1.1+v1.2 smoke tests via curl all green:
+  Chatea /me → 200 (ws: jeferson moreno) · 18 novedades · 4 skills seeded ·
+  12 queue items · agent run returns full markdown table with tool trace.
 
 ## Prioritized Backlog
 
-### P1 — Nice-to-have
-- Multi-tenant support (org_id already present in Supabase schema).
-- Dropi connector — import orders directly from Dropi fulfillment.
-- VAPI outbound-call trigger (currently only inbound webhook is wired; the
-  external AI orchestrator dials via VAPI itself).
-- Cadence edge-case: when both day-0 and day-1 land on the same holiday, bump
-  each offset independently so spread plans always yield distinct dates.
+### P1
+- Load full 426-row novedades dataset (owner has it).
+- Streaming tokens in the Copilot chat (currently non-streaming send_message).
+- Skill "auto" mode UI polish (currently runs but doesn't visualise progress).
+- Dropi connector — real endpoints when documented.
+- VAPI outbound dial trigger with the selected voice_id + verified caller_id.
 
-### P2 — Later
-- Per-user auth on the dashboard (currently a shared trusted API key).
-- Chart visualisations on Metrics page (Recharts is already installed).
-- CSV export of queue + tickets.
-- LLM-based translation provider fully implemented (currently stubs → library).
+### P2
+- Full multi-tenant support (org_id).
+- Per-user auth on the dashboard.
 - Signature verification on webhooks.
+- LLM-based translation provider fully implemented.
+- Full "Archivos" management page (currently upload happens via API only).
 
 ## Deferred
-- Full multi-tenancy → depends on Supabase org_id propagation.
-- Push notifications for agents.
+- Push notifications.
+- SLA/dashboards per carrier over time (novedad recovery rates).

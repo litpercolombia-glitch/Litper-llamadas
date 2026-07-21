@@ -1,16 +1,21 @@
 import { NavLink } from "react-router-dom";
 import {
   ChartBar, Queue, ClockCountdown, ChatCircleDots, ListChecks,
-  Plugs, Truck, House
+  Plugs, Truck, House, Microphone, PhoneCall, Warning, Robot, Sparkle
 } from "@phosphor-icons/react";
 
 const NAV = [
-  { to: "/",           label: "Métricas",   icon: ChartBar,        testId: "sidebar-nav-metrics" },
+  { to: "/",           label: "Copilot",    icon: Robot,           testId: "sidebar-nav-copilot" },
+  { to: "/skills",     label: "Habilidades", icon: Sparkle,        testId: "sidebar-nav-skills" },
+  { to: "/metrics",    label: "Métricas",   icon: ChartBar,        testId: "sidebar-nav-metrics" },
   { to: "/queue",      label: "Cola",       icon: Queue,           testId: "sidebar-nav-queue" },
   { to: "/cadence",    label: "Cadencia",   icon: ClockCountdown,  testId: "sidebar-nav-cadence" },
   { to: "/tasks",      label: "Tickets",    icon: ListChecks,      testId: "sidebar-nav-tasks" },
   { to: "/messages",   label: "Mensajes",   icon: ChatCircleDots,  testId: "sidebar-nav-messages" },
+  { to: "/voices",     label: "Voces",      icon: Microphone,      testId: "sidebar-nav-voices" },
+  { to: "/numbers",    label: "Números",    icon: PhoneCall,       testId: "sidebar-nav-numbers" },
   { to: "/carriers",   label: "Transportadoras", icon: Truck,      testId: "sidebar-nav-carriers" },
+  { to: "/novedades",  label: "Novedades",  icon: Warning,         testId: "sidebar-nav-novedades" },
   { to: "/connectors", label: "Conectores", icon: Plugs,           testId: "sidebar-nav-connectors" },
 ];
 
@@ -23,7 +28,7 @@ export default function Sidebar() {
           <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-zinc-500">Litper</span>
         </div>
         <h1 className="text-lg font-semibold text-white mt-1">Connect Hub</h1>
-        <p className="text-[11px] font-mono text-zinc-500 mt-1">COD · LATAM · v1.0</p>
+        <p className="text-[11px] font-mono text-zinc-500 mt-1">COD · LATAM · v1.1</p>
       </div>
 
       <nav className="flex-1 py-3">

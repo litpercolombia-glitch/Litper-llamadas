@@ -223,3 +223,132 @@ class TranslateResponse(BaseModel):
     source: str
     target: str
     provider: str
+
+
+# ---------- VOICE PROFILES ----------
+class VoiceProfileIn(BaseModel):
+    name: str = Field(..., description="Nombre corto, ej. 'Sofía CO'.")
+    elevenlabs_voice_id: str
+    language: Literal["es-CO", "es-EC", "es-CL", "es-MX", "es-AR", "es", "en", "pt"] = "es-CO"
+    country: Literal["CO", "EC", "CL", "OTHER"] = "CO"
+    is_default: bool = False
+    description: str = ""
+
+
+class VoiceProfile(VoiceProfileIn):
+    id: str = Field(default_factory=_uid)
+    created_at: str = Field(default_factory=_now_iso)
+    updated_at: str = Field(default_factory=_now_iso)
+
+
+class VoiceProfileUpdate(BaseModel):
+    name: Optional[str] = None
+    elevenlabs_voice_id: Optional[str] = None
+    language: Optional[str] = None
+    country: Optional[Literal["CO", "EC", "CL", "OTHER"]] = None
+    is_default: Optional[bool] = None
+    description: Optional[str] = None
+
+
+# ---------- CONNECTED NUMBERS (Twilio verified caller IDs) ----------
+class NumberVerifyStart(BaseModel):
+    phone_number: str = Field(..., description="Número en formato E.164, ej. +573001234567")
+    country: Literal["CO", "EC", "CL", "OTHER"] = "CO"
+    friendly_name: Optional[str] = None
+
+
+class NumberVerifyConfirm(BaseModel):
+    phone_number: str
+
+
+class NumberImport(BaseModel):
+    phone_number: str
+    twilio_sid: Optional[str] = None
+    friendly_name: Optional[str] = None
+    country: Literal["CO", "EC", "CL", "OTHER"] = "CO"
+
+
+class ConnectedNumber(BaseModel):
+    id: str = Field(default_factory=_uid)
+    phone_number: str
+    friendly_name: Optional[str] = None
+    country: str = "CO"
+    provider: Literal["twilio", "manual"] = "twilio"
+    status: Literal["pending", "verified", "failed", "imported"] = "pending"
+    validation_code: Optional[str] = None
+    call_sid: Optional[str] = None
+    twilio_sid: Optional[str] = None
+    created_at: str = Field(default_factory=_now_iso)
+    updated_at: str = Field(default_factory=_now_iso)
+
+
+# ---------- NOVEDADES (carrier status reference) ----------
+class Novedad(BaseModel):
+    id: str = Field(default_factory=_uid)
+    carrier: str
+    estatus_carrier: str
+    estatus_dropi: Optional[str] = None
+    significado: str
+    accion: str
+    categoria: Literal[
+        "RECLAMO_EN_OFICINA", "DEVOLUCION", "NOVEDAD",
+        "TRANSITO", "ENTREGADO", "OTRO"
+    ] = "OTRO"
+
+
+# ---------- COPILOT / AGENT ----------
+class ChatThread(BaseModel):
+    id: str = Field(default_factory=_uid)
+    title: str = "Nueva conversación"
+    created_at: str = Field(default_factory=_now_iso)
+    updated_at: str = Field(default_factory=_now_iso)
+    skill_id: Optional[str] = None
+    auto_mode: bool = False
+
+
+class ChatMessage(BaseModel):
+    id: str = Field(default_factory=_uid)
+    thread_id: str
+    role: Literal["user", "assistant", "tool", "system"]
+    content: str = ""
+    tool_calls: list[dict[str, Any]] = []
+    tool_call_id: Optional[str] = None
+    tool_name: Optional[str] = None
+    attachments: list[dict[str, Any]] = []
+    created_at: str = Field(default_factory=_now_iso)
+
+
+class SendMessageIn(BaseModel):
+    thread_id: Optional[str] = None
+    text: str
+    skill_id: Optional[str] = None
+    auto_mode: bool = False
+    file_ids: list[str] = []
+
+
+class SkillIn(BaseModel):
+    name: str
+    trigger: str = Field(..., description="Comando corto, ej. 'revisar-cola'.")
+    description: str = ""
+    instructions: str = Field(..., description="Prompt/instrucciones que se inyectan al agente.")
+    steps: list[str] = []
+
+
+class Skill(SkillIn):
+    id: str = Field(default_factory=_uid)
+    is_seed: bool = False
+    created_at: str = Field(default_factory=_now_iso)
+    updated_at: str = Field(default_factory=_now_iso)
+
+
+class UploadedFile(BaseModel):
+    id: str = Field(default_factory=_uid)
+    filename: str
+    content_type: str
+    size: int
+    kind: Literal["csv", "xlsx", "pdf", "image", "other"] = "other"
+    rows_preview: list[dict[str, Any]] = []
+    columns: list[str] = []
+    row_count: int = 0
+    thread_id: Optional[str] = None
+    created_at: str = Field(default_factory=_now_iso)

@@ -110,3 +110,22 @@ async def vapi_webhook(payload: VapiWebhook):
                                    attempt_number=payload.attempt_number,
                                    result=payload.result,
                                    notes=(payload.transcript or "")[:2000]))
+
+
+@router.post("/twilio", summary="Twilio StatusCallback — caller-ID verification result.")
+async def twilio_webhook(request: Request):
+    """Twilio hits this after the OutgoingCallerId verification call completes."""
+    form = await request.form()
+    to_number = form.get("To") or form.get("Called")
+    verification_status = form.get("VerificationStatus")
+    outgoing_caller_id_sid = form.get("OutgoingCallerIdSid")
+    db = get_db()
+    if to_number:
+        status = "verified" if verification_status == "success" else "failed"
+        await db.connected_numbers.update_one(
+            {"phone_number": to_number},
+            {"$set": {"status": status,
+                      "twilio_sid": outgoing_caller_id_sid,
+                      "updated_at": _now()}},
+        )
+    return {"ok": True}
