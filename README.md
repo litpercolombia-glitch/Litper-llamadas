@@ -6,6 +6,61 @@ dashboard, purpose-built for COD e-commerce call-center operations in LATAM
 (Chatea Pro) to confirm COD orders sitting at carrier offices — *llamadas a
 oficina* — before they get returned.
 
+## Route layout
+
+- `/`               — public **Funnel** landing (Hormozi Grand Slam Offer,
+  Grupo VIP capture).
+- `/funnel`         — alias to `/`.
+- `/login`          — operator login (validates the `PUBLIC_API_KEY`).
+- `/app/*`          — internal Command Center (Copilot home, Cola, Cadencia,
+  Métricas, Tickets, Mensajes, Voces, Números, Transportadoras, Novedades,
+  Importar, Productos & Promociones, Leads VIP, Conexiones). Every internal
+  route is gated by the operator token stored in `localStorage`.
+
+Old flat URLs (`/copilot`, `/queue`, `/metrics`, …) redirect to `/app/*`
+automatically so existing links keep working.
+
+## Products & Promotions
+
+`/api/products` is a catalog of Litper products. Each product has an
+`instrucciones_llamada` string (variables `{customer_name} {product_name}
+{promo_name} {promo_price} {tracking} {references}`) and a list of
+`Promotion`s. Each promotion has a `sku_pattern` — when an imported order's
+SKUs / product names contain the pattern tokens, that promo is auto-matched
+and Sofía's script renders the *commercial* name and price instead of the
+technical SKU. Seed: "Protector Antifluido Premium + 2 Fundas",
+"Colcha + Sábana King 600 hilos".
+
+`POST /api/products/match` returns the best-matching promotion for any
+SKU / product name / items list. `GET /api/orders/{id}/prompt-vars` now also
+returns `promo_name`, `promo_price`, `promo_bonuses`.
+
+**Never say "impermeable"** — Litper products are "antifluido".
+
+## Funnel & VIP capture
+
+`POST /api/vip-leads` is public (no API key) — the landing page uses it
+directly. Optional Chatea Pro welcome WhatsApp is sent to the lead if the
+integration is configured. `VIP_GROUP_URL` env var provides the WhatsApp
+group invite that appears in the thank-you screen. Admins can list, patch,
+delete and export XLSX at `/api/vip-leads` (with API key).
+
+## Design system — Silver Matrix + ZYNEX neon
+
+Base palette is iPhone 17 Silver (silver-tinted dark in night, silver-tinted
+light in day). Overlaid with ZYNEX-inspired neon depth:
+
+- **Glowing 3D mascot** on Copilot & Login (`.mascot-ring` — animated pulse +
+  slow spin + cyan halo).
+- **Gradient CTAs** — silver → cyan → magenta (`.btn-cta-grad`) with soft
+  bloom on hover.
+- **Neon accent glow** on active nav, buttons, logo.
+- **Suggestion cards** on Copilot home (Semáforo · Vencimientos · Novedades ·
+  Recuperación) that navigate to the underlying pages.
+- **Skill chips** for the "SKILLS — HAZ CLIC PARA USAR" section.
+
+Toggle day/night via the sun/moon button top-right.
+
 ## Dropi import (Excel / CSV) — combo-safe
 
 Real Dropi "Reclamos en Oficina" exports store **one order as multiple rows**:

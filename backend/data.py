@@ -292,3 +292,67 @@ VOICES_SEED = [
      "created_at": _iso_now(), "updated_at": _iso_now()},
 ]
 
+
+
+# Catalog products with promotions (seeded on boot, idempotent by nombre).
+PRODUCTS_SEED = [
+    {
+        "id": _new_uid(),
+        "nombre": "Protector Antifluido Premium",
+        "slug": "protector-antifluido-premium",
+        "descripcion": ("Protector de colchón antifluido premium. NUNCA decir "
+                        "'impermeable' — usamos 'antifluido'."),
+        "instrucciones_llamada": (
+            "Tono cálido, colombiano, cercano. Menciona la promo por "
+            "{promo_name}. Si es combo, di 'tu pedido de {product_name}'. "
+            "Recuerda al cliente que puede reclamar en oficina antes de que "
+            "venza el plazo del carrier."),
+        "promotions": [
+            {
+                "id": _new_uid(),
+                "sku_pattern": "PROTECTOR MAS FUNDAS",
+                "nombre_comercial": "Protector Antifluido Premium + 2 Fundas de regalo",
+                "descripcion": "Protector antifluido + 2 fundas antifluido de regalo.",
+                "precio_lista": 189000,
+                "precio_promo": 149000,
+                "bonos": ["2 fundas antifluido", "Envío contra entrega"],
+                "activa": True,
+            },
+            {
+                "id": _new_uid(),
+                "sku_pattern": "PROTECTOR",
+                "nombre_comercial": "Protector Antifluido Premium",
+                "descripcion": "Protector de colchón antifluido premium.",
+                "precio_lista": 129000,
+                "precio_promo": 99000,
+                "bonos": ["Envío contra entrega"],
+                "activa": True,
+            },
+        ],
+        "activo": True,
+        "created_at": _iso_now(), "updated_at": _iso_now(),
+    },
+    {
+        "id": _new_uid(),
+        "nombre": "Colcha + Sábana King 600 hilos",
+        "slug": "colcha-sabana-king-600",
+        "descripcion": "Set de colcha y sábana king de 600 hilos.",
+        "instrucciones_llamada": (
+            "Menciona la textura suave, 600 hilos, tamaño king. Si el cliente "
+            "duda del precio, recuérdale el ahorro vs comprar por separado."),
+        "promotions": [
+            {
+                "id": _new_uid(),
+                "sku_pattern": "COLCHA SABANA KING 600",
+                "nombre_comercial": "Set Colcha + Sábana King 600 hilos",
+                "descripcion": "Set completo colcha y sábana tamaño king de 600 hilos.",
+                "precio_lista": 320000,
+                "precio_promo": 229000,
+                "bonos": ["Envío contra entrega", "Empaque de regalo"],
+                "activa": True,
+            },
+        ],
+        "activo": True,
+        "created_at": _iso_now(), "updated_at": _iso_now(),
+    },
+]

@@ -82,9 +82,10 @@ async def get_order(order_id: str):
 
 @router.get("/{order_id}/prompt-vars",
             summary="Return the variables used to render Sofía's outbound call script "
-                    "for this order (combo-aware).")
+                    "for this order (combo-aware + promo-matched).")
 async def order_prompt_vars(order_id: str):
-    doc = await get_db().orders.find_one({"id": order_id}, {"_id": 0})
+    db = get_db()
+    doc = await db.orders.find_one({"id": order_id}, {"_id": 0})
     if not doc:
         raise HTTPException(404, "Order not found")
     items = doc.get("items") or []
@@ -93,6 +94,32 @@ async def order_prompt_vars(order_id: str):
     product_name = (doc.get("products_display")
                     or (items[0].get("product", "") if items else "")
                     or "tu pedido")
+
+    # Promo matching: combine every sku/product/variation into a haystack and
+    # find the best (most specific) active promotion.
+    from routes.products import _promo_matches, _norm
+    haystack_parts: list[str] = []
+    for it in items:
+        for k in ("sku", "product", "variation"):
+            v = it.get(k)
+            if v:
+                haystack_parts.append(str(v))
+    haystack = " | ".join(haystack_parts)
+
+    best_promo = None
+    async for prod in db.catalog_products.find({"activo": {"$ne": False}}, {"_id": 0}):
+        for promo in prod.get("promotions") or []:
+            if not promo.get("activa", True):
+                continue
+            if _promo_matches(promo["sku_pattern"], haystack):
+                if best_promo is None or len(_norm(promo["sku_pattern"])) > \
+                        len(_norm(best_promo["sku_pattern"])):
+                    best_promo = promo
+
+    promo_name = (best_promo or {}).get("nombre_comercial", "") if best_promo else ""
+    promo_price = (best_promo or {}).get("precio_promo", 0) if best_promo else 0
+    promo_bonuses = ", ".join((best_promo or {}).get("bonos", []) or []) if best_promo else ""
+
     return {
         "customer_name":  doc.get("customer_name", ""),
         "customer_phone": doc.get("customer_phone", ""),
@@ -106,4 +133,9 @@ async def order_prompt_vars(order_id: str):
         "is_combo":       doc.get("is_combo", False),
         "total_amount":   doc.get("total_amount", 0),
         "currency":       doc.get("currency", "COP"),
+        # Promotion match (empty strings/0 if no promo matched)
+        "promo_name":     promo_name,
+        "promo_price":    promo_price,
+        "promo_bonuses":  promo_bonuses,
+        "promo_matched":  bool(best_promo),
     }

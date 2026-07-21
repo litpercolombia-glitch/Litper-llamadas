@@ -392,3 +392,59 @@ class UploadedFile(BaseModel):
     row_count: int = 0
     thread_id: Optional[str] = None
     created_at: str = Field(default_factory=_now_iso)
+
+
+# ---------- PRODUCTS & PROMOTIONS ----------
+class Promotion(BaseModel):
+    id: str = Field(default_factory=_uid)
+    sku_pattern: str = Field(..., description="SKU sustring/regex/keywords, ej. 'PROTECTOR MAS FUNDAS'")
+    nombre_comercial: str = Field(..., description="Nombre bonito de la oferta que dirá Sofía")
+    descripcion: str = ""
+    precio_lista: float = 0
+    precio_promo: float = 0
+    bonos: list[str] = []
+    activa: bool = True
+
+
+class ProductIn(BaseModel):
+    nombre: str = Field(..., description="Nombre técnico del producto")
+    slug: Optional[str] = None
+    descripcion: str = ""
+    instrucciones_llamada: str = Field(
+        "", description="Instrucciones para el prompt de llamada (variables permitidas: "
+                       "{customer_name} {product_name} {tracking} {city} {references}).")
+    promotions: list[Promotion] = []
+    activo: bool = True
+
+
+class ProductCatalog(ProductIn):
+    id: str = Field(default_factory=_uid)
+    created_at: str = Field(default_factory=_now_iso)
+    updated_at: str = Field(default_factory=_now_iso)
+
+
+class ProductUpdate(BaseModel):
+    nombre: Optional[str] = None
+    slug: Optional[str] = None
+    descripcion: Optional[str] = None
+    instrucciones_llamada: Optional[str] = None
+    promotions: Optional[list[Promotion]] = None
+    activo: Optional[bool] = None
+
+
+# ---------- VIP LEADS (funnel) ----------
+class VipLeadIn(BaseModel):
+    nombre: str
+    whatsapp: str = Field(..., description="Ej. +573001234567")
+    pais: Literal["CO", "EC", "CL", "MX", "PE", "AR", "OTRO"] = "CO"
+    pedidos_semana: Optional[str] = Field(None, description="Rango: <50, 50-200, 200-500, 500+")
+    email: Optional[str] = None
+    utm: dict[str, Any] = {}
+
+
+class VipLead(VipLeadIn):
+    id: str = Field(default_factory=_uid)
+    created_at: str = Field(default_factory=_now_iso)
+    status: Literal["nuevo", "contactado", "unido", "descartado"] = "nuevo"
+    welcome_sent: bool = False
+    welcome_error: Optional[str] = None

@@ -38,6 +38,8 @@ from routes.copilot import router as copilot_router  # noqa: E402
 from routes.skills import router as skills_router  # noqa: E402
 from routes.files import router as files_router  # noqa: E402
 from routes.dropi import router as dropi_router  # noqa: E402
+from routes.products import router as products_router  # noqa: E402
+from routes.vip import public_router as vip_public_router, admin_router as vip_admin_router  # noqa: E402
 from routes.llm import router as llm_router  # noqa: E402
 
 logging.basicConfig(level=logging.INFO,
@@ -78,6 +80,9 @@ async def _ensure_seed():
     await db.chat_messages.create_index([("thread_id", 1), ("created_at", 1)])
     await db.copilot_skills.create_index("id", unique=True)
     await db.uploaded_files.create_index("id", unique=True)
+    await db.catalog_products.create_index("id", unique=True)
+    await db.vip_leads.create_index("id", unique=True)
+    await db.vip_leads.create_index("whatsapp")
 
     # Seed novedades (idempotent by carrier+estatus_carrier)
     for n in NOVEDADES_SEED:
@@ -100,6 +105,15 @@ async def _ensure_seed():
         await db.voice_profiles.update_one(
             {"elevenlabs_voice_id": v["elevenlabs_voice_id"]},
             {"$setOnInsert": v},
+            upsert=True,
+        )
+
+    # Seed catalog products with promotions (idempotent by nombre)
+    from data import PRODUCTS_SEED
+    for p in PRODUCTS_SEED:
+        await db.catalog_products.update_one(
+            {"nombre": p["nombre"]},
+            {"$setOnInsert": p},
             upsert=True,
         )
 
@@ -162,6 +176,9 @@ api.include_router(copilot_router)
 api.include_router(skills_router)
 api.include_router(files_router)
 api.include_router(dropi_router)
+api.include_router(products_router)
+api.include_router(vip_public_router)
+api.include_router(vip_admin_router)
 api.include_router(llm_router)
 
 

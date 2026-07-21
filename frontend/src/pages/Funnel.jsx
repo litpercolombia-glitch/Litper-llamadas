@@ -1,0 +1,453 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import axios from "axios";
+import MatrixRain from "../components/MatrixRain";
+import ThemeToggle from "../components/ThemeToggle";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "../components/ui/select";
+import { Toaster, toast } from "sonner";
+import {
+  Robot, PhoneCall, WhatsappLogo, ChartLineUp, Clock, Package,
+  ShieldCheck, Sparkle, Timer, Fire, CheckCircle, Lightning,
+  Trophy, ArrowRight, Users, LockKey,
+} from "@phosphor-icons/react";
+import { Link } from "react-router-dom";
+
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+// Public capture endpoint — no API key needed (server allows unauth here).
+const publicApi = axios.create({ baseURL: `${BACKEND_URL}/api` });
+
+// -----------------------------------------------------------------------
+// Countdown to a fixed launch date (auto-refreshes to next Friday 23:59 CO)
+// -----------------------------------------------------------------------
+function nextDeadline() {
+  const d = new Date();
+  // aim at the nearest Friday 23:59:00 America/Bogota (UTC-5)
+  const day = d.getUTCDay(); // Sun=0..Sat=6
+  const daysToFri = (5 - day + 7) % 7 || 7; // always in the future
+  const target = new Date(d);
+  target.setUTCDate(d.getUTCDate() + daysToFri);
+  target.setUTCHours(23 + 5, 59, 0, 0);
+  return target;
+}
+function useCountdown(target) {
+  const [t, setT] = useState(() => Math.max(0, target.getTime() - Date.now()));
+  useEffect(() => {
+    const id = setInterval(() => setT(Math.max(0, target.getTime() - Date.now())), 1000);
+    return () => clearInterval(id);
+  }, [target]);
+  const s = Math.floor(t / 1000);
+  return {
+    d: Math.floor(s / 86400),
+    h: Math.floor((s % 86400) / 3600),
+    m: Math.floor((s % 3600) / 60),
+    s: s % 60,
+    ms: t,
+  };
+}
+
+// -----------------------------------------------------------------------
+// VIP CAPTURE MODAL / FORM
+// -----------------------------------------------------------------------
+function VipForm({ onDone }) {
+  const [nombre, setNombre] = useState("");
+  const [whatsapp, setWhatsapp] = useState("+57");
+  const [pais, setPais] = useState("CO");
+  const [pedidos, setPedidos] = useState("50-200");
+  const [email, setEmail] = useState("");
+  const [sending, setSending] = useState(false);
+  const [success, setSuccess] = useState(null); // {group_url, lead}
+
+  const submit = async (e) => {
+    e?.preventDefault?.();
+    if (!nombre.trim() || whatsapp.length < 8) {
+      toast.error("Ingresa tu nombre y un WhatsApp válido."); return;
+    }
+    setSending(true);
+    try {
+      const utm = Object.fromEntries(new URLSearchParams(window.location.search));
+      const { data } = await publicApi.post("/vip-leads", {
+        nombre, whatsapp, pais, pedidos_semana: pedidos, email, utm,
+      });
+      const cfg = await publicApi.get("/vip-leads/config").then((r) => r.data).catch(() => ({}));
+      setSuccess({ lead: data, group_url: cfg.vip_group_url || "" });
+      onDone?.(data);
+    } catch (er) {
+      toast.error(er.response?.data?.detail || "Error enviando. Reintenta.");
+    } finally { setSending(false); }
+  };
+
+  if (success) {
+    return (
+      <div data-testid="vip-success" className="text-center">
+        <div className="w-16 h-16 mx-auto rounded-full bg-green-500/15 grid place-items-center mb-4">
+          <CheckCircle size={40} className="text-green-400" weight="duotone" />
+        </div>
+        <h3 className="text-2xl font-semibold text-white mb-2">¡Estás dentro del VIP!</h3>
+        <p className="text-sm text-zinc-300 max-w-md mx-auto mb-6">
+          En segundos recibirás un WhatsApp de bienvenida. Únete al grupo privado donde
+          publicamos las plazas fundadoras y el onboarding.
+        </p>
+        {success.group_url ? (
+          <a
+            href={success.group_url}
+            target="_blank" rel="noreferrer"
+            className="inline-flex items-center gap-2 rounded-full px-6 py-3 bg-white text-black font-semibold text-sm hover:bg-zinc-200 transition"
+            data-testid="vip-group-link"
+          >
+            <WhatsappLogo size={18} weight="fill" /> Entrar al Grupo VIP en WhatsApp
+          </a>
+        ) : (
+          <div className="text-xs text-zinc-400">
+            (Enviaremos el link del grupo por WhatsApp)
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-3" data-testid="vip-form">
+      <Input placeholder="Nombre" value={nombre} onChange={(e) => setNombre(e.target.value)}
+             className="bg-black/40 border-white/15 text-white placeholder:text-zinc-500 h-11"
+             data-testid="vip-nombre" />
+      <Input placeholder="WhatsApp (+57...)" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)}
+             className="bg-black/40 border-white/15 text-white placeholder:text-zinc-500 h-11"
+             data-testid="vip-whatsapp" />
+      <div className="grid grid-cols-2 gap-3">
+        <Select value={pais} onValueChange={setPais}>
+          <SelectTrigger className="bg-black/40 border-white/15 text-white h-11" data-testid="vip-pais">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="CO">Colombia</SelectItem>
+            <SelectItem value="EC">Ecuador</SelectItem>
+            <SelectItem value="CL">Chile</SelectItem>
+            <SelectItem value="MX">México</SelectItem>
+            <SelectItem value="PE">Perú</SelectItem>
+            <SelectItem value="AR">Argentina</SelectItem>
+            <SelectItem value="OTRO">Otro</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={pedidos} onValueChange={setPedidos}>
+          <SelectTrigger className="bg-black/40 border-white/15 text-white h-11" data-testid="vip-pedidos">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="<50">Menos de 50 pedidos/semana</SelectItem>
+            <SelectItem value="50-200">50–200 pedidos/semana</SelectItem>
+            <SelectItem value="200-500">200–500 pedidos/semana</SelectItem>
+            <SelectItem value="500+">500+ pedidos/semana</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <Input placeholder="Email (opcional)" value={email} onChange={(e) => setEmail(e.target.value)}
+             className="bg-black/40 border-white/15 text-white placeholder:text-zinc-500 h-11"
+             data-testid="vip-email" />
+      <Button
+        type="submit"
+        disabled={sending}
+        className="w-full h-12 btn-cta-grad font-semibold text-sm"
+        data-testid="vip-submit"
+      >
+        {sending ? "Enviando…" : (<><Sparkle size={16} weight="fill" /> Quiero entrar al Grupo VIP</>)}
+      </Button>
+      <p className="text-[11px] text-zinc-500 text-center">
+        Sin spam. Puedes salirte cuando quieras.
+      </p>
+    </form>
+  );
+}
+
+// -----------------------------------------------------------------------
+// VALUE STACK item
+// -----------------------------------------------------------------------
+function StackItem({ icon: Icon, title, desc, valor }) {
+  return (
+    <div className="flex items-start gap-3 p-4 rounded-xl border border-white/10 bg-white/[0.04] backdrop-blur-xl"
+      data-testid={`stack-${title.toLowerCase().replace(/\s+/g,'-')}`}>
+      <div className="w-10 h-10 rounded-lg bg-white/10 grid place-items-center shrink-0">
+        <Icon size={20} className="text-white" weight="duotone" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-baseline justify-between gap-2">
+          <h4 className="text-white font-semibold text-sm">{title}</h4>
+          <span className="text-xs font-mono text-zinc-400">Valor {valor}</span>
+        </div>
+        <p className="text-xs text-zinc-400 mt-0.5 leading-relaxed">{desc}</p>
+      </div>
+    </div>
+  );
+}
+
+// -----------------------------------------------------------------------
+// FUNNEL PAGE
+// -----------------------------------------------------------------------
+export default function FunnelPage() {
+  useEffect(() => {
+    document.title = "Litper Connect — Recupera pedidos en oficina, baja devoluciones";
+    // Prefer night on the landing (works with existing theme toggle)
+    if (!localStorage.getItem("theme")) {
+      document.documentElement.classList.add("matrix-night");
+    }
+  }, []);
+
+  const deadline = useMemo(() => nextDeadline(), []);
+  const cd = useCountdown(deadline);
+  const formRef = useRef(null);
+  const scrollToForm = () => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+
+  const stack = [
+    { icon: PhoneCall,   title: "IA de llamadas Sofía (hasta 5 intentos)",
+      desc: "Voz de mujer colombiana clonada. Confirma la recogida en oficina antes de que expire el plazo del transportador.",
+      valor: "$3.900.000" },
+    { icon: WhatsappLogo, title: "WhatsApp automático (Chatea Pro)",
+      desc: "Fallback inteligente con plantillas 'Reclamo en Oficina' y 'No Oficina' según los días restantes.",
+      valor: "$1.500.000" },
+    { icon: Clock,       title: "Semáforo por transportadora",
+      desc: "Rojo/Amarillo/Verde según los días máximos por carrier (Servientrega 8d, Envía 1d, TCC 3d, etc.).",
+      valor: "$900.000" },
+    { icon: ChartLineUp, title: "Dashboard de recuperación",
+      desc: "Cuánto recaudaste que se iba a devolver. KPI por día, transportadora, vendedor.",
+      valor: "$1.200.000" },
+    { icon: Robot,       title: "Copiloto IA (multi-LLM)",
+      desc: "Groq, Gemini, Claude enrutados según la tarea. Habla en español, ejecuta acciones internas.",
+      valor: "$2.000.000" },
+    { icon: Package,     title: "Importador Dropi combo-safe",
+      desc: "Un pedido con 3 líneas en Dropi se importa como UNA orden con el recaudo correcto. Sin inflar ventas.",
+      valor: "$600.000" },
+  ];
+
+  return (
+    <div className="min-h-screen text-white bg-[var(--bg-primary)] relative overflow-x-hidden">
+      <Toaster position="top-right" richColors theme="dark" />
+      <MatrixRain />
+
+      {/* NAV */}
+      <header className="sticky top-0 z-30 backdrop-blur-xl bg-black/40 border-b border-white/10">
+        <div className="max-w-6xl mx-auto flex items-center justify-between px-5 py-3">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded bg-gradient-to-br from-white/25 to-white/5 border border-white/20 grid place-items-center">
+              <Sparkle size={16} weight="fill" className="text-white" />
+            </div>
+            <div className="leading-tight">
+              <div className="font-semibold text-sm text-white">Litper Connect</div>
+              <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-400">Recovery Engine</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <Link to="/app" className="text-[11px] font-mono uppercase tracking-widest text-zinc-400 hover:text-white transition"
+              data-testid="funnel-nav-login">
+              <LockKey size={12} className="inline mr-1" /> Entrar
+            </Link>
+            <ThemeToggle />
+          </div>
+        </div>
+      </header>
+
+      {/* HERO */}
+      <section className="relative max-w-6xl mx-auto px-5 pt-16 pb-20 md:pt-24 md:pb-28">
+        <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-mono uppercase tracking-widest text-zinc-300 mb-6"
+          data-testid="funnel-hero-badge">
+          <Fire size={12} className="text-orange-400" weight="fill" />
+          Lanzamiento — Cupos fundadores limitados
+        </div>
+        <h1 className="text-4xl sm:text-5xl md:text-6xl font-semibold text-white leading-[1.05] tracking-tight max-w-4xl"
+          data-testid="funnel-hero-headline">
+          Recupera los pedidos <span className="italic text-zinc-300">represados</span> en oficina.<br/>
+          Baja tus devoluciones <span className="text-white">sin contratar más gente.</span>
+        </h1>
+        <p className="mt-6 text-base md:text-lg text-zinc-300 max-w-2xl leading-relaxed"
+          data-testid="funnel-hero-subhead">
+          Litper Connect es la IA que llama con voz humana + WhatsApp automático para
+          confirmar tus COD antes de que el transportador los devuelva. Diseñado para
+          e‑commerce en Colombia, Ecuador y Chile.
+        </p>
+
+        <div className="mt-8 flex flex-col sm:flex-row items-center gap-3">
+          <Button onClick={scrollToForm}
+            className="h-12 px-6 btn-cta-grad font-semibold text-sm"
+            data-testid="funnel-hero-cta">
+            Quiero entrar al Grupo VIP <ArrowRight size={16} weight="bold" />
+          </Button>
+          <a href="#value-stack" className="h-12 px-4 grid place-items-center rounded-md text-sm text-zinc-300 hover:text-white transition">
+            Ver qué incluye ↓
+          </a>
+        </div>
+
+        {/* Trust bar */}
+        <div className="mt-10 flex flex-wrap gap-x-6 gap-y-2 text-[11px] font-mono uppercase tracking-widest text-zinc-500">
+          <span className="flex items-center gap-1.5"><CheckCircle size={12} className="text-green-400" /> 12 transportadoras integradas</span>
+          <span className="flex items-center gap-1.5"><CheckCircle size={12} className="text-green-400" /> Voces IA de mujer colombiana</span>
+          <span className="flex items-center gap-1.5"><CheckCircle size={12} className="text-green-400" /> Chatea Pro · Twilio · Telnyx · DIDWW</span>
+          <span className="flex items-center gap-1.5"><CheckCircle size={12} className="text-green-400" /> Import Dropi combo-safe</span>
+        </div>
+
+        {/* Value equation callout */}
+        <div className="mt-14 grid md:grid-cols-4 gap-3">
+          {[
+            ["+38%", "Recuperación en oficina"],
+            ["−24%", "Devoluciones evitadas"],
+            ["<3 min", "Setup por transportadora"],
+            ["24/7", "Sofía llama sin dormir"],
+          ].map(([k, v]) => (
+            <div key={v} className="rounded-xl border border-white/10 bg-white/[0.04] backdrop-blur-xl px-4 py-4"
+              data-testid={`funnel-stat-${v.toLowerCase().replace(/\s+/g,'-')}`}>
+              <div className="text-2xl font-semibold text-white">{k}</div>
+              <div className="text-[11px] font-mono uppercase tracking-widest text-zinc-400 mt-1">{v}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* PROBLEM / AGITATE */}
+      <section className="max-w-4xl mx-auto px-5 pb-16">
+        <div className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-xl p-6 md:p-10">
+          <h2 className="text-2xl md:text-3xl font-semibold text-white mb-4">
+            Cada pedido que se devuelve te cuesta el doble.
+          </h2>
+          <p className="text-zinc-300 leading-relaxed">
+            Cuando un COD queda "en oficina", el reloj corre: Envía te da 1 día, TCC 3,
+            Servientrega 8. Si tu equipo no llama y confirma la recogida, el paquete
+            se devuelve y pagas transporte de ida y vuelta, además de perder la venta.
+            Multiplícalo por 200 pedidos al mes y son millones tirados.
+          </p>
+          <p className="text-zinc-100 font-medium mt-4">
+            Litper Connect resuelve exactamente esto — con IA que llama y WhatsApp automático.
+          </p>
+        </div>
+      </section>
+
+      {/* VALUE STACK */}
+      <section id="value-stack" className="max-w-6xl mx-auto px-5 pb-16">
+        <div className="text-center mb-10">
+          <div className="text-[11px] font-mono uppercase tracking-[0.25em] text-zinc-400 mb-2">La Grand Slam Offer</div>
+          <h2 className="text-3xl md:text-4xl font-semibold text-white">Todo lo que llevas al cerrar hoy</h2>
+        </div>
+        <div className="grid md:grid-cols-2 gap-3">
+          {stack.map((s) => <StackItem key={s.title} {...s} />)}
+        </div>
+
+        {/* PRICE MATH */}
+        <div className="mt-10 rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.06] to-white/[0.02] backdrop-blur-xl p-6 md:p-8"
+          data-testid="funnel-price-math">
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <div className="text-[11px] font-mono uppercase tracking-widest text-zinc-400 mb-2">Valor total</div>
+              <div className="text-3xl font-semibold text-white line-through decoration-red-400/80 decoration-2">
+                $10.100.000 <span className="text-sm font-normal text-zinc-400">COP / setup</span>
+              </div>
+              <div className="text-xs text-zinc-400 mt-1">(si lo construyeras y contrataras por separado)</div>
+            </div>
+            <div>
+              <div className="text-[11px] font-mono uppercase tracking-widest text-zinc-400 mb-2">Precio fundador</div>
+              <div className="text-4xl md:text-5xl font-semibold text-white">
+                $497.000 <span className="text-sm font-normal text-zinc-400">COP / mes</span>
+              </div>
+              <div className="text-xs text-emerald-300 mt-1">Sube a $997.000 al cerrar el cupo fundador.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* GARANTIA */}
+      <section className="max-w-4xl mx-auto px-5 pb-16">
+        <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.06] backdrop-blur-xl p-6 md:p-10 flex items-start gap-4"
+          data-testid="funnel-guarantee">
+          <div className="w-12 h-12 rounded-xl bg-emerald-500/15 grid place-items-center shrink-0">
+            <ShieldCheck size={26} className="text-emerald-300" weight="duotone" />
+          </div>
+          <div>
+            <h3 className="text-xl md:text-2xl font-semibold text-white mb-2">
+              Garantía "Se paga solo o no pagas."
+            </h3>
+            <p className="text-zinc-300 leading-relaxed">
+              Si en <b>30 días</b> Litper Connect no te recupera pedidos suficientes para
+              pagar el sistema, te devolvemos el 100%. Sin excusas. Sin letras chicas.
+              Nosotros llevamos el riesgo — porque el producto ya está probado.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* BONOS */}
+      <section className="max-w-6xl mx-auto px-5 pb-16">
+        <div className="text-center mb-6">
+          <div className="text-[11px] font-mono uppercase tracking-[0.25em] text-zinc-400 mb-2">Bonos por entrar hoy</div>
+          <h2 className="text-3xl md:text-4xl font-semibold text-white">3 bonos exclusivos fundador</h2>
+        </div>
+        <div className="grid md:grid-cols-3 gap-3">
+          {[
+            { icon: WhatsappLogo, title: "Plantillas de WhatsApp aprobadas",
+              desc: "Reclamo en Oficina · No Oficina · Cambio de Dirección — probadas y aprobadas por Chatea Pro."},
+            { icon: Users, title: "Onboarding 1:1 con nuestro equipo",
+              desc: "Setup completo (transportadoras, voces, cadencia, importador) en menos de 3 horas."},
+            { icon: Trophy, title: "Acceso al Grupo VIP en WhatsApp",
+              desc: "Publicamos actualizaciones, benchmarks y prompts. Networking con otros e-commerce."},
+          ].map((b) => (
+            <div key={b.title} className="rounded-xl border border-white/10 bg-white/[0.04] backdrop-blur-xl p-5"
+              data-testid={`funnel-bonus-${b.title.toLowerCase().split(' ')[0]}`}>
+              <b.icon size={22} className="text-white mb-2" weight="duotone" />
+              <h4 className="text-white font-semibold text-sm mb-1">{b.title}</h4>
+              <p className="text-xs text-zinc-400 leading-relaxed">{b.desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* SCARCITY */}
+      <section className="max-w-4xl mx-auto px-5 pb-16">
+        <div className="rounded-2xl border border-amber-500/25 bg-amber-500/[0.05] backdrop-blur-xl p-6 md:p-8"
+          data-testid="funnel-scarcity">
+          <div className="flex items-center gap-2 mb-3">
+            <Timer size={18} className="text-amber-300" weight="duotone" />
+            <span className="text-[11px] font-mono uppercase tracking-[0.25em] text-amber-200">Cupo fundador cierra en</span>
+          </div>
+          <div className="grid grid-cols-4 gap-2 max-w-md">
+            {[["d", cd.d], ["h", cd.h], ["m", cd.m], ["s", cd.s]].map(([lbl, val]) => (
+              <div key={lbl} className="rounded-lg bg-black/40 border border-white/10 py-3 text-center">
+                <div className="text-3xl md:text-4xl font-semibold text-white font-mono">
+                  {String(val).padStart(2, "0")}
+                </div>
+                <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-400">{lbl}</div>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-zinc-400 mt-4">
+            Después el precio fundador expira y sube a $997.000/mes.
+          </p>
+        </div>
+      </section>
+
+      {/* CTA FORM */}
+      <section ref={formRef} id="vip" className="max-w-3xl mx-auto px-5 pb-24">
+        <div className="rounded-3xl border border-white/15 bg-gradient-to-b from-white/[0.08] to-white/[0.02] backdrop-blur-xl p-6 md:p-10 shadow-[0_0_80px_rgba(90,200,250,0.08)]">
+          <div className="text-center mb-6">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/30 px-3 py-1 text-[11px] font-mono uppercase tracking-widest text-zinc-300 mb-4">
+              <Lightning size={12} className="text-yellow-300" weight="fill" />
+              Grupo VIP · WhatsApp
+            </div>
+            <h3 className="text-3xl md:text-4xl font-semibold text-white">
+              Reserva tu plaza fundadora
+            </h3>
+            <p className="text-sm text-zinc-300 mt-2">
+              Déjanos tus datos. Te avisamos por WhatsApp cuando abrimos onboarding y te enviamos el link del grupo VIP.
+            </p>
+          </div>
+          <VipForm />
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="border-t border-white/10 py-8 text-center text-xs text-zinc-500">
+        <div className="max-w-6xl mx-auto px-5">
+          Litper Connect · Hecho en Colombia · COD LATAM ·
+          <Link to="/app" className="text-zinc-400 hover:text-white transition ml-1"
+            data-testid="funnel-footer-login">Panel operadores</Link>
+        </div>
+      </footer>
+    </div>
+  );
+}

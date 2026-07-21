@@ -12,8 +12,10 @@ import {
 import { Switch } from "../components/ui/switch";
 import {
   Robot, PaperPlaneRight, Plus, TrashSimple, Wrench,
-  CheckCircle, WarningCircle, User, Lightning, Sparkle
+  CheckCircle, WarningCircle, User, Lightning, Sparkle,
+  Queue, ClockCountdown, Warning, ChartLineUp,
 } from "@phosphor-icons/react";
+import { useNavigate } from "react-router-dom";
 import MatrixRain from "../components/MatrixRain";
 import ThemeToggle from "../components/ThemeToggle";
 
@@ -96,8 +98,8 @@ function ThreadsPanel({ threads, activeId, onSelect, onNew, onDelete }) {
     <aside className="w-64 shrink-0 border-r border-zinc-800 bg-zinc-950/70 flex flex-col h-screen sticky top-0">
       <div className="p-4 border-b border-zinc-800">
         <Button onClick={onNew} data-testid="copilot-new-thread"
-          className="w-full bg-white text-black hover:bg-zinc-200 rounded-sm h-9">
-          <Plus size={14} className="mr-1" /> Nuevo chat
+          className="w-full btn-cta-grad rounded-sm h-9">
+          <Plus size={14} className="mr-1" /> Nueva conversación
         </Button>
       </div>
       <div className="flex-1 overflow-y-auto">
@@ -132,6 +134,7 @@ function ThreadsPanel({ threads, activeId, onSelect, onNew, onDelete }) {
 }
 
 export default function CopilotPage() {
+  const navigate = useNavigate();
   const [threads, setThreads] = useState([]);
   const [activeId, setActiveId] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -267,25 +270,60 @@ export default function CopilotPage() {
         <div ref={scrollRef} className="flex-1 overflow-y-auto px-8">
           <div className="max-w-3xl mx-auto py-6">
             {messages.length === 0 && !running && (
-              <div className="py-16 text-center">
-                <div className="w-14 h-14 mx-auto mb-4 rounded-sm bg-zinc-800 border border-zinc-700 flex items-center justify-center">
-                  <Robot size={28} className="text-white" weight="duotone" />
+              <div className="py-12 text-center">
+                {/* 3D glowing mascot ring */}
+                <div className="mx-auto mascot-ring mb-8" data-testid="copilot-mascot">
+                  <Robot size={72} className="text-white drop-shadow-[0_0_10px_rgba(90,200,250,0.6)]" weight="duotone" />
                 </div>
-                <h1 className="text-2xl font-semibold text-white mb-2">¿En qué te ayudo hoy?</h1>
-                <p className="text-sm text-zinc-400 mb-8">Puedo consultar la cola, programar cadencias, enviar WhatsApp y crear tickets — usando datos reales del Hub.</p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-left max-w-xl mx-auto">
-                  {skills.map(s => (
-                    <button key={s.id} onClick={() => applySkill(s)}
-                      data-testid={`copilot-skill-quick-${s.trigger}`}
-                      className="border border-zinc-800 hover:border-zinc-600 bg-zinc-900/50 hover:bg-zinc-900 p-4 rounded-sm text-left transition group">
-                      <div className="text-sm font-medium text-white mb-1 flex items-center gap-2">
-                        <Sparkle size={13} className="text-zinc-500 group-hover:text-white" />
-                        {s.name}
-                      </div>
-                      <div className="text-xs text-zinc-500 line-clamp-2">{s.description}</div>
-                    </button>
+
+                <h1 className="text-3xl md:text-4xl font-semibold text-white mb-3 tracking-tight"
+                    data-testid="copilot-greeting">
+                  Hola, soy <span className="neon-text">Marcus</span>{" "}
+                  <span className="text-white">— Tu agente logístico COD.</span>
+                </h1>
+                <p className="text-sm text-zinc-400 mb-10 max-w-lg mx-auto">
+                  Consulto la cola, programo cadencias, envío WhatsApp y creo tickets — con datos reales del Hub.
+                </p>
+
+                {/* 4 quick action cards */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-3xl mx-auto mb-10">
+                  {[
+                    { icon: Queue, label: "Semáforo",   sub: "Ver cola prioritaria",
+                      to: "/app/queue", testId: "quick-semaforo" },
+                    { icon: ClockCountdown, label: "Vencimientos", sub: "Oficina — deadline",
+                      to: "/app/cadence", testId: "quick-vencimientos" },
+                    { icon: Warning, label: "Novedades", sub: "Estatus por carrier",
+                      to: "/app/novedades", testId: "quick-novedades" },
+                    { icon: ChartLineUp, label: "Recuperación", sub: "KPI del día",
+                      to: "/app/metrics", testId: "quick-recuperacion" },
+                  ].map((q) => (
+                    <div key={q.label} className="zx-suggest-card text-left"
+                         onClick={() => navigate(q.to)}
+                         data-testid={q.testId}>
+                      <q.icon size={22} className="text-white mb-2" weight="duotone" />
+                      <div className="text-sm font-semibold text-white">{q.label}</div>
+                      <div className="text-[11px] text-zinc-400 mt-0.5">{q.sub}</div>
+                    </div>
                   ))}
                 </div>
+
+                {/* Skill chips */}
+                {skills.length > 0 && (
+                  <div className="max-w-2xl mx-auto">
+                    <div className="text-[10px] uppercase tracking-widest font-mono text-zinc-500 mb-3">
+                      Skills — haz clic para usar
+                    </div>
+                    <div className="flex flex-wrap gap-2 justify-center">
+                      {skills.map((s) => (
+                        <button key={s.id} onClick={() => applySkill(s)}
+                          className="zx-skill-chip"
+                          data-testid={`copilot-skill-quick-${s.trigger}`}>
+                          <Sparkle size={11} weight="fill" /> {s.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
             {messages.map(m => <MessageBubble key={m.id} m={m} />)}
@@ -327,7 +365,7 @@ export default function CopilotPage() {
                 </div>
                 <Button onClick={send} disabled={!input.trim() || running}
                   data-testid="copilot-send"
-                  className="bg-white text-black hover:bg-zinc-200 rounded-sm h-8">
+                  className="btn-cta-grad rounded-sm h-8 text-white">
                   <PaperPlaneRight size={13} className="mr-1" /> Enviar
                 </Button>
               </div>

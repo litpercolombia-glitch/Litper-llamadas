@@ -2,14 +2,25 @@ import axios from "axios";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
-// The public API key is exposed here BY DESIGN (this is an internal admin dashboard
-// consumed by trusted operators). Rotate PUBLIC_API_KEY server-side to invalidate.
-const API_KEY = "litper_hub_pk_2026_prod_ChangeMe_9x2Kf7bQvE4mLnT8sZ3H";
+// The operator API key is entered at /login (see LoginPage). We fall back to
+// a public hardcoded key ONLY for pre-login (public funnel) so screenshots +
+// health can still work; the sensitive endpoints require the header regardless.
+const FALLBACK_KEY = "litper_hub_pk_2026_prod_ChangeMe_9x2Kf7bQvE4mLnT8sZ3H";
+
+function currentKey() {
+  if (typeof window === "undefined") return FALLBACK_KEY;
+  return localStorage.getItem("litper_operator_key") || FALLBACK_KEY;
+}
 
 export const api = axios.create({
   baseURL: `${BACKEND_URL}/api`,
-  headers: { "X-API-Key": API_KEY },
   timeout: 20000,
+});
+
+api.interceptors.request.use((config) => {
+  config.headers = config.headers || {};
+  config.headers["X-API-Key"] = currentKey();
+  return config;
 });
 
 export const semaforoStyles = {

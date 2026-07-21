@@ -55,7 +55,12 @@ html.matrix-night, :root {
   --border:       #26292E;
   --border-strong:#3A3D42;
   --accent:       var(--accent-night);
-  --rain-opacity: 0.10;
+  --accent-glow:  0 0 24px rgba(90, 200, 250, 0.35),
+                  0 0 60px rgba(100, 210, 255, 0.18);
+  --accent-glow-strong: 0 0 32px rgba(90, 200, 250, 0.55),
+                        0 0 90px rgba(100, 210, 255, 0.30);
+  --gradient-cta: linear-gradient(135deg, #E8EAED 0%, #5AC8FA 55%, #B673F5 100%);
+  --rain-opacity: 0.18;
   --metallic-gradient: linear-gradient(145deg, #1A1D21 0%, #121417 50%, #0D0F12 100%);
   --metallic-highlight: rgba(255, 255, 255, 0.08);
   --shadow-elev: 0 1px 0 rgba(255,255,255,0.05) inset,
@@ -75,7 +80,12 @@ html.matrix-day {
   --border:       #E3E5E9;
   --border-strong:#D9DCE1;
   --accent:       var(--accent-day);
-  --rain-opacity: 0.04;
+  --accent-glow:  0 0 20px rgba(10, 132, 255, 0.22),
+                  0 0 44px rgba(10, 132, 255, 0.10);
+  --accent-glow-strong: 0 0 26px rgba(10, 132, 255, 0.35),
+                        0 0 60px rgba(10, 132, 255, 0.16);
+  --gradient-cta: linear-gradient(135deg, #1D1F23 0%, #0A84FF 55%, #6B4CE6 100%);
+  --rain-opacity: 0.05;
   --metallic-gradient: linear-gradient(145deg, #FFFFFF 0%, #F0F1F4 50%, #E3E5E9 100%);
   --metallic-highlight: rgba(255, 255, 255, 0.9);
   --shadow-elev: 0 1px 0 rgba(255,255,255,0.9) inset,
@@ -273,3 +283,127 @@ main, aside, header, footer, .relative-above {
   border: 1px solid var(--border);
   padding: 6px 10px;
 }
+
+/* ================================================================
+   ZYNEX-inspired: neon glow, 3D mascot ring, gradient CTAs
+   Adds premium "neon 3D command console" depth to Silver Matrix.
+   ================================================================ */
+
+/* Gradient CTA button — silver → cyan → magenta glow */
+.btn-cta-grad {
+  background: var(--gradient-cta);
+  background-size: 200% 100%;
+  color: #0B0C0E;
+  box-shadow: var(--accent-glow), 0 6px 20px rgba(0,0,0,0.35);
+  transition: background-position 400ms ease, box-shadow 200ms ease,
+              transform 120ms ease;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+.btn-cta-grad:hover {
+  background-position: 100% 0%;
+  box-shadow: var(--accent-glow-strong), 0 10px 30px rgba(0,0,0,0.45);
+}
+.btn-cta-grad:active { transform: translateY(1px); }
+html.matrix-day .btn-cta-grad { color: #FFFFFF; }
+
+/* Soft neon glow around any element (nav active, logo, mascot) */
+.neon-glow      { box-shadow: var(--accent-glow); }
+.neon-glow-strong { box-shadow: var(--accent-glow-strong); }
+.neon-text {
+  color: var(--accent);
+  text-shadow: 0 0 12px color-mix(in oklab, var(--accent) 55%, transparent),
+               0 0 28px color-mix(in oklab, var(--accent) 25%, transparent);
+}
+
+/* Active sidebar link — draw a neon-cyan border + inner glow */
+aside a[aria-current="page"],
+aside a.active-nav {
+  box-shadow: inset 3px 0 0 var(--accent),
+              0 0 0 1px color-mix(in oklab, var(--accent) 25%, transparent),
+              0 0 22px -6px color-mix(in oklab, var(--accent) 60%, transparent);
+  background: color-mix(in oklab, var(--accent) 10%, var(--surface)) !important;
+}
+
+/* Mascot ring — glowing halo around a circular avatar */
+.mascot-ring {
+  position: relative;
+  width: 156px; height: 156px;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 30% 30%, rgba(255,255,255,0.85), rgba(255,255,255,0.05) 55%),
+    radial-gradient(circle at 65% 70%, color-mix(in oklab, var(--accent) 55%, transparent), transparent 65%),
+    var(--metallic-gradient);
+  box-shadow:
+    0 0 60px color-mix(in oklab, var(--accent) 40%, transparent),
+    0 0 140px color-mix(in oklab, var(--accent) 20%, transparent),
+    inset 0 1px 0 rgba(255,255,255,0.35),
+    inset 0 -10px 30px rgba(0,0,0,0.35);
+  display: grid;
+  place-items: center;
+  isolation: isolate;
+  animation: mascot-float 6s ease-in-out infinite;
+}
+.mascot-ring::before {
+  content: "";
+  position: absolute; inset: -8px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in oklab, var(--accent) 45%, transparent);
+  box-shadow: 0 0 24px color-mix(in oklab, var(--accent) 55%, transparent);
+  animation: mascot-pulse 3s ease-in-out infinite;
+}
+.mascot-ring::after {
+  content: "";
+  position: absolute; inset: -22px;
+  border-radius: 999px;
+  border: 1px dashed color-mix(in oklab, var(--accent) 25%, transparent);
+  animation: mascot-spin 22s linear infinite;
+}
+@keyframes mascot-float {
+  0%, 100% { transform: translateY(0px); }
+  50%      { transform: translateY(-6px); }
+}
+@keyframes mascot-pulse {
+  0%, 100% { opacity: 0.45; transform: scale(1); }
+  50%      { opacity: 1;    transform: scale(1.03); }
+}
+@keyframes mascot-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* Suggestion cards on Copilot home (like ZYNEX quick-actions) */
+.zx-suggest-card {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  backdrop-filter: blur(18px) saturate(140%);
+  border-radius: 16px;
+  padding: 18px;
+  transition: transform 220ms ease, box-shadow 220ms ease, border-color 200ms;
+  cursor: pointer;
+}
+.zx-suggest-card:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in oklab, var(--accent) 45%, var(--border));
+  box-shadow: 0 20px 45px rgba(0,0,0,0.35),
+              0 0 32px -8px color-mix(in oklab, var(--accent) 55%, transparent);
+}
+
+/* Skill chip on sidebar */
+.zx-skill-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 10px; border-radius: 999px;
+  font-size: 11px; font-family: "IBM Plex Mono", monospace;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  background: color-mix(in oklab, var(--accent) 6%, var(--surface));
+  cursor: pointer;
+  transition: all 160ms;
+}
+.zx-skill-chip:hover {
+  color: var(--text-primary);
+  border-color: color-mix(in oklab, var(--accent) 50%, var(--border));
+  box-shadow: 0 0 14px -4px color-mix(in oklab, var(--accent) 55%, transparent);
+}
+
+/* Matrix rain a bit brighter in night to match ZYNEX ambiance */
+html.matrix-night .matrix-rain { opacity: var(--rain-opacity); }
