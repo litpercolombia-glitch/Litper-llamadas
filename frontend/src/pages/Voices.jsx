@@ -177,7 +177,7 @@ export default function VoicesPage() {
             <div className="font-mono text-xs text-zinc-300 break-all mb-3">{v.elevenlabs_voice_id}</div>
             {v.description && <p className="text-sm text-zinc-400 mb-3">{v.description}</p>}
             <div className="flex gap-2 flex-wrap">
-              <Button variant="outline" size="sm" onClick={() => preview(v)}
+              <Button variant="outline" size="sm" onClick={() => playPreview(v)}
                 data-testid={`voice-preview-${v.id}`}
                 className="border-zinc-700 bg-transparent rounded-sm text-xs">
                 {playing === v.id

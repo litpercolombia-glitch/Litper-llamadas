@@ -25,6 +25,26 @@ Same as v1.0 plus:
 
 ## Implementation Status
 
+### v1.3 (2026-02-21) — Silver Matrix + Real ElevenLabs + Full Metrics
+- **ElevenLabs wired (real key)** — 6 voices auto-seeded on boot (Sofía CO,
+  Sofía EC, Voz 3-6). New `POST /voices/preview` synthesizes TTS via
+  `POST /text-to-speech/{voice_id}` and returns `audio/mpeg`. Voces page has a
+  "Probar voz" button that plays the sample line. `GET /voices/elevenlabs/available`
+  now returns 38 real voices from the account.
+- **Full KPI dashboard** at `/metrics`: 5 groups (NORTE / Embudo / WhatsApp /
+  Operación / Costos) with target chips + traffic-light coloring, Recharts
+  visualisations, funnel, semaphore bars, cost stacked bars, 14-day trend
+  lines for Recovery Rate and CPR. Filters: date range, country, carrier.
+  Cost model env-driven (`TWILIO_COST_PER_MIN`, `ELEVENLABS_COST_PER_MIN`,
+  `WHATSAPP_COST_PER_MSG`, `LLM_COST_PER_1K`, `USD_TO_COP`, `RTO_BASELINE_PCT`,
+  `COD_MARGIN_PCT`).
+- **"Silver Matrix" full-app redesign**: iPhone 17 Pro Max silver/titanium
+  palette (light + dark modes), day/night toggle (persisted in localStorage),
+  glassmorphism cards with metallic borders + dual 3D shadows, KPI card tilt
+  animation on hover (rotateX/rotateY perspective:800px), silver/cyan Matrix
+  rain canvas background, Inter + IBM Plex Mono fonts, rounded 10-16px, all
+  applied globally via CSS variable overrides — no per-component changes.
+
 ### v1.0 (2026-02-21) — DONE
 - FastAPI + APScheduler + Chatea Pro (abstraction) + optional Supabase mirror.
 - 12 carriers + 7 demo orders seeded.
