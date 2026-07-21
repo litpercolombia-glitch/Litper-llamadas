@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import MatrixRain from "../components/MatrixRain";
 import ThemeToggle from "../components/ThemeToggle";
+import WireframePolyhedron from "../components/WireframePolyhedron";
+import Constellation from "../components/Constellation";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import {
@@ -11,7 +13,8 @@ import { Toaster, toast } from "sonner";
 import {
   Robot, PhoneCall, WhatsappLogo, ChartLineUp, Clock, Package,
   ShieldCheck, Sparkle, Timer, Fire, CheckCircle, Lightning,
-  Trophy, ArrowRight, Users, LockKey,
+  Trophy, ArrowRight, Users, LockKey, Storefront, ShoppingBag,
+  FileXls, GearSix, MetaLogo, PlugsConnected,
 } from "@phosphor-icons/react";
 import { Link } from "react-router-dom";
 
@@ -221,26 +224,50 @@ export default function FunnelPage() {
   ];
 
   return (
-    <div className="min-h-screen text-white bg-[var(--bg-primary)] relative overflow-x-hidden">
+    <div className="min-h-screen text-[var(--text-primary)] bg-[var(--bg-primary)] relative overflow-x-hidden">
       <Toaster position="top-right" richColors theme="dark" />
+      <Constellation density={110} />
       <MatrixRain />
 
+      {/* TOP MARQUEE TICKER */}
+      <div className="marquee relative z-20" data-testid="funnel-marquee">
+        <div className="marquee-inner">
+          {Array.from({ length: 2 }).flatMap((_, r) => [
+            <span key={`a-${r}`}><span className="dot" /> Recupera pedidos represados en oficina</span>,
+            <span key={`b-${r}`}><span className="dot" /> Hasta 5 llamadas IA + fallback WhatsApp</span>,
+            <span key={`c-${r}`}><span className="dot" /> 13 transportadoras integradas</span>,
+            <span key={`d-${r}`}><span className="dot" /> Colombia · Ecuador · Chile</span>,
+            <span key={`e-${r}`}><span className="dot" /> Sofía habla como una colombiana real</span>,
+            <span key={`f-${r}`}><span className="dot" /> Importador Dropi combo-safe</span>,
+          ])}
+        </div>
+      </div>
+
       {/* NAV */}
-      <header className="sticky top-0 z-30 backdrop-blur-xl bg-black/40 border-b border-white/10">
+      <header className="sticky top-0 z-30 backdrop-blur-xl bg-[color-mix(in_oklab,var(--bg-primary)_75%,transparent)] border-b border-[var(--border)]">
         <div className="max-w-6xl mx-auto flex items-center justify-between px-5 py-3">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded bg-gradient-to-br from-white/25 to-white/5 border border-white/20 grid place-items-center">
-              <Sparkle size={16} weight="fill" className="text-white" />
+          <div className="flex items-center gap-2.5">
+            {/* Gradient chevrons logo */}
+            <div className="relative w-9 h-9 grid place-items-center">
+              <div className="absolute inset-0 rounded-lg" style={{ background: "var(--accent-grad)" }} />
+              <div className="absolute inset-[1px] rounded-[7px] bg-[var(--bg-primary)] grid place-items-center">
+                <span className="text-[15px] font-bold grad-text tracking-tight">L</span>
+              </div>
             </div>
             <div className="leading-tight">
-              <div className="font-semibold text-sm text-white">Litper Connect</div>
-              <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-400">Recovery Engine</div>
+              <div className="font-semibold text-sm">Litper <span className="grad-text">Connect</span></div>
+              <div className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-muted)]">Recovery Engine</div>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <Link to="/app" className="text-[11px] font-mono uppercase tracking-widest text-zinc-400 hover:text-white transition"
+          <nav className="hidden md:flex items-center gap-6 text-[13px] text-[var(--text-secondary)]">
+            <a href="#value-stack" className="hover:text-[var(--text-primary)] transition">Funciones</a>
+            <a href="#guarantee"   className="hover:text-[var(--text-primary)] transition">Diagnóstico</a>
+            <a href="#pricing"     className="hover:text-[var(--text-primary)] transition">Precios</a>
+          </nav>
+          <div className="flex items-center gap-2">
+            <Link to="/app" className="text-[11px] font-mono uppercase tracking-widest text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition px-3 py-1.5 rounded-full border border-[var(--border)]"
               data-testid="funnel-nav-login">
-              <LockKey size={12} className="inline mr-1" /> Entrar
+              <LockKey size={12} className="inline mr-1" /> Ingresar
             </Link>
             <ThemeToggle />
           </div>
@@ -248,41 +275,71 @@ export default function FunnelPage() {
       </header>
 
       {/* HERO */}
-      <section className="relative max-w-6xl mx-auto px-5 pt-16 pb-20 md:pt-24 md:pb-28">
-        <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-mono uppercase tracking-widest text-zinc-300 mb-6"
-          data-testid="funnel-hero-badge">
-          <Fire size={12} className="text-orange-400" weight="fill" />
-          Lanzamiento — Cupos fundadores limitados
-        </div>
-        <h1 className="text-4xl sm:text-5xl md:text-6xl font-semibold text-white leading-[1.05] tracking-tight max-w-4xl"
-          data-testid="funnel-hero-headline">
-          Recupera los pedidos <span className="italic text-zinc-300">represados</span> en oficina.<br/>
-          Baja tus devoluciones <span className="text-white">sin contratar más gente.</span>
-        </h1>
-        <p className="mt-6 text-base md:text-lg text-zinc-300 max-w-2xl leading-relaxed"
-          data-testid="funnel-hero-subhead">
-          Litper Connect es la IA que llama con voz humana + WhatsApp automático para
-          confirmar tus COD antes de que el transportador los devuelva. Diseñado para
-          e‑commerce en Colombia, Ecuador y Chile.
-        </p>
+      <section className="relative max-w-6xl mx-auto px-5 pt-14 pb-16 md:pt-20 md:pb-24">
+        <div className="grid md:grid-cols-2 gap-10 items-center">
+          {/* LEFT — copy */}
+          <div>
+            <div className="pill-grad inline-flex items-center gap-2 mb-6" data-testid="funnel-hero-badge">
+              <Fire size={12} weight="fill" /> Lanzamiento · Cupos fundadores
+            </div>
+            <h1 className="text-4xl sm:text-5xl md:text-6xl font-semibold leading-[1.02] tracking-tight"
+              data-testid="funnel-hero-headline">
+              Recupera los pedidos represados en oficina.<br/>
+              <span className="grad-text">Sabe exactamente</span> dónde pierdes plata.
+            </h1>
+            <p className="mt-5 text-[15px] md:text-base text-[var(--text-secondary)] max-w-xl leading-relaxed"
+              data-testid="funnel-hero-subhead">
+              Litper Connect es la IA que llama con voz humana y WhatsApp automático
+              para confirmar tus COD antes de que el transportador los devuelva.
+              Diseñado para e‑commerce en Colombia, Ecuador y Chile.
+            </p>
 
-        <div className="mt-8 flex flex-col sm:flex-row items-center gap-3">
-          <Button onClick={scrollToForm}
-            className="h-12 px-6 btn-cta-grad font-semibold text-sm"
-            data-testid="funnel-hero-cta">
-            Quiero entrar al Grupo VIP <ArrowRight size={16} weight="bold" />
-          </Button>
-          <a href="#value-stack" className="h-12 px-4 grid place-items-center rounded-md text-sm text-zinc-300 hover:text-white transition">
-            Ver qué incluye ↓
-          </a>
+            <div className="mt-7 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+              <Button onClick={scrollToForm}
+                className="h-12 px-6 btn-cta-grad font-semibold text-sm"
+                data-testid="funnel-hero-cta">
+                Quiero entrar al Grupo VIP <ArrowRight size={16} weight="bold" />
+              </Button>
+              <a href="#value-stack" className="h-12 px-2 grid place-items-center text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition">
+                Ver qué incluye ↓
+              </a>
+            </div>
+
+            {/* Trust bar */}
+            <div className="mt-8 flex flex-wrap gap-x-5 gap-y-2 text-[10px] font-mono uppercase tracking-widest text-[var(--text-muted)]">
+              <span className="flex items-center gap-1.5"><CheckCircle size={12} className="text-emerald-400" /> 13 transportadoras</span>
+              <span className="flex items-center gap-1.5"><CheckCircle size={12} className="text-emerald-400" /> Voces IA CO</span>
+              <span className="flex items-center gap-1.5"><CheckCircle size={12} className="text-emerald-400" /> Chatea · Twilio · Telnyx</span>
+              <span className="flex items-center gap-1.5"><CheckCircle size={12} className="text-emerald-400" /> Dropi combo-safe</span>
+            </div>
+          </div>
+
+          {/* RIGHT — 3D wireframe */}
+          <div className="relative flex items-center justify-center min-h-[380px]">
+            <WireframePolyhedron size={380} />
+          </div>
         </div>
 
-        {/* Trust bar */}
-        <div className="mt-10 flex flex-wrap gap-x-6 gap-y-2 text-[11px] font-mono uppercase tracking-widest text-zinc-500">
-          <span className="flex items-center gap-1.5"><CheckCircle size={12} className="text-green-400" /> 12 transportadoras integradas</span>
-          <span className="flex items-center gap-1.5"><CheckCircle size={12} className="text-green-400" /> Voces IA de mujer colombiana</span>
-          <span className="flex items-center gap-1.5"><CheckCircle size={12} className="text-green-400" /> Chatea Pro · Twilio · Telnyx · DIDWW</span>
-          <span className="flex items-center gap-1.5"><CheckCircle size={12} className="text-green-400" /> Import Dropi combo-safe</span>
+        {/* Connector pills */}
+        <div className="mt-14" data-testid="funnel-connector-pills">
+          <div className="text-[10px] font-mono uppercase tracking-[0.25em] text-[var(--text-muted)] mb-3 text-center">
+            Se conecta con tu stack
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            {[
+              { label: "Dropi",       Icon: ShoppingBag },
+              { label: "Meta Ads",    Icon: MetaLogo },
+              { label: "Shopify",     Icon: Storefront },
+              { label: "WhatsApp",    Icon: WhatsappLogo },
+              { label: "Excel / CSV", Icon: FileXls },
+              { label: "Chatea Pro",  Icon: PlugsConnected },
+              { label: "n8n",         Icon: GearSix },
+            ].map(({ label, Icon }) => (
+              <div key={label} className="chip-glass" data-testid={`connector-pill-${label.toLowerCase().replace(/[^a-z0-9]+/g,'-')}`}>
+                <Icon size={14} weight="duotone" /> {label}
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Value equation callout */}
@@ -293,10 +350,10 @@ export default function FunnelPage() {
             ["<3 min", "Setup por transportadora"],
             ["24/7", "Sofía llama sin dormir"],
           ].map(([k, v]) => (
-            <div key={v} className="rounded-xl border border-white/10 bg-white/[0.04] backdrop-blur-xl px-4 py-4"
+            <div key={v} className="rounded-xl border border-[var(--border)] bg-[var(--surface)] backdrop-blur-xl px-4 py-4"
               data-testid={`funnel-stat-${v.toLowerCase().replace(/\s+/g,'-')}`}>
-              <div className="text-2xl font-semibold text-white">{k}</div>
-              <div className="text-[11px] font-mono uppercase tracking-widest text-zinc-400 mt-1">{v}</div>
+              <div className="text-2xl font-semibold grad-text">{k}</div>
+              <div className="text-[11px] font-mono uppercase tracking-widest text-[var(--text-muted)] mt-1">{v}</div>
             </div>
           ))}
         </div>
@@ -331,7 +388,7 @@ export default function FunnelPage() {
         </div>
 
         {/* PRICE MATH */}
-        <div className="mt-10 rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.06] to-white/[0.02] backdrop-blur-xl p-6 md:p-8"
+        <div id="pricing" className="mt-10 rounded-2xl border border-[var(--border)] bg-gradient-to-b from-[color-mix(in_oklab,var(--accent)_10%,var(--surface))] to-[var(--surface)] backdrop-blur-xl p-6 md:p-8"
           data-testid="funnel-price-math">
           <div className="grid md:grid-cols-2 gap-4">
             <div>
@@ -353,17 +410,17 @@ export default function FunnelPage() {
       </section>
 
       {/* GARANTIA */}
-      <section className="max-w-4xl mx-auto px-5 pb-16">
-        <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.06] backdrop-blur-xl p-6 md:p-10 flex items-start gap-4"
-          data-testid="funnel-guarantee">
+      <section id="guarantee" className="max-w-4xl mx-auto px-5 pb-16">
+        <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/[0.05] backdrop-blur-xl p-6 md:p-10 flex items-start gap-4"
+             data-testid="funnel-guarantee">
           <div className="w-12 h-12 rounded-xl bg-emerald-500/15 grid place-items-center shrink-0">
             <ShieldCheck size={26} className="text-emerald-300" weight="duotone" />
           </div>
           <div>
-            <h3 className="text-xl md:text-2xl font-semibold text-white mb-2">
-              Garantía "Se paga solo o no pagas."
+            <h3 className="text-xl md:text-2xl font-semibold mb-2">
+              Garantía <span className="grad-text">"Se paga solo o no pagas."</span>
             </h3>
-            <p className="text-zinc-300 leading-relaxed">
+            <p className="text-[var(--text-secondary)] leading-relaxed">
               Si en <b>30 días</b> Litper Connect no te recupera pedidos suficientes para
               pagar el sistema, te devolvemos el 100%. Sin excusas. Sin letras chicas.
               Nosotros llevamos el riesgo — porque el producto ya está probado.

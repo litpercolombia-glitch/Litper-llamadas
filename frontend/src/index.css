@@ -44,53 +44,66 @@
 }
 
 /* ---------- NIGHT (default) ---------- */
+/* ---------- NIGHT (default) — DARK TITANIUM (not pure black) ---------- */
 html.matrix-night, :root {
-  --bg-primary:   #0B0C0E;
-  --bg-secondary: #15171A;
-  --surface:      rgba(21, 23, 26, 0.72);
-  --surface-solid:#141619;
+  --bg-primary:   #16181C;   /* dark titanium */
+  --bg-secondary: #1D1F23;
+  --surface:      rgba(35, 38, 43, 0.55);
+  --surface-solid:#22252A;
   --text-primary: #E8EAED;
-  --text-secondary: #B9BEC7;
-  --text-muted:   #6B7079;
-  --border:       #26292E;
-  --border-strong:#3A3D42;
+  --text-secondary: #C2C6CD;
+  --text-muted:   #7C8189;
+  --border:       #33363C;
+  --border-strong:#4A4E55;
   --accent:       var(--accent-night);
-  --accent-glow:  0 0 24px rgba(90, 200, 250, 0.35),
-                  0 0 60px rgba(100, 210, 255, 0.18);
-  --accent-glow-strong: 0 0 32px rgba(90, 200, 250, 0.55),
-                        0 0 90px rgba(100, 210, 255, 0.30);
-  --gradient-cta: linear-gradient(135deg, #E8EAED 0%, #5AC8FA 55%, #B673F5 100%);
-  --rain-opacity: 0.18;
-  --metallic-gradient: linear-gradient(145deg, #1A1D21 0%, #121417 50%, #0D0F12 100%);
-  --metallic-highlight: rgba(255, 255, 255, 0.08);
-  --shadow-elev: 0 1px 0 rgba(255,255,255,0.05) inset,
-                 0 -1px 0 rgba(0,0,0,0.4) inset,
-                 0 10px 30px rgba(0,0,0,0.4);
+  --accent-grad:  linear-gradient(135deg, #00D8FF 0%, #0A84FF 33%, #7C5CFF 66%, #C04BFF 100%);
+  --accent-grad-text: linear-gradient(135deg, #64EBFF 0%, #4AA5FF 40%, #A98AFF 75%, #DC93FF 100%);
+  --accent-glow:  0 0 28px rgba(10, 132, 255, 0.45),
+                  0 0 70px rgba(124, 92, 255, 0.25),
+                  0 0 120px rgba(192, 75, 255, 0.12);
+  --accent-glow-strong: 0 0 40px rgba(0, 216, 255, 0.55),
+                        0 0 90px rgba(124, 92, 255, 0.35),
+                        0 0 160px rgba(192, 75, 255, 0.20);
+  --gradient-cta: linear-gradient(135deg, #00D8FF 0%, #0A84FF 40%, #7C5CFF 70%, #C04BFF 100%);
+  --rain-opacity: 0.14;
+  /* Dark titanium sheen: subtle silver highlight through the base */
+  --titanium-sheen: radial-gradient(1200px 800px at 20% 0%, rgba(220,224,230,0.06), transparent 60%),
+                    radial-gradient(1000px 600px at 100% 100%, rgba(160,170,180,0.04), transparent 60%);
+  --metallic-gradient: linear-gradient(145deg, #2A2D33 0%, #1D1F23 50%, #16181C 100%);
+  --metallic-highlight: rgba(255, 255, 255, 0.10);
+  --shadow-elev: 0 1px 0 rgba(255,255,255,0.06) inset,
+                 0 -1px 0 rgba(0,0,0,0.5) inset,
+                 0 10px 30px rgba(0,0,0,0.5);
 }
 
 /* ---------- DAY ---------- */
 html.matrix-day {
-  --bg-primary:   #F2F3F5;
-  --bg-secondary: #FFFFFF;
-  --surface:      rgba(255, 255, 255, 0.78);
+  --bg-primary:   #EDEEF0;   /* brushed titanium light silver */
+  --bg-secondary: #F5F6F8;
+  --surface:      rgba(255, 255, 255, 0.72);
   --surface-solid:#FFFFFF;
-  --text-primary: #1D1F23;
+  --text-primary: #14161A;
   --text-secondary: #3A3D42;
   --text-muted:   #6B7079;
-  --border:       #E3E5E9;
-  --border-strong:#D9DCE1;
+  --border:       #D9DCE1;
+  --border-strong:#C4C8CE;
   --accent:       var(--accent-day);
-  --accent-glow:  0 0 20px rgba(10, 132, 255, 0.22),
-                  0 0 44px rgba(10, 132, 255, 0.10);
-  --accent-glow-strong: 0 0 26px rgba(10, 132, 255, 0.35),
-                        0 0 60px rgba(10, 132, 255, 0.16);
-  --gradient-cta: linear-gradient(135deg, #1D1F23 0%, #0A84FF 55%, #6B4CE6 100%);
-  --rain-opacity: 0.05;
-  --metallic-gradient: linear-gradient(145deg, #FFFFFF 0%, #F0F1F4 50%, #E3E5E9 100%);
+  --accent-grad:  linear-gradient(135deg, #00A3CC 0%, #0A84FF 33%, #6B4CE6 66%, #A63FE0 100%);
+  --accent-grad-text: linear-gradient(135deg, #007A99 0%, #0064D6 40%, #4B29B5 75%, #7A15B0 100%);
+  --accent-glow:  0 0 22px rgba(10, 132, 255, 0.28),
+                  0 0 52px rgba(107, 76, 230, 0.18),
+                  0 0 90px rgba(166, 63, 224, 0.08);
+  --accent-glow-strong: 0 0 32px rgba(10, 132, 255, 0.40),
+                        0 0 70px rgba(107, 76, 230, 0.25);
+  --gradient-cta: linear-gradient(135deg, #00A3CC 0%, #0A84FF 40%, #6B4CE6 70%, #A63FE0 100%);
+  --rain-opacity: 0.06;
+  --titanium-sheen: radial-gradient(1200px 800px at 20% 0%, rgba(255,255,255,0.65), transparent 65%),
+                    radial-gradient(1000px 600px at 100% 100%, rgba(200,210,220,0.35), transparent 60%);
+  --metallic-gradient: linear-gradient(145deg, #F5F6F8 0%, #E2E4E8 50%, #CFD3DA 100%);
   --metallic-highlight: rgba(255, 255, 255, 0.9);
   --shadow-elev: 0 1px 0 rgba(255,255,255,0.9) inset,
                  0 -1px 0 rgba(0,0,0,0.06) inset,
-                 0 8px 24px rgba(120, 130, 150, 0.12);
+                 0 8px 24px rgba(120, 130, 150, 0.14);
 }
 
 body {
@@ -98,14 +111,10 @@ body {
   font-family: "Inter", "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
   -webkit-font-smoothing: antialiased;
   background: var(--bg-primary);
-  background-image: radial-gradient(ellipse 100% 60% at 50% 0%,
-    rgba(90, 200, 250, 0.06), transparent 70%);
+  background-image: var(--titanium-sheen);
+  background-attachment: fixed;
   color: var(--text-primary);
   transition: background 400ms ease, color 400ms ease;
-}
-html.matrix-day body {
-  background-image: radial-gradient(ellipse 100% 60% at 50% 0%,
-    rgba(10, 132, 255, 0.05), transparent 70%);
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -407,3 +416,171 @@ aside a.active-nav {
 
 /* Matrix rain a bit brighter in night to match ZYNEX ambiance */
 html.matrix-night .matrix-rain { opacity: var(--rain-opacity); }
+
+/* ================================================================
+   ZYNEX v2 — Silver base + Cyan→Azure→Violet→Magenta gradient
+   Adds: gradient headline text, 3D wireframe icosahedron,
+   constellation dot-network, marquee ticker, connector pills.
+   ================================================================ */
+
+/* Gradient text (headline "destella") */
+.grad-text {
+  background: var(--accent-grad-text);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 0 30px color-mix(in oklab, var(--accent) 30%, transparent);
+}
+
+/* Upgrade the CTA — glass-morphic border + gradient fill + neon bloom */
+.btn-cta-grad {
+  background: var(--gradient-cta);
+  background-size: 200% 200%;
+  color: #FFFFFF !important;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow: var(--accent-glow),
+              0 8px 26px rgba(0, 0, 0, 0.35),
+              inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  transition: background-position 500ms ease, box-shadow 220ms ease,
+              transform 120ms ease;
+  animation: cta-shimmer 6s ease-in-out infinite;
+}
+.btn-cta-grad:hover {
+  background-position: 100% 100%;
+  box-shadow: var(--accent-glow-strong),
+              0 14px 40px rgba(0,0,0,0.45),
+              inset 0 1px 0 rgba(255,255,255,0.35);
+}
+.btn-cta-grad:active { transform: translateY(1px) scale(0.995); }
+@keyframes cta-shimmer {
+  0%, 100% { background-position: 0% 0%; }
+  50%      { background-position: 100% 100%; }
+}
+
+/* Badge pill with glowing gradient border */
+.pill-grad {
+  position: relative;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-primary);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  isolation: isolate;
+  backdrop-filter: blur(12px);
+}
+.pill-grad::before {
+  content: "";
+  position: absolute; inset: -1px;
+  border-radius: 999px;
+  padding: 1px;
+  background: var(--accent-grad);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  filter: drop-shadow(0 0 10px color-mix(in oklab, var(--accent) 60%, transparent));
+  z-index: -1;
+}
+
+/* Connector chip (glassy pill) */
+.chip-glass {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(14px) saturate(140%);
+  font-size: 12px;
+  color: var(--text-secondary);
+  transition: transform 180ms, border-color 180ms, box-shadow 180ms;
+}
+.chip-glass:hover {
+  transform: translateY(-2px);
+  color: var(--text-primary);
+  border-color: color-mix(in oklab, var(--accent) 40%, var(--border));
+  box-shadow: 0 0 20px -4px color-mix(in oklab, var(--accent) 45%, transparent);
+}
+
+/* Top marquee ticker */
+.marquee {
+  overflow: hidden;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in oklab, var(--bg-secondary) 70%, transparent);
+  backdrop-filter: blur(10px);
+}
+.marquee-inner {
+  display: inline-flex;
+  gap: 3rem;
+  padding: 8px 0;
+  white-space: nowrap;
+  animation: marquee-scroll 42s linear infinite;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.marquee-inner > span {
+  display: inline-flex; align-items: center; gap: 8px;
+}
+.marquee-inner .dot {
+  width: 6px; height: 6px; border-radius: 999px;
+  background: var(--accent-grad);
+  box-shadow: 0 0 12px color-mix(in oklab, var(--accent) 60%, transparent);
+}
+@keyframes marquee-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+/* 3D wireframe icosahedron container (parallax rotation) */
+.wireframe-3d {
+  width: 380px; height: 380px;
+  position: relative;
+  filter: drop-shadow(0 0 40px color-mix(in oklab, var(--accent) 55%, transparent))
+          drop-shadow(0 0 90px color-mix(in oklab, #C04BFF 40%, transparent));
+  transform-style: preserve-3d;
+  animation: wireframe-spin 24s linear infinite;
+}
+.wireframe-3d svg { width: 100%; height: 100%; }
+@keyframes wireframe-spin {
+  from { transform: rotateY(0deg) rotateX(15deg); }
+  to   { transform: rotateY(360deg) rotateX(15deg); }
+}
+/* radial vignette behind the wireframe so it reads on the silver bg */
+.wireframe-vignette {
+  position: absolute; inset: -80px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side,
+              color-mix(in oklab, var(--accent) 22%, transparent) 0%,
+              transparent 70%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Constellation canvas — full-viewport background */
+.constellation-canvas {
+  position: fixed; inset: 0;
+  width: 100vw; height: 100vh;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.7;
+}
+html.matrix-day .constellation-canvas { opacity: 0.42; }
+
+/* Neon rule for the mascot ring (already defined) — override to use gradient */
+.mascot-ring {
+  background:
+    radial-gradient(circle at 30% 30%, rgba(255,255,255,0.9), rgba(255,255,255,0.05) 55%),
+    var(--metallic-gradient);
+}
+.mascot-ring::before {
+  border-color: transparent;
+  background: var(--accent-grad);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  padding: 1px;
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  filter: drop-shadow(0 0 18px color-mix(in oklab, var(--accent) 65%, transparent));
+}

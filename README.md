@@ -45,19 +45,30 @@ integration is configured. `VIP_GROUP_URL` env var provides the WhatsApp
 group invite that appears in the thank-you screen. Admins can list, patch,
 delete and export XLSX at `/api/vip-leads` (with API key).
 
-## Design system — Silver Matrix + ZYNEX neon
+## Design system — Silver Matrix + ZYNEX v2 (neon gradient + 3D)
 
-Base palette is iPhone 17 Silver (silver-tinted dark in night, silver-tinted
-light in day). Overlaid with ZYNEX-inspired neon depth:
+Base palette is iPhone 17 **Silver** — brushed titanium light silver in day,
+dark titanium in night (never pure black). Accent is the ZYNEX gradient:
+`cyan #00D8FF → azure #0A84FF → violet #7C5CFF → magenta #C04BFF` — used on
+gradient headlines (`.grad-text`), primary CTAs (`.btn-cta-grad`), pill
+borders (`.pill-grad`), the 3D wireframe hero, and the mascot ring.
 
+Signature elements from ZYNEX.PRO landing:
+
+- **Top marquee ticker** with stat highlights (`.marquee`).
+- **Nav** with gradient logo mark, Funciones · Diagnóstico · Precios · Ingresar.
+- **3D wireframe icosahedron** hero centerpiece (`<WireframePolyhedron />`)
+  — rotating SVG with cyan→magenta gradient stroke and dual drop-shadow bloom.
+- **Constellation dot-network background** (`<Constellation />`) — canvas of
+  drifting points connected by fading lines, ~18% sparkling "destellos".
+  Visible in night, subtle in day.
 - **Glowing 3D mascot** on Copilot & Login (`.mascot-ring` — animated pulse +
-  slow spin + cyan halo).
-- **Gradient CTAs** — silver → cyan → magenta (`.btn-cta-grad`) with soft
-  bloom on hover.
-- **Neon accent glow** on active nav, buttons, logo.
-- **Suggestion cards** on Copilot home (Semáforo · Vencimientos · Novedades ·
+  slow spin + gradient halo).
+- **Connector chips** (Dropi · Meta Ads · Shopify · WhatsApp · Excel/CSV ·
+  Chatea Pro · n8n) as glassy pills that glow on hover.
+- **4 suggestion cards** on Copilot home (Semáforo · Vencimientos · Novedades ·
   Recuperación) that navigate to the underlying pages.
-- **Skill chips** for the "SKILLS — HAZ CLIC PARA USAR" section.
+- **Skill chips** for "SKILLS — HAZ CLIC PARA USAR".
 
 Toggle day/night via the sun/moon button top-right.
 

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
 import MatrixRain from "../components/MatrixRain";
+import Constellation from "../components/Constellation";
 import ThemeToggle from "../components/ThemeToggle";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -38,8 +39,9 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen grid place-items-center bg-[var(--bg-primary)] text-white relative overflow-hidden">
+    <div className="min-h-screen grid place-items-center bg-[var(--bg-primary)] text-[var(--text-primary)] relative overflow-hidden">
       <Toaster position="top-right" richColors theme="dark" />
+      <Constellation density={70} />
       <MatrixRain />
       <div className="absolute top-4 right-4"><ThemeToggle /></div>
 

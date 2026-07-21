@@ -17,6 +17,7 @@ import {
 } from "@phosphor-icons/react";
 import { useNavigate } from "react-router-dom";
 import MatrixRain from "../components/MatrixRain";
+import Constellation from "../components/Constellation";
 import ThemeToggle from "../components/ThemeToggle";
 
 function ToolCard({ tc }) {
@@ -211,7 +212,8 @@ export default function CopilotPage() {
   const activeSkill = skills.find(s => s.id === skillId);
 
   return (
-    <div className="min-h-screen flex bg-zinc-950 text-zinc-100">
+    <div className="min-h-screen flex bg-zinc-950 text-zinc-100 relative">
+      <Constellation density={55} />
       <MatrixRain />
       <Sidebar />
       <ThreadsPanel threads={threads} activeId={activeId}

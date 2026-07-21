@@ -103,3 +103,14 @@ Same as v1.0 plus:
 ## Deferred
 - Push notifications.
 - SLA/dashboards per carrier over time (novedad recovery rates).
+
+## 2026-02-21 — ZYNEX v2 Design Alignment
+- Full palette refactor: Silver iPhone 17 base (brushed light silver day / dark titanium night, never pure black).
+- Accent = ZYNEX gradient (#00D8FF → #0A84FF → #7C5CFF → #C04BFF) with strong neon bloom.
+- New reusable components:
+  - `WireframePolyhedron` — SVG icosahedron hero centerpiece (rotating, cyan→magenta wireframe, drop-shadow bloom).
+  - `Constellation` — canvas dot-network background with drifting nodes, connecting lines, and ~18% sparkling "destellos". Auto-fades in day mode.
+- Funnel landing rebuilt to ZYNEX.PRO layout: top marquee ticker · gradient logo nav (Funciones/Diagnóstico/Precios/Ingresar) · split-line headline with gradient accent · 3D wireframe on right · connector pills row (Dropi/Meta Ads/Shopify/WhatsApp/Excel-CSV/Chatea Pro/n8n) · Hormozi value stack + guarantee + scarcity + bonuses + VIP capture form.
+- Silver base + gradient neon glow applied consistently to Copilot mascot ring, Login mascot, and all internal pages via Layout constellation background.
+- Screenshots verified: funnel (day + night) + Copilot home (day + night).
+- Tests: iteration_6 = 100% pass. No functionality regression (all data-testids retained + new ones added: `hero-wireframe`, `funnel-marquee`, `funnel-connector-pills`, `connector-pill-*`).

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="1" failures="0" skipped="0" tests="1" time="0.686" timestamp="2026-07-21T22:28:58.673157+00:00" hostname="agent-env-979f7527-2f43-4aef-9666-16efaba9b808"><testcase classname="" name="tests.test_dropi_import" time="0.000"><error message="collection failure">ImportError while importing test module '/app/backend/tests/test_dropi_import.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/usr/local/lib/python3.11/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_dropi_import.py:18: in &lt;module&gt;
+    from dropi_import import parse_sheet, detect_column_map, normalize_carrier
+E   ModuleNotFoundError: No module named 'dropi_import'</error></testcase></testsuite></testsuites>
