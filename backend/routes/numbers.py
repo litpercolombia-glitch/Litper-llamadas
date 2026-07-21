@@ -168,7 +168,8 @@ async def sip_register(payload: SipConnectionIn | None = None):
     res = await get_eleven().register_sip_trunk(
         label=label, address=domain, username=user, password=pw, phone_number=caller)
     if not res.get("ok"):
-        raise HTTPException(502, detail=res)
+        # Return 400 (not 502) so the ingress does not swallow the error detail.
+        raise HTTPException(400, detail={"error": "ElevenLabs SIP register failed", "elevenlabs": res})
     pn_id = res.get("phone_number_id")
     db = get_db()
     rec = ConnectedNumber(
@@ -222,7 +223,7 @@ async def place_test_call(payload: PlaceCallIn):
         phone_number_id=num["elevenlabs_phone_number_id"],
         agent_id=agent_id, to_number=to_num, metadata=metadata)
     if not res.get("ok"):
-        raise HTTPException(502, detail=res)
+        raise HTTPException(400, detail={"error": "ElevenLabs SIP call failed", "elevenlabs": res})
 
     import uuid as _u
     await db.message_log.insert_one({
