@@ -56,14 +56,36 @@ async def dispatch_due_attempts():
                     f"¿Puedes confirmar si lo recogerás hoy?")
 
                 # WhatsApp rule: 0–3 días → reclamo_oficina · +3 → no_oficina
-                from routes.whatsapp import resolve_rule_for_days_left
+                from routes.whatsapp import resolve_rule_for_days_left, window_open
                 rule = await resolve_rule_for_days_left(days_left)
                 template_name = None
                 if rule:
                     template_name = rule.get("template_name")
 
+                # META 24h window enforcement:
+                # If the customer has NOT replied in the last 24h → we MUST use a
+                # template (approved by Meta). Free-form messages will be rejected.
+                is_open, _ = await window_open(phone) if phone else (False, None)
+
                 if phone and chatea.configured:
-                    if template_name:
+                    if not is_open and not template_name:
+                        # Refuse — nothing we can send outside window without a template.
+                        att["status"] = "skipped"
+                        att["result"] = "wa_window_closed_no_template"
+                        att["executed_at"] = now_iso
+                        continue
+                    if template_name and not is_open:
+                        # Force template send (proactive outbound outside window)
+                        params = {
+                            "customer_name": customer_name or "",
+                            "product_name":  product_name  or "",
+                            "days_left":     str(days_left),
+                        }
+                        res = await chatea.send_template(phone, template_name,
+                                                         params=params,
+                                                         language=(rule or {}).get("template_language", "es"))
+                    elif template_name and is_open:
+                        # Window open — still use the template for consistency
                         params = {
                             "customer_name": customer_name or "",
                             "product_name":  product_name  or "",
@@ -73,6 +95,7 @@ async def dispatch_due_attempts():
                                                          params=params,
                                                          language=(rule or {}).get("template_language", "es"))
                     else:
+                        # Window open + no rule → free-form allowed.
                         res = await chatea.send_message(phone, body_text)
                     att["status"] = "dispatched"
                     att["result"] = "whatsapp_sent" if res.get("ok") else "whatsapp_failed"

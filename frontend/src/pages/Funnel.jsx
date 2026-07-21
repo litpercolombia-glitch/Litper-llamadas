@@ -409,6 +409,16 @@ export default function FunnelPage() {
         </div>
       </section>
 
+      {/* PRECIOS — 3 planes con spotlight */}
+      <PricingSection />
+
+      {/* FUNCIONES — grid con tilted cards */}
+      <FeaturesGrid />
+
+      {/* FAQ */}
+      <FaqSection />
+
+
       {/* GARANTIA */}
       <section id="guarantee" className="max-w-4xl mx-auto px-5 pb-16">
         <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/[0.05] backdrop-blur-xl p-6 md:p-10 flex items-start gap-4"
@@ -506,5 +516,231 @@ export default function FunnelPage() {
         </div>
       </footer>
     </div>
+  );
+}
+
+
+// -----------------------------------------------------------------------
+// PRICING
+// -----------------------------------------------------------------------
+function PricingSection() {
+  const [annual, setAnnual] = useState(false);
+
+  const plans = [
+    {
+      name: "Starter", subtitle: "Para probar el sistema.",
+      monthly: 297, annualMul: 10, // 2 meses gratis
+      features: [
+        "1 usuario operador",
+        "Hasta 200 órdenes/mes en cola",
+        "Importador Dropi combo-safe",
+        "WhatsApp + reglas 24h",
+        "1 voz Sofía",
+        "Soporte por email",
+      ],
+      cta: "Empezar",
+      highlight: false,
+    },
+    {
+      name: "Growth", subtitle: "Recomendado. Escala el equipo.",
+      monthly: 497, annualMul: 10,
+      features: [
+        "5 usuarios operadores",
+        "Hasta 2.000 órdenes/mes",
+        "Voces Sofía por país (CO · EC · CL)",
+        "Multi-LLM router (Groq · Claude · Gemini)",
+        "Prompts pro (6-block ElevenLabs)",
+        "Métricas de recuperación",
+        "Onboarding 1:1",
+      ],
+      cta: "Reservar plaza",
+      highlight: true,
+    },
+    {
+      name: "Scale · Fundador", subtitle: "Cupo limitado antes del lanzamiento.",
+      monthly: 997, annualMul: 10,
+      features: [
+        "Usuarios ilimitados",
+        "Órdenes ilimitadas",
+        "Voces custom clonadas (2 incluidas)",
+        "SIP dedicado Telnyx",
+        "Integración custom (Supabase / n8n / Meta Ads)",
+        "Soporte prioritario 24/7",
+        "Precio fundador congelado",
+      ],
+      cta: "Hablar con ventas",
+      highlight: false,
+    },
+  ];
+
+  return (
+    <section id="pricing-plans" className="max-w-6xl mx-auto px-5 pb-16" data-testid="funnel-pricing">
+      <div className="text-center mb-8">
+        <div className="pill-grad inline-flex items-center gap-2 mb-3">
+          <Sparkle size={12} weight="fill" /> Precios
+        </div>
+        <h2 className="text-3xl md:text-4xl font-semibold">
+          Plan simple. <span className="grad-text">ROI inmediato.</span>
+        </h2>
+        <p className="text-sm text-[var(--text-secondary)] max-w-xl mx-auto mt-3">
+          Precios en pesos colombianos (COP), miles. Editables desde el panel — solo son sugerencia.
+        </p>
+        <div className="mt-5 inline-flex rounded-full border border-[var(--border)] p-1 bg-[var(--surface)] backdrop-blur">
+          <button onClick={() => setAnnual(false)}
+            className={`px-4 py-1.5 text-xs rounded-full transition ${!annual ? "bg-[var(--text-primary)] text-[var(--bg-primary)] font-medium" : "text-[var(--text-secondary)]"}`}
+            data-testid="pricing-toggle-monthly">Mensual</button>
+          <button onClick={() => setAnnual(true)}
+            className={`px-4 py-1.5 text-xs rounded-full transition ${annual ? "bg-[var(--text-primary)] text-[var(--bg-primary)] font-medium" : "text-[var(--text-secondary)]"}`}
+            data-testid="pricing-toggle-annual">
+            Anual · <span className="grad-text">2 meses gratis</span>
+          </button>
+        </div>
+      </div>
+
+      <div className="grid md:grid-cols-3 gap-4">
+        {plans.map((p) => {
+          const price = annual ? p.monthly * p.annualMul : p.monthly;
+          return (
+            <div key={p.name}
+              className={`relative rounded-2xl border p-6 backdrop-blur-xl transition
+                ${p.highlight
+                  ? "border-transparent bg-gradient-to-b from-[color-mix(in_oklab,var(--accent)_20%,var(--surface))] to-[var(--surface)]"
+                  : "border-[var(--border)] bg-[var(--surface)]"}`}
+              data-testid={`pricing-plan-${p.name.toLowerCase().replace(/\W+/g,'-')}`}
+              style={p.highlight ? { boxShadow: "0 0 0 1px transparent, 0 20px 60px -20px rgba(10,132,255,0.35)" } : {}}>
+              {p.highlight && (
+                <div className="absolute -top-3 left-6 pill-grad" data-testid="pricing-recommended">
+                  Más popular
+                </div>
+              )}
+              <div className="text-sm text-[var(--text-secondary)]">{p.subtitle}</div>
+              <h3 className={`text-2xl font-semibold mt-1 ${p.highlight ? "grad-text" : ""}`}>{p.name}</h3>
+              <div className="mt-5 flex items-baseline gap-1">
+                <span className="text-4xl font-semibold">${price.toLocaleString("es-CO")}</span>
+                <span className="text-xs text-[var(--text-muted)]">
+                  .000 COP / {annual ? "año" : "mes"}
+                </span>
+              </div>
+              {annual && (
+                <div className="text-[11px] text-emerald-400 mt-1">
+                  Ahorras ${(p.monthly * 2).toLocaleString("es-CO")}.000 vs pagar mensual.
+                </div>
+              )}
+              <ul className="mt-5 space-y-2">
+                {p.features.map((f) => (
+                  <li key={f} className="text-sm text-[var(--text-secondary)] flex items-start gap-2">
+                    <CheckCircle size={14} className="text-emerald-400 mt-0.5 shrink-0" weight="duotone" />
+                    <span>{f}</span>
+                  </li>
+                ))}
+              </ul>
+              <Button
+                onClick={() => document.getElementById("vip")?.scrollIntoView({ behavior: "smooth" })}
+                className={`w-full mt-6 h-11 ${p.highlight ? "btn-cta-grad" : ""}`}
+                variant={p.highlight ? undefined : "outline"}
+                data-testid={`pricing-cta-${p.name.toLowerCase().replace(/\W+/g,'-')}`}>
+                {p.cta} <ArrowRight size={14} weight="bold" />
+              </Button>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+// -----------------------------------------------------------------------
+// FEATURES GRID
+// -----------------------------------------------------------------------
+function FeaturesGrid() {
+  const items = [
+    { Icon: Package,     title: "Importador Dropi combo-safe",
+      desc: "Un pedido con 3 líneas se importa como UNA orden con el recaudo correcto. Adiós al inflado." },
+    { Icon: PhoneCall,   title: "Sofía IA — voz humana colombiana",
+      desc: "Hasta 5 intentos por pedido. Registra el resultado y crea tickets automáticamente." },
+    { Icon: WhatsappLogo, title: "WhatsApp 24h + templates Meta",
+      desc: "Detecta la ventana de 24h. Fuera de ella usa plantillas aprobadas por Chatea Pro." },
+    { Icon: Sparkle,     title: "Prompts pro (6-block ElevenLabs)",
+      desc: "Genera scripts Sofía siguiendo Personalidad / Entorno / Tono / Objetivo / Guardrails / Herramientas." },
+    { Icon: Clock,       title: "Semáforo por transportadora",
+      desc: "Rojo/Amarillo/Verde con los días máximos de cada carrier — Servientrega 8, Envía 1, TCC 3." },
+    { Icon: ChartLineUp, title: "Métricas de recuperación",
+      desc: "Cuánto recuperaste vs cuánto se hubiera devuelto. Por día, carrier y vendedor." },
+  ];
+  return (
+    <section id="features" className="max-w-6xl mx-auto px-5 pb-16" data-testid="funnel-features">
+      <div className="text-center mb-8">
+        <div className="pill-grad inline-flex items-center gap-2 mb-3">
+          <Robot size={12} /> Funciones
+        </div>
+        <h2 className="text-3xl md:text-4xl font-semibold">
+          Todo lo que necesitas para <span className="grad-text">no perder pedidos</span>.
+        </h2>
+      </div>
+      <div className="grid md:grid-cols-3 gap-4">
+        {items.map(({ Icon, title, desc }) => (
+          <div key={title}
+            className="rounded-xl border border-[var(--border)] bg-[var(--surface)] backdrop-blur-xl p-5 transition hover:-translate-y-1"
+            style={{
+              transition: "transform 220ms ease, box-shadow 220ms ease",
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.boxShadow =
+              "0 20px 45px rgba(0,0,0,0.35), 0 0 32px -6px color-mix(in oklab, var(--accent) 55%, transparent)"}
+            onMouseLeave={(e) => e.currentTarget.style.boxShadow = "none"}
+            data-testid={`feature-${title.toLowerCase().split(" ")[0]}`}>
+            <Icon size={22} className="text-white mb-3" weight="duotone" />
+            <h4 className="font-semibold text-white text-sm mb-1">{title}</h4>
+            <p className="text-xs text-[var(--text-secondary)] leading-relaxed">{desc}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// -----------------------------------------------------------------------
+// FAQ
+// -----------------------------------------------------------------------
+function FaqSection() {
+  const [open, setOpen] = useState(0);
+  const faqs = [
+    { q: "¿Funciona con mi cuenta de Chatea Pro / Telnyx / Twilio?",
+      a: "Sí. Cada organización configura sus PROPIAS llaves desde /app/config — encriptadas en el servidor. Nunca las vemos en texto plano." },
+    { q: "¿Sofía puede sonar como una colombiana real?",
+      a: "Sí. Usamos ElevenLabs con voz clonada colombiana. En Growth incluye voces por país (CO/EC/CL). En Scale · Fundador clonamos hasta 2 voces custom." },
+    { q: "¿Y si el cliente no responde en 24h?",
+      a: "Meta cierra la ventana de conversación. Litper detecta esto y automáticamente cambia a plantillas aprobadas — nunca envía mensajes que Meta rechace." },
+    { q: "¿Cuánto tardo en montarlo?",
+      a: "Menos de 3 horas con onboarding 1:1 (incluido en Growth y Scale). Sin onboarding, un operador técnico lo tiene listo en un día." },
+    { q: "¿Puedo probar antes de pagar?",
+      a: "Sí. Únete al Grupo VIP (arriba) y te damos acceso al panel demo con datos reales de prueba." },
+    { q: "¿Y la garantía?",
+      a: "30 días. Si Litper Connect no te recupera pedidos que paguen el sistema, te devolvemos el 100%. Sin letras chicas." },
+  ];
+  return (
+    <section id="faq" className="max-w-3xl mx-auto px-5 pb-16" data-testid="funnel-faq">
+      <div className="text-center mb-6">
+        <div className="pill-grad inline-flex items-center gap-2 mb-3">
+          <ShieldCheck size={12} /> Preguntas frecuentes
+        </div>
+        <h2 className="text-3xl md:text-4xl font-semibold">Antes de decidir</h2>
+      </div>
+      <div className="space-y-2">
+        {faqs.map((f, i) => (
+          <div key={i}
+            className="rounded-xl border border-[var(--border)] bg-[var(--surface)] backdrop-blur"
+            data-testid={`faq-item-${i}`}>
+            <button onClick={() => setOpen(open === i ? -1 : i)}
+              className="w-full text-left px-4 py-3 flex items-center justify-between gap-3">
+              <span className="text-sm font-medium text-white">{f.q}</span>
+              <span className="text-xs text-[var(--text-muted)] font-mono">{open === i ? "−" : "+"}</span>
+            </button>
+            {open === i && (
+              <div className="px-4 pb-3 text-sm text-[var(--text-secondary)] leading-relaxed">{f.a}</div>
+            )}
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }

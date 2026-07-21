@@ -2,7 +2,7 @@ import { NavLink } from "react-router-dom";
 import {
   ChartBar, Queue, ClockCountdown, ChatCircleDots, ListChecks,
   Plugs, Truck, House, Microphone, PhoneCall, Warning, Robot, Sparkle,
-  FileXls, Package, UsersThree, ChatText,
+  FileXls, Package, UsersThree, ChatText, Key,
 } from "@phosphor-icons/react";
 
 const NAV = [
@@ -22,6 +22,7 @@ const NAV = [
   { to: "/app/novedades",  label: "Novedades",     icon: Warning,         testId: "sidebar-nav-novedades" },
   { to: "/app/vip-leads",  label: "Leads VIP",     icon: UsersThree,      testId: "sidebar-nav-vip" },
   { to: "/app/connectors", label: "Conexiones",    icon: Plugs,           testId: "sidebar-nav-connectors" },
+  { to: "/app/config",     label: "Credenciales",  icon: Key,             testId: "sidebar-nav-config" },
 ];
 
 export default function Sidebar() {

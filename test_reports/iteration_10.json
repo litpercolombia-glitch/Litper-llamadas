@@ -1,0 +1,41 @@
+{
+  "summary": "Iteration 10 test: multi-tenant credentials (encrypted), WA 24h window, 6-block prompts, landing pricing/features/FAQ. Backend 14/15 (1 real bug: seeded Sofía CO prompt still on OLD non-6-block structure because seeding uses $setOnInsert). Frontend 100% for all specified flows (9 provider cards, save/test/clear, mask, no plaintext leak, sidebar, pricing plans+toggle, FAQ, CTA scroll to vip-form).",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "GET /api/prompts (seeded Sofía CO)", "issue": "system_prompt still starts with 'Eres Sofía...' (LEGACY) instead of the required '# Personalidad'. Contains forbidden word 'impermeable'. Root cause: /app/backend/server.py:128-132 seeds prompts with `$setOnInsert` — existing docs from previous iterations never get rewritten to the new 6-block structure defined in data.py `_SOFIA_SYSTEM`. Needs one-shot migration or `$set` on version bump.", "priority": "HIGH"}
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Config toast (Probar conexión)", "issue": "After clicking 'Probar conexión', a toast displays 'chatea_pro: [object Object]' — the detail object is not stringified before rendering. Cosmetic but confusing.", "selector": "toast for config-test-chatea_pro", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Landing FAQ", "issues": ["faq-item-0 appears open by default; clicking it did not visibly collapse in my run — accordion open/close toggle may be inverted or accessing wrong sibling. Content is present, so acceptable but worth a review."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration_10.py",
+    "/app/test_reports/pytest/iter10.xml"
+  ],
+  "action_items": [
+    "Force-update seeded Sofía CO/EC prompts on server start (replace $setOnInsert with `$set` on a version key, or drop+reseed) so system_prompt begins with '# Personalidad' and does NOT contain 'impermeable'.",
+    "Fix config `Probar conexión` toast to render detail as string, not '[object Object]'."
+  ],
+  "critical_code_review_comments": [
+    "server.py `_ensure_seed`: using $setOnInsert for PROMPTS means every prompt schema change silently fails to migrate — recommend seed by version key.",
+    "Landing FAQ accordion default state appears expanded — verify controlled state initializer.",
+    "org_credentials: has_value=True when the field only comes from env is by design (combined view). Consider adding `has_org_value` for clearer UX."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration_10.py"
+  ],
+  "success_rate": {"backend": "93% (14/15) + dropi 5/5", "frontend": "100% on tested flows"},
+  "test_credentials": "X-API-Key: litper_hub_pk_2026_prod_ChangeMe_9x2Kf7bQvE4mLnT8sZ3H; frontend operator gate via localStorage litper_operator_ok=1 + litper_operator_key=<PUBLIC_API_KEY>.",
+  "seed_data_creation": "Marked WhatsApp inbound for +573001999888 via /api/whatsapp/contacts/mark-inbound during tests.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "The one remaining backend failure is a seed migration issue in server.py (_ensure_seed uses $setOnInsert). If main agent fixes, re-run backend/tests/test_iteration_10.py::TestPrompts::test_seeded_prompts. All other flows are verified. Verified NO plaintext leak in /api/config/credentials responses (checked via network capture in Playwright).",
+  "rca of the issue": "server.py line ~128: `await db.prompts.update_one({...match...}, {'$setOnInsert': pr}, upsert=True)` only writes on insert. The existing Sofía CO doc was seeded in an earlier iteration with the legacy prompt text. When data.py `_SOFIA_SYSTEM` was rewritten to the 6-block format for v3, the DB was never migrated. Fix: bump a `seed_version` field on PROMPTS_SEED items and use `$set` when the stored version is lower, or delete+reinsert idempotently by (name, scope, country, seed_version)."
+}

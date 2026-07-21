@@ -141,3 +141,84 @@ async def resolve_rule_endpoint(days_left: int):
     if not r:
         return {"matched": False, "days_left": days_left}
     return {"matched": True, "days_left": days_left, "rule": r}
+
+
+# ---------------------------------------------------------------------------
+# 24-HOUR CUSTOMER-CARE WINDOW (Meta rule)
+# ---------------------------------------------------------------------------
+async def window_open(phone: str) -> tuple[bool, dict | None]:
+    """Return (is_open, contact_doc). Window opens on every inbound message
+    and closes 24h later — Meta requires TEMPLATES for proactive sends after
+    that. A template reply from the customer reopens the window."""
+    if not phone:
+        return False, None
+    doc = await get_db().whatsapp_contacts.find_one({"phone": phone}, {"_id": 0})
+    if not doc or not doc.get("last_inbound_at"):
+        return False, doc
+    try:
+        last = datetime.fromisoformat(doc["last_inbound_at"].replace("Z", "+00:00"))
+    except Exception:
+        return False, doc
+    delta = datetime.now(timezone.utc) - last
+    return (delta.total_seconds() < 24 * 3600), doc
+
+
+@router.get("/window/{phone}",
+            summary="Return the 24h window status for a contact (open/closed + remaining).")
+async def window_status(phone: str):
+    from datetime import datetime as _dt, timezone as _tz
+    is_open, doc = await window_open(phone)
+    remaining_seconds = 0
+    last_iso = None
+    if doc and doc.get("last_inbound_at"):
+        try:
+            last = _dt.fromisoformat(doc["last_inbound_at"].replace("Z", "+00:00"))
+            last_iso = doc["last_inbound_at"]
+            elapsed = (_dt.now(_tz.utc) - last).total_seconds()
+            remaining_seconds = max(0, int(24 * 3600 - elapsed))
+        except Exception:
+            pass
+    return {
+        "phone": phone,
+        "window_open": is_open,
+        "last_inbound_at": last_iso,
+        "remaining_seconds": remaining_seconds,
+        "allowed_send_types": ["freeform", "template"] if is_open else ["template"],
+        "notes": ("Ventana ABIERTA (24h). Puedes enviar texto libre O template."
+                  if is_open else
+                  "Ventana CERRADA. Solo templates aprobados por Meta pueden enviarse."),
+    }
+
+
+@router.get("/contacts",
+            summary="List known WhatsApp contacts with their window status.")
+async def list_contacts(limit: int = 200):
+    from datetime import datetime as _dt, timezone as _tz
+    docs = await get_db().whatsapp_contacts.find({}, {"_id": 0}) \
+        .sort("last_inbound_at", -1).limit(limit).to_list(limit)
+    now = _dt.now(_tz.utc)
+    for d in docs:
+        li = d.get("last_inbound_at")
+        d["window_open"] = False
+        d["remaining_seconds"] = 0
+        if li:
+            try:
+                last = _dt.fromisoformat(li.replace("Z", "+00:00"))
+                elapsed = (now - last).total_seconds()
+                d["window_open"] = elapsed < 24 * 3600
+                d["remaining_seconds"] = max(0, int(24 * 3600 - elapsed))
+            except Exception:
+                pass
+    return docs
+
+
+@router.post("/contacts/mark-inbound",
+             summary="Manually mark a contact as having replied (opens the 24h window). "
+                     "Useful for testing.")
+async def mark_inbound(phone: str, body: str = ""):
+    await get_db().whatsapp_contacts.update_one(
+        {"phone": phone},
+        {"$set": {"phone": phone, "last_inbound_at": _iso(),
+                  "last_inbound_body": (body or "manual test")[:400]}},
+        upsert=True)
+    return await window_status(phone)

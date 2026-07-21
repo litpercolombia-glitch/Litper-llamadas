@@ -20,6 +20,7 @@ import ImportPage     from "@/pages/Import";
 import ProductsPage   from "@/pages/Products";
 import VipLeadsPage   from "@/pages/VipLeads";
 import PromptsPage    from "@/pages/Prompts";
+import ConfigPage     from "@/pages/Config";
 import LoginPage      from "@/pages/Login";
 
 // Simple operator gate — checks localStorage token exists.
@@ -59,6 +60,7 @@ function App() {
         <Route path="/app/products"    element={<OperatorGate><ProductsPage /></OperatorGate>} />
         <Route path="/app/vip-leads"   element={<OperatorGate><VipLeadsPage /></OperatorGate>} />
         <Route path="/app/prompts"     element={<OperatorGate><PromptsPage /></OperatorGate>} />
+        <Route path="/app/config"      element={<OperatorGate><ConfigPage /></OperatorGate>} />
 
         {/* Back-compat redirects from old URLs */}
         <Route path="/copilot"    element={<Navigate to="/app" replace />} />

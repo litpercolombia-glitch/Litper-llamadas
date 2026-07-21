@@ -27,9 +27,10 @@ log = logging.getLogger("chatea_pro")
 
 
 class ChateaProClient:
-    def __init__(self):
-        self.api_key = os.environ.get("CHATEA_PRO_API_KEY", "")
-        self.base_url = os.environ.get("CHATEA_PRO_BASE_URL", "https://chateapro.app/api").rstrip("/")
+    def __init__(self, api_key: str | None = None, base_url: str | None = None):
+        self.api_key = (api_key if api_key is not None else os.environ.get("CHATEA_PRO_API_KEY", "")) or ""
+        base = base_url if base_url is not None else os.environ.get("CHATEA_PRO_BASE_URL", "https://chateapro.app/api")
+        self.base_url = base.rstrip("/") if base else "https://chateapro.app/api"
         self.me_path = os.environ.get("CHATEA_PRO_ME_PATH", "/me")
         self.send_text_path = os.environ.get("CHATEA_PRO_SEND_TEXT_PATH", "/subscriber/send-text")
         self.send_template_path = os.environ.get("CHATEA_PRO_SEND_TEMPLATE_PATH",
@@ -210,3 +211,30 @@ def reset_client() -> None:
     """Force a re-read of env vars on next call (used by tests / hot reload)."""
     global _singleton
     _singleton = None
+
+
+# Public alias used by /config/credentials/{provider}/test to instantiate
+# a one-off client with per-org credentials.
+ChateaClient = ChateaProClient
+
+
+# Health-check helper (used by /config credentials test). Adds a `health()`
+# method to any ChateaProClient instance via monkey-patch.
+async def _chatea_health(self) -> dict[str, Any]:
+    if not self.configured:
+        return {"ok": False, "status_code": 0, "error": "API key vacía", "body": None}
+    async with httpx.AsyncClient(timeout=10) as x:
+        try:
+            r = await x.get(f"{self.base_url}{self.me_path}",
+                            headers={"Authorization": f"Bearer {self.api_key}"})
+            body = None
+            try:
+                body = r.json()
+            except Exception:
+                body = r.text[:400]
+            return {"ok": r.status_code < 400, "status_code": r.status_code, "body": body}
+        except Exception as e:  # noqa: BLE001
+            return {"ok": False, "status_code": 0, "error": str(e), "body": None}
+
+
+ChateaProClient.health = _chatea_health  # type: ignore[attr-defined]

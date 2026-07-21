@@ -106,6 +106,15 @@ async def chatea_webhook(
             })
             processed_notes.append("inbound_logged")
 
+            # Update the WhatsApp 24h window for this contact — every inbound
+            # message reopens the free-form window (Meta rule).
+            await db.whatsapp_contacts.update_one(
+                {"phone": phone},
+                {"$set": {"phone": phone, "last_inbound_at": _now(),
+                          "last_inbound_body": text[:400]}},
+                upsert=True)
+            processed_notes.append("wa_window_opened")
+
             # Auto-classify
             low = text.lower()
             action = None
