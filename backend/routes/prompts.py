@@ -203,7 +203,9 @@ Devuelve SOLO el system prompt (sin comentarios ni JSON). Empieza directamente c
 
 @router.post("/generate",
              summary="Ask the LLM router to author a full Sofía script for the given product / carrier / tone. "
-                     "Returns { system_prompt, first_message, model_used }.")
+                     "Returns { system_prompt, first_message, model_used }. "
+                     "If the LLM omits required constraints (antifluido, full flow), we fall back to a "
+                     "template-based script so the output is ALWAYS valid.")
 async def generate_prompt(payload: PromptGenerateIn):
     meta = GENERATE_META.format(
         tono=payload.tono, product=payload.product,
@@ -217,15 +219,37 @@ async def generate_prompt(payload: PromptGenerateIn):
         total_to_pay="{total_to_pay}", guia="{guia}",
         promo_name="{promo_name}", promo_price="{promo_price}",
     )
+    llm_ok = True
+    llm_err: str | None = None
+    text = ""
+    model = "template-fallback"
     try:
         text, model = await llm_router.call(
-            system="Eres un redactor de scripts de call-center e-commerce COD en LATAM.",
+            system=("Eres un redactor de scripts de call-center e-commerce COD en LATAM. "
+                    "Sigue las REGLAS DURAS al pie de la letra. "
+                    "SIEMPRE dices 'antifluido', NUNCA 'impermeable'. "
+                    "Escribe el system prompt COMPLETO con las 6 etapas del FLUJO."),
             messages=[{"role": "user", "content": meta}],
             tier="default", override=payload.model,
             session_id="prompt-generate",
         )
     except Exception as e:  # noqa: BLE001
-        raise HTTPException(502, f"LLM router falló: {e}")
+        llm_ok = False
+        llm_err = str(e)
+
+    # Validation: the output MUST contain 'antifluido' AND either the FLUJO
+    # structure OR be substantially long (>=900 chars). Otherwise we rebuild
+    # from the deterministic template.
+    txt_low = text.lower()
+    is_valid = (
+        llm_ok
+        and "antifluido" in txt_low
+        and "impermeable" not in txt_low
+        and (len(text.strip()) >= 900 or "flujo" in txt_low)
+    )
+    if not is_valid:
+        text = _template_sofia_script(payload)
+        model = f"{model} (template-repaired)" if llm_ok else "template-fallback"
 
     first_message = (
         "Hola, ¿hablo con {customer_first_name}? "
@@ -236,7 +260,45 @@ async def generate_prompt(payload: PromptGenerateIn):
         "system_prompt": text.strip(),
         "first_message": first_message,
         "model_used": model,
+        "llm_error": llm_err,
     }
+
+
+def _template_sofia_script(p: PromptGenerateIn) -> str:
+    """Deterministic Sofía script generator — used when the LLM output is
+    invalid (missing 'antifluido', too short, or contains 'impermeable')."""
+    bene = (p.beneficios or "").strip() or "producto de calidad Litper"
+    obj  = (p.objeciones or "").strip() or "precio, tiempos de entrega, dudas de calidad"
+    carrier = (p.transportadora or "el carrier asignado").strip()
+    tono = (p.tono or "colombiano cálido y directo").strip()
+    return f"""Eres Sofía, la asesora del equipo Litper (Colombia). Llamas a un cliente cuyo pedido de {p.product} está represado en oficina y necesitas que lo reclame ANTES de que se devuelva. Tono {tono}. Español natural. Duración objetivo < 60 segundos. Sé breve.
+
+REGLAS DURAS
+- SIEMPRE di "antifluido" al referirte al producto (NUNCA otras palabras como "im-per-meable").
+- No prometas descuentos que no estén en {{promo_name}}.
+- Confirma identidad ANTES de dar detalles del pedido.
+- Producto y beneficios clave: {bene}.
+
+FLUJO DE LA LLAMADA
+1) Saludo + verifica identidad: "Hola, ¿hablo con {{customer_first_name}}?".
+2) Presenta el tema: "Te llamo del equipo Litper. Tu pedido de {{product_name}} está represado en la oficina de {{carrier_name}} en {{city}} — {{office_address}}."
+3) Urgencia: "Tienes {{days_left}} días para reclamarlo, {{deadline_text}}. Después el paquete se devuelve."
+4) Pide fecha exacta de recogida: "¿Qué día exacto puedes ir a recogerlo?".
+5) Guía + total: "El número de guía es {{guia}}. Total contra entrega: {{total_to_pay}}."
+6) Si el cliente no puede en {{days_left}} días, ofrece ticket de EXTENSIÓN Dropi (hasta 10 días adicionales) y confirma el día exacto.
+
+MANEJO DE OBJECIONES (frecuentes: {obj})
+- "Sí, lo recojo hoy/mañana" → confirma fecha + agradece + cierra: "Perfecto, te esperan con la guía {{guia}}."
+- "En otro día" → pregunta cuál. Si cabe en {{days_left}} días → confirma. Si no → ofrece extensión Dropi (max 10 d) y agenda el día.
+- "Estoy de viaje" → agenda extensión + confirma día exacto de regreso.
+- "Ya no lo quiero" → pregunta la razón. Si es precio, menciona {{promo_name}} a {{promo_price}} si aplica. Si insiste, marca cancelación educada.
+- "Número equivocado" → "Perdona la molestia, gracias por atender." Cierra.
+- "Ya lo recogí" → "¡Perfecto! ¿Me confirmas la guía {{guia}}? Gracias."
+- Silencio / voicemail → deja un mensaje corto de 12 segundos con guía y deadline.
+
+CIERRE
+- Confirma día + guía + agradece por nombre. Menciona el carrier {carrier} para reforzar contexto.
+"""
 
 
 # ---------------------------------------------------------------------------

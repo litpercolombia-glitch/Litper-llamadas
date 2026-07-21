@@ -332,17 +332,19 @@ function PromptEditor({ value, onChange, onSave, onDelete, mode, onModeChange, p
 
           {/* Preview */}
           <div className="pt-3 border-t border-zinc-800">
-            <div className="text-[10px] font-mono uppercase text-zinc-500 mb-2">Vista previa con datos de ejemplo</div>
+            <div className="text-[10px] font-mono uppercase text-zinc-500 mb-2">
+              Vista previa con datos de ejemplo — María · Servientrega · Medellín · guía SGT-987
+            </div>
             <div className="rounded border border-zinc-800 bg-zinc-950/60 p-3 space-y-2 max-h-64 overflow-y-auto">
               {rendered.fm && (
                 <div>
-                  <div className="text-[10px] text-zinc-500 mb-1">First message</div>
-                  <div className="text-xs text-zinc-200" data-testid="prompt-preview-first">{rendered.fm}</div>
+                  <div className="text-[10px] text-zinc-500 mb-1">First message (renderizado)</div>
+                  <div className="text-xs text-emerald-200" data-testid="prompt-preview-first">{rendered.fm}</div>
                 </div>
               )}
               <div>
-                <div className="text-[10px] text-zinc-500 mb-1">System prompt</div>
-                <pre className="text-[11px] text-zinc-300 whitespace-pre-wrap font-mono" data-testid="prompt-preview-system">{rendered.sp}</pre>
+                <div className="text-[10px] text-zinc-500 mb-1">System prompt (renderizado)</div>
+                <pre className="text-[11px] text-zinc-200 whitespace-pre-wrap font-mono" data-testid="prompt-preview-system">{rendered.sp}</pre>
               </div>
             </div>
           </div>

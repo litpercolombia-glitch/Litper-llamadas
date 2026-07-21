@@ -1,0 +1,21 @@
+{
+  "summary": "Retest of iter_8 minor fixes: (1) POST /api/prompts/generate now returns system_prompt containing 'antifluido', no 'impermeable', 'FLUJO' structure text, length>=900 chars OR flujo markers, and at least one {var} placeholder — PASSED. (2) /app/prompts editor preview header explicitly states 'María · Servientrega · Medellín · guía SGT-987' AND the rendered prompt-preview-system substitutes all 4 tokens — PASSED. Full pytest suite 16/16 green, no regressions.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iteration_8.py",
+    "/app/test_reports/pytest/iteration_9.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Optional cleanup: /app/backend/tests/test_dropi_import.py cannot be collected (ModuleNotFoundError: dropi_import) — same pre-existing state as iter_8; not in retest scope but worth adding conftest sys.path adjustment or renaming import."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration_8.py"],
+  "success_rate": {"backend": "100% (16/16)", "frontend": "100%"},
+  "test_credentials": "PUBLIC_API_KEY=litper_hub_pk_2026_prod_ChangeMe_9x2Kf7bQvE4mLnT8sZ3H; frontend gate: localStorage litper_operator_ok=1 + litper_operator_key=<KEY>",
+  "seed_data_creation": "TEST_Sofia Servientrega campaign prompt created & deleted in CRUD test.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter_9 closes both iter_8 minors. Generate endpoint returned model_used with valid content on live LLM call (all 5 assertions: antifluido present, impermeable absent, FLUJO present, length>=900 or flujo markers, at least one {var} placeholder). Frontend preview correctly substitutes María/Servientrega/Medellín/SGT-987 in rendered prompt-preview-system. All 16 pytest tests pass (Prompts CRUD+resolve+generate, Telnyx config/register guardrail, WA rules CRUD+resolve including days_left=999 edge, WA templates proxy, products.match promo regression).",
+  "rca of the issue": "N/A — retest confirmed fixes"
+}

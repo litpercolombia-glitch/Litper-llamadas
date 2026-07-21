@@ -87,17 +87,24 @@ class TestPrompts:
 
     def test_generate_prompt(self):
         payload = {"product": "Protector Antifluido Premium",
-                   "tono": "colombiano cálido",
-                   "transportadora": "Servientrega"}
+                   "tono": "colombiano",
+                   "transportadora": "Servientrega",
+                   "beneficios": "antifluido, doble capa",
+                   "objeciones": "precio, tiempos"}
         r = requests.post(f"{BASE_URL}/api/prompts/generate", headers=H, json=payload, timeout=90)
-        # Both 200 (LLM ok) and 502 (LLM not configured) are acceptable
         if r.status_code == 200:
             data = r.json()
             assert "system_prompt" in data and "first_message" in data and "model_used" in data
-            sp = data["system_prompt"].lower()
+            sp_raw = data["system_prompt"]
+            sp = sp_raw.lower()
             assert "antifluido" in sp, "system_prompt must contain 'antifluido'"
-            # NEVER impermeable
             assert "impermeable" not in sp, "system_prompt must NOT contain 'impermeable'"
+            assert "flujo" in sp, "system_prompt must mention FLUJO structure"
+            assert (len(sp_raw) >= 900) or ("flujo" in sp), "must be >=900 chars or contain FLUJO markers"
+            # placeholder
+            assert ("{customer_first_name}" in sp_raw) or ("{guia}" in sp_raw), \
+                "must contain at least one variable placeholder"
+            print(f"model_used={data.get('model_used')} len={len(sp_raw)}")
         else:
             assert r.status_code == 502, f"unexpected {r.status_code}: {r.text}"
             print(f"LLM router returned 502 as acceptable outcome: {r.text[:200]}")
