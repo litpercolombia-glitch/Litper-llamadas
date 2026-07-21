@@ -1,0 +1,33 @@
+{
+  "summary": "Litper Connect Hub v1.4 backend testing: 19/19 tests passed covering (A) multi-LLM router (5 providers list, groq/mistral/gemini pings, agent /run with groq override + auto routing) and (B) robust webhooks — Chatea delivered event + inbound 'ya_recogio' auto-classify + 'NO' opt-out, Twilio completed (call_sid+duration attached) + no-answer (result=no_contesta,status=done), ElevenLabs confirmed→confirmado + wrong_number→numero_incorrecto with queue advancement, /webhooks/events log, signature verification correctly disabled when secret blank, plus regressions (health, voices=6, novedades=18, /metrics schema).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "GET /api/calls/schedule/{queue_id}",
+        "issue": "Attempt Pydantic model in /app/backend/models.py is missing fields call_sid, duration_seconds, recording_url, transcript, summary. Twilio + ElevenLabs webhooks correctly persist these fields into Mongo (verified via direct DB query) but they are STRIPPED from the HTTP response by response_model=CallSchedule. Data is safe; only the read API projection loses info."
+      }
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_hub_v14.py",
+    "/app/test_reports/pytest/v14.xml"
+  ],
+  "action_items": [
+    "Extend models.Attempt with optional call_sid, duration_seconds, recording_url, transcript, summary fields so GET /api/calls/schedule/{queue_id} exposes the data written by Twilio/ElevenLabs webhooks. (One-line fix in models.py; no schema migration needed.)"
+  ],
+  "critical_code_review_comments": [
+    "Router fallback chain works as designed: Groq → Gemini → Mistral → Cerebras; provider override propagates correctly from /agent/run.",
+    "Signature verification correctly no-ops when *_WEBHOOK_SECRET is blank (safe default for dev).",
+    "webhooks.py auto-classify logic correctly handles ya_recogi/recogí/pasé/listo variants and opt-out keywords (NO/STOP/BAJA/SALIR) with proper cascade to orders.opt_out + call_queue.status=detenido + pending attempts→skipped.",
+    "ElevenLabs webhook delegates to routes.cadence.attempt_result via direct function import — tight coupling but works; consider extracting business logic to a service module for testability.",
+    "Attempt model omissions cause silent data loss on API projection (see minor issue above)."
+  ],
+  "updated_files": ["/app/backend/tests/test_hub_v14.py"],
+  "success_rate": {"backend": "100%"},
+  "seed_data_creation": "Created 4 TEST_ orders during tests (TEST_WH_v14, TEST_WH_OPTOUT, 2x TEST_WH_11L). Auto-enqueued in call_queue with schedules. No cleanup performed — these are isolated with TEST_ prefix.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "test_hub_v14.py covers v1.4 (router+webhooks). Prior files test_hub.py (v1.0, 25) and test_hub_v13.py (v1.3, 24) still valid. Twilio-completed test verifies call_sid/duration via direct Mongo read because Attempt Pydantic model strips those fields on API response — main agent should add call_sid/duration_seconds/recording_url/transcript/summary as Optional fields on Attempt."
+}

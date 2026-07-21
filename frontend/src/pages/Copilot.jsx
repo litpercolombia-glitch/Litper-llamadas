@@ -56,8 +56,13 @@ function MessageBubble({ m }) {
         </div>
       )}
       <div className={`max-w-[85%] ${isUser ? "order-2" : ""}`}>
-        <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-1">
+        <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-1 flex items-center gap-2">
           {isUser ? "Tú" : "Marcus"}
+          {isAssistant && m.provider && (
+            <span className="border border-zinc-700 bg-zinc-800/60 px-1.5 py-0.5 rounded text-[9px] tracking-widest">
+              via {m.provider}
+            </span>
+          )}
         </div>
         {isAssistant && Array.isArray(m.tool_calls) && m.tool_calls.length > 0 && (
           <div className="mb-2">
@@ -132,6 +137,7 @@ export default function CopilotPage() {
   const [messages, setMessages] = useState([]);
   const [skills, setSkills] = useState([]);
   const [skillId, setSkillId] = useState("none");
+  const [modelOverride, setModelOverride] = useState("auto");
   const [autoMode, setAutoMode] = useState(false);
   const [input, setInput] = useState("");
   const [running, setRunning] = useState(false);
@@ -181,6 +187,7 @@ export default function CopilotPage() {
         thread_id: activeId,
         text,
         skill_id: skillId !== "none" ? skillId : undefined,
+        model_override: modelOverride !== "auto" ? modelOverride : undefined,
         auto_mode: autoMode,
       }, { timeout: 120000 });
       if (!activeId) setActiveId(r.data.thread_id);
@@ -221,6 +228,20 @@ export default function CopilotPage() {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              <Select value={modelOverride} onValueChange={setModelOverride}>
+                <SelectTrigger data-testid="copilot-model-select"
+                  className="w-32 bg-zinc-900 border-zinc-800 rounded-sm text-xs font-mono">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-zinc-950 border-zinc-800">
+                  <SelectItem value="auto">Auto</SelectItem>
+                  <SelectItem value="groq">Groq</SelectItem>
+                  <SelectItem value="gemini">Gemini</SelectItem>
+                  <SelectItem value="mistral">Mistral</SelectItem>
+                  <SelectItem value="cerebras">Cerebras</SelectItem>
+                  <SelectItem value="claude">Claude</SelectItem>
+                </SelectContent>
+              </Select>
               <Select value={skillId} onValueChange={setSkillId}>
                 <SelectTrigger data-testid="copilot-skill-select"
                   className="w-56 bg-zinc-900 border-zinc-800 rounded-sm text-sm">

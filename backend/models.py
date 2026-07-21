@@ -324,6 +324,7 @@ class SendMessageIn(BaseModel):
     skill_id: Optional[str] = None
     auto_mode: bool = False
     file_ids: list[str] = []
+    model_override: Optional[str] = None
 
 
 class SkillIn(BaseModel):

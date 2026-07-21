@@ -105,7 +105,8 @@ async def run(payload: SendMessageIn):
     # Run
     result = await run_agent(session_id=tid, history=history, user_text=payload.text,
                              skill_instructions=skill_instructions,
-                             auto_mode=payload.auto_mode)
+                             auto_mode=payload.auto_mode,
+                             model_override=payload.model_override)
 
     # Persist assistant message with tool_calls trace
     tool_calls = []
@@ -115,10 +116,13 @@ async def run(payload: SendMessageIn):
     asst = ChatMessage(thread_id=tid, role="assistant",
                        content=result.get("final_text", ""),
                        tool_calls=tool_calls)
-    await db.chat_messages.insert_one(asst.model_dump())
+    asst_dict = asst.model_dump()
+    asst_dict["provider"] = result.get("provider")
+    await db.chat_messages.insert_one(asst_dict)
     await db.chat_threads.update_one({"id": tid}, {"$set": {"updated_at": _now()}})
 
     return {"thread_id": tid,
             "final_text": result.get("final_text", ""),
+            "provider": result.get("provider"),
             "steps": result.get("steps", []),
             "message_id": asst.id}

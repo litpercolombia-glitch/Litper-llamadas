@@ -16,12 +16,11 @@ blocks OR max iterations reached.
 """
 from __future__ import annotations
 import json
-import os
 import re
 import logging
 from typing import Any
-from emergentintegrations.llm.chat import LlmChat, UserMessage
 
+from .router import call as llm_call, PROVIDERS
 from .tools import execute, tools_prompt_block
 
 log = logging.getLogger("agent")
@@ -66,25 +65,14 @@ HERRAMIENTAS DISPONIBLES:
 
 
 def _api_key() -> str:
-    key = os.environ.get("EMERGENT_LLM_KEY", "").strip()
-    if not key:
-        # Optional fallback env keys
-        for fallback in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY"):
-            v = os.environ.get(fallback)
-            if v:
-                return v
-    return key
+    return "router"  # legacy placeholder; router handles keys per-provider
 
 
-def _new_chat(session_id: str, extra_system: str = "") -> LlmChat:
+def _system_prompt(extra_system: str = "") -> str:
     system = SYSTEM_PROMPT + "\n" + tools_prompt_block()
     if extra_system:
         system += "\n\n--- Skill activada ---\n" + extra_system
-    return LlmChat(
-        api_key=_api_key(),
-        session_id=session_id,
-        system_message=system,
-    ).with_model("anthropic", "claude-sonnet-4-6")
+    return system
 
 
 def _parse_tool_calls(text: str) -> list[dict[str, Any]]:
@@ -107,80 +95,60 @@ def _strip_tool_blocks(text: str) -> str:
 async def run_agent(session_id: str, history: list[dict[str, str]],
                     user_text: str, *, skill_instructions: str = "",
                     max_iterations: int = MAX_ITERATIONS,
-                    auto_mode: bool = False) -> dict[str, Any]:
-    """Run the agent loop for one user turn.
-
-    Returns dict:
-      { 'final_text': str,
-        'steps': [{ 'assistant_text': str,
-                    'tool_calls': [{name, args, result}] }, ...] }
-    """
-    if not _api_key():
-        return {"final_text": "⚠️ No hay LLM key configurada. Añade EMERGENT_LLM_KEY o "
-                              "ANTHROPIC_API_KEY en backend/.env y reinicia.",
-                "steps": []}
-
-    chat = _new_chat(session_id, extra_system=skill_instructions)
-
-    # Replay history so the LLM has context
-    for m in history:
-        role = m.get("role")
-        content = m.get("content") or ""
-        if role and content and role in ("user", "assistant"):
-            # emergentintegrations manages this via session_id when we use send_message
-            # sequentially; but since we're creating a fresh chat, we prepend history
-            # by sending it as a compact context block.
-            pass
-
-    context_prefix = ""
-    if history:
-        joined = "\n\n".join(
-            f"[{m['role']}] {m['content']}" for m in history[-8:]
-            if m.get("role") in ("user", "assistant") and m.get("content")
-        )
-        if joined:
-            context_prefix = f"CONTEXTO PREVIO (resumen breve):\n{joined}\n\n---\n\n"
+                    auto_mode: bool = False,
+                    model_override: str | None = None) -> dict[str, Any]:
+    """Run the agent loop for one user turn."""
+    system = _system_prompt(skill_instructions)
+    conv: list[dict[str, str]] = []
+    for m in history[-10:]:
+        if m.get("role") in ("user", "assistant") and m.get("content"):
+            conv.append({"role": m["role"], "content": m["content"]})
 
     if auto_mode:
-        context_prefix += ("MODO AUTÓNOMO ACTIVADO: ejecuta la petición completa con "
-                           "múltiples herramientas si hace falta y reporta lo hecho.\n\n")
+        user_text = ("MODO AUTÓNOMO: ejecuta la petición completa con múltiples "
+                     "herramientas si hace falta y reporta lo hecho.\n\n") + user_text
 
-    current_user_text = context_prefix + user_text
+    conv.append({"role": "user", "content": user_text})
     steps: list[dict[str, Any]] = []
+    provider_used = None
 
-    for i in range(max_iterations):
-        reply = await chat.send_message(UserMessage(text=current_user_text))
-        assistant_text = reply if isinstance(reply, str) else str(reply)
+    for _ in range(max_iterations):
+        try:
+            tier = "reasoning" if (model_override in ("claude", "gemini")
+                                   or "razona" in (skill_instructions or "").lower()) else "default"
+            assistant_text, provider_used = await llm_call(
+                system, conv, tier=tier, override=model_override,
+                session_id=session_id)
+        except Exception as e:  # noqa: BLE001
+            return {"final_text": f"⚠️ Todos los proveedores LLM fallaron: {e}",
+                    "steps": steps, "provider": None}
 
         calls = _parse_tool_calls(assistant_text)
         visible_text = _strip_tool_blocks(assistant_text)
 
         if not calls:
-            # Final answer.
             steps.append({"assistant_text": visible_text or assistant_text,
-                          "tool_calls": []})
-            return {"final_text": visible_text or assistant_text, "steps": steps}
+                          "tool_calls": [], "provider": provider_used})
+            return {"final_text": visible_text or assistant_text,
+                    "steps": steps, "provider": provider_used}
 
-        # Execute each tool and collect the results
         executed: list[dict[str, Any]] = []
         for c in calls:
             res = await execute(c["name"], c.get("args") or {})
             executed.append({"name": c["name"], "args": c.get("args") or {},
                              "result": res})
+        steps.append({"assistant_text": visible_text, "tool_calls": executed,
+                      "provider": provider_used})
 
-        steps.append({"assistant_text": visible_text, "tool_calls": executed})
-
-        # Build tool_result blocks to feed back
+        conv.append({"role": "assistant", "content": assistant_text})
         blocks = []
         for e in executed:
             payload = json.dumps({"name": e["name"], "result": e["result"]},
                                  ensure_ascii=False, default=str)
-            # Truncate huge results
             if len(payload) > 6000:
                 payload = payload[:6000] + "…(truncado)"
             blocks.append(f"```tool_result\n{payload}\n```")
-        current_user_text = "\n\n".join(blocks)
+        conv.append({"role": "user", "content": "\n\n".join(blocks)})
 
-    # If we hit the iteration cap
-    return {"final_text": "Se alcanzó el máximo de iteraciones. Aquí lo que hice hasta ahora.",
-            "steps": steps}
+    return {"final_text": "Se alcanzó el máximo de iteraciones.",
+            "steps": steps, "provider": provider_used}
