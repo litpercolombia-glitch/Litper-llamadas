@@ -1,0 +1,116 @@
+{
+  "theme": "dark",
+  "archetype": "ARCHETYPE 4: SWISS & HIGH-CONTRAST (Command Center Tactical variant)",
+  "design_philosophy": "Functional brutalism. High data density prioritized over padding. The UI acts as a neutral, high-contrast scaffold for operational data. Color is reserved strictly for status communication (the 'Semaphore' system) and actionable metrics.",
+  "typography": {
+    "strategy": "The Swiss Brutalist - Rigid, highly legible, optimized for data scanning.",
+    "fonts": {
+      "headings": "Work Sans",
+      "body": "IBM Plex Sans",
+      "data_and_numbers": "IBM Plex Mono",
+      "install_command": "yarn add @fontsource/work-sans @fontsource/ibm-plex-sans @fontsource/ibm-plex-mono"
+    },
+    "hierarchy": {
+      "h1": "text-3xl sm:text-4xl tracking-tight font-semibold text-zinc-50",
+      "h2": "text-xl sm:text-2xl tracking-tight font-medium text-zinc-100",
+      "h3": "text-lg font-medium text-zinc-200",
+      "body": "text-sm text-zinc-400 leading-relaxed",
+      "data_labels": "text-xs uppercase tracking-[0.15em] font-medium text-zinc-500 font-mono",
+      "table_data": "text-sm text-zinc-300 font-mono"
+    }
+  },
+  "colors": {
+    "background": {
+      "base": "#09090b",
+      "surface": "#18181b",
+      "surface_hover": "#27272a"
+    },
+    "border": {
+      "default": "#27272a",
+      "focus": "#52525b"
+    },
+    "text": {
+      "primary": "#ffffff",
+      "secondary": "#a1a1aa",
+      "muted": "#71717a"
+    },
+    "brand_primary": "#ffffff",
+    "semaphore_system": {
+      "description": "CRITICAL: Used for 'llamadas a oficina' office status and attempt tracking.",
+      "rojo": {
+        "bg": "bg-red-500/10",
+        "text": "text-red-500",
+        "border": "border-red-500/20",
+        "indicator": "#ef4444"
+      },
+      "amarillo": {
+        "bg": "bg-yellow-500/10",
+        "text": "text-yellow-500",
+        "border": "border-yellow-500/20",
+        "indicator": "#eab308"
+      },
+      "verde": {
+        "bg": "bg-green-500/10",
+        "text": "text-green-500",
+        "border": "border-green-500/20",
+        "indicator": "#22c55e"
+      },
+      "gris": {
+        "bg": "bg-zinc-500/10",
+        "text": "text-zinc-400",
+        "border": "border-zinc-500/20",
+        "indicator": "#71717a"
+      }
+    }
+  },
+  "visual_enhancers": {
+    "surfaces": "GRID BORDERS (The 'Technical' Look). Use border-collapse style layouts for tables and data grids. Expose the skeleton. Cards should have flat backgrounds (bg-zinc-900), 1px subtle borders (border-zinc-800), and NO soft shadows.",
+    "borders": "Crisp 1px borders. Use sharp edges or minimal rounding (rounded-sm or max 4px radius).",
+    "glassmorphism": "Only used for sticky headers or command palettes. bg-zinc-950/80 backdrop-blur-xl border-b border-zinc-800."
+  },
+  "grids_and_layouts": {
+    "overall_structure": "Collapsible Left-Sidebar (240px) + Main Content Area with sticky top header for global filters.",
+    "dashboard_grid": "MODE B: High Density Grid. grid-cols-1 md:grid-cols-3 lg:grid-cols-4 with gap-4 or gap-6. Every pixel must be utilized. Use h-full on children.",
+    "spacing": "Tight density for tables (py-2 px-3). Moderate density for widget containers (p-4 to p-6).",
+    "table_layout": "Compact tables with sticky headers. Horizontal scrolling enabled. Use monospace font for numeric columns (days_left, attempts, phone numbers)."
+  },
+  "components": {
+    "navigation": "Left sidebar with clear active states. Active: bg-zinc-800 text-white border-l-2 border-white. Inactive: text-zinc-400 hover:text-white hover:bg-zinc-800/50.",
+    "cards": "Cardless or 'Grid Borders' style. Flat rectangular blocks with 1px border. No drop shadows. Example: border border-zinc-800 bg-zinc-900/50 p-5.",
+    "badges_and_pills": "Used for Semaphore status. Sharp corners (rounded-sm), utilizing the semaphore_system colors.",
+    "tables": "Shadcn Table. Remove rounded corners on table wrapper. Add border-b border-zinc-800 to rows. Hover: hover:bg-zinc-800/30.",
+    "timeline": "Cadence Timeline View (5-attempt plan) should use vertical line connectors (border-l-2 border-zinc-800) with circle nodes colored by status (Semaphore colors).",
+    "buttons": "Tactical buttons. Sharp corners (rounded-none or rounded-sm). Primary: bg-white text-black hover:bg-zinc-200. Secondary: border border-zinc-700 bg-transparent text-white hover:bg-zinc-800."
+  },
+  "icons": {
+    "library": "@phosphor-icons/react",
+    "install_command": "yarn add @phosphor-icons/react",
+    "style": "Duotone or Regular weight. Size: 18px to 20px. Use for sidebar, actionable table headers, and status indicators."
+  },
+  "motion_and_interactions": {
+    "hover_states": "Crisp, immediate feedback. hover:bg-zinc-800 transition-colors duration-150.",
+    "focus_states": "High contrast focus ring: focus:ring-2 focus:ring-white focus:outline-none.",
+    "micro_interactions": "Subtle -translate-y-[1px] on actionable cards. Table rows should instantly highlight on hover to aid scanning wide datasets."
+  },
+  "accessibility": {
+    "contrast": "Strict APCA/WCAG AA compliance. Dark background with white text ensures readability.",
+    "testing_attributes": "All interactive elements MUST include data-testid. Examples: data-testid='sidebar-nav-queue', data-testid='status-filter-rojo', data-testid='action-cambio-direccion'.",
+    "motion": "Respect prefers-reduced-motion."
+  },
+  "universal_guidelines_for_main_agent": [
+    "NEVER use generic generic gradients or soft, muddy shadows.",
+    "Use Phosphor icons. NEVER use AI emojis (🤖, 🟢, 🔴). Implement actual SVG circles or badges for the semaphore system.",
+    "Ensure the 'Connectors Status Page' has manual 'Test' buttons and visible connection logs.",
+    "Ensure 'Queue Management' table has sorting and robust filtering (by semaphore status).",
+    "DO NOT use a transparent background for headers, modals, or dropdowns. They must be opaque (bg-zinc-950) or blurred.",
+    "Ensure 'Messages Log' visually distinguishes sent (e.g., align right, bg-zinc-800) vs received (align left, bg-zinc-900 border border-zinc-800).",
+    "The UI must be exclusively in Spanish as requested (LATAM context).",
+    "Use Sonner for toasts (yarn add sonner). Configure it to dark theme.",
+    "For charts in 'Metrics Dashboard', use Shadcn charts (Recharts) with stroke colors matching the semaphore palette where applicable."
+  ],
+  "instructions_to_main_agent": {
+    "setup": "Install required fonts, @phosphor-icons/react, recharts, and sonner.",
+    "theming": "Apply dark mode universally. Do not build a light mode toggle; hardcode the dark tactical command center theme by forcing the 'dark' class on the HTML/body.",
+    "implementation_order": "1. Layout Shell (Sidebar + Header). 2. Connectors Status Page. 3. Queue Management (Table + Semaphore). 4. Cadence Timeline & Tasks Management. 5. Metrics Dashboard."
+  }
+}
