@@ -702,7 +702,7 @@ function FeaturesGrid() {
 // FAQ
 // -----------------------------------------------------------------------
 function FaqSection() {
-  const [open, setOpen] = useState(0);
+  const [open, setOpen] = useState(-1);
   const faqs = [
     { q: "¿Funciona con mi cuenta de Chatea Pro / Telnyx / Twilio?",
       a: "Sí. Cada organización configura sus PROPIAS llaves desde /app/config — encriptadas en el servidor. Nunca las vemos en texto plano." },

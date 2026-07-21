@@ -18,6 +18,46 @@ oficina* — before they get returned.
   con instrucciones paso a paso). Every internal route is gated by the
   operator token stored in `localStorage`.
 
+## Multi-tenant credentials (Configuración → Credenciales)
+
+Every organization stores its OWN provider keys — encrypted at rest with
+Fernet (`ENCRYPTION_KEY` in `backend/.env`). The frontend never receives
+plaintext; only status (`origin: org | env | none`) and a masked hint like
+`cp_t…3456`.
+
+Endpoints:
+- `GET /api/config/providers` — schema (field names, labels, secret flags,
+  matching env vars).
+- `GET /api/config/credentials` — per-org non-sensitive status of every
+  provider.
+- `PUT /api/config/credentials/{provider}` — upsert (empty string = clear).
+- `DELETE /api/config/credentials/{provider}` — remove org override (falls
+  back to `.env`).
+- `POST /api/config/credentials/{provider}/test` — live health-check using
+  the effective credentials (org > env > empty).
+
+Multi-tenant hook: an operator can send an `X-Org-Id` header; today every
+request defaults to `org_id="default"` so single-tenant behaviour still works.
+
+Providers supported: `chatea_pro`, `telnyx`, `elevenlabs`, `twilio`, `groq`,
+`gemini`, `mistral`, `cerebras`, `claude`.
+
+## WhatsApp 24h window (Meta rule)
+
+Meta closes the customer-care window 24h after the last inbound message.
+Litper tracks it automatically:
+
+- Chatea webhook updates `whatsapp_contacts.last_inbound_at` on every inbound.
+- `GET /api/whatsapp/window/{phone}` returns
+  `{window_open, remaining_seconds, allowed_send_types}`.
+- The scheduler REFUSES to send free-form messages when the window is
+  closed — it forces a Meta-approved TEMPLATE send via Chatea Pro. If no
+  matching rule (`reclamo_oficina` 0–3d / `no_oficina` +3d) is configured
+  for the days_left value, the attempt is marked `skipped` with
+  `wa_window_closed_no_template`.
+- `POST /api/whatsapp/contacts/mark-inbound?phone=...&body=...` opens the
+  window manually (used for testing).
+
 ## Prompts module (Sofía)
 
 `/api/prompts` CRUD + `/api/prompts/resolve` picks the best-matching prompt

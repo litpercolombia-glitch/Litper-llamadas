@@ -1,0 +1,16 @@
+{
+  "summary": "Retested 3 targeted fixes from iteration_10. All PASSED. Backend seed migration correctly rewrote both Sofía CO/EC prompts to start with '# Personalidad' and no 'impermeable'; all 6 headers present; still only 2 seeded prompts (no duplicates). Frontend Config /Probar conexión toast now JSON-stringifies dict details (no '[object Object]'). Funnel FAQ starts collapsed and toggles correctly.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/test_reports/iteration_11.json"],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "PUBLIC_API_KEY from backend/.env; localStorage seeded (litper_operator_ok=1, litper_operator_key=<KEY>)",
+  "seed_data_creation": "None - used existing seeded Sofía CO/EC prompts",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iteration_11 verified all 3 fixes: (1) GET /api/prompts returns 2 seeded prompts both starting with '# Personalidad', no 'impermeable', all 6 headers present. (2) config-test-chatea_pro click shows toast 'chatea_pro: {\"id\":137403,\"name\":\"jeferson moreno\",\"email\":\"jefer102024@gmail.com\"}' — dict is JSON-stringified. (3) faq-item-0 initial inner text is only the question (58 chars); click expands to 189 chars showing answer; second click collapses back to 58.",
+  "rca of the issue": "N/A - all fixes verified"
+}

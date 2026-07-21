@@ -83,8 +83,12 @@ export default function ConfigPage() {
     setBusy((b) => ({ ...b, [`test-${p}`]: true }));
     try {
       const r = await api.post(`/config/credentials/${p}/test`);
-      if (r.data?.ok) toast.success(`${p}: ${r.data.detail || "OK"}`);
-      else toast.error(`${p}: ${r.data?.detail || "falló"}`);
+      const detail = r.data?.detail;
+      const detailText = (typeof detail === "string")
+        ? detail
+        : (detail ? JSON.stringify(detail).slice(0, 160) : "");
+      if (r.data?.ok) toast.success(`${p}: ${detailText || "OK"}`);
+      else toast.error(`${p}: ${detailText || "falló"}`);
     } catch (e) {
       toast.error(e.response?.data?.detail || "Error probando.");
     } finally {

@@ -123,13 +123,28 @@ async def _ensure_seed():
             upsert=True,
         )
 
-    # Seed the default Sofía global prompt (LIT-LOG-RO flow)
+    # Seed the default Sofía global prompt (LIT-LOG-RO flow — 6-block ElevenLabs).
+    # Force-overwrite if the existing doc is from a legacy structure so upgrades
+    # roll out cleanly without a manual migration.
     from data import PROMPTS_SEED, WHATSAPP_RULES_SEED
     for pr in PROMPTS_SEED:
-        await db.prompts.update_one(
+        existing = await db.prompts.find_one(
             {"name": pr["name"], "scope": pr["scope"], "country": pr.get("country")},
-            {"$setOnInsert": pr}, upsert=True,
+            {"_id": 0, "system_prompt": 1})
+        needs_upgrade = (
+            existing
+            and (not (existing.get("system_prompt") or "").lstrip().startswith("# Personalidad")
+                 or "impermeable" in (existing.get("system_prompt") or "").lower())
         )
+        if existing and needs_upgrade:
+            await db.prompts.update_one(
+                {"name": pr["name"], "scope": pr["scope"], "country": pr.get("country")},
+                {"$set": {"system_prompt": pr["system_prompt"],
+                          "first_message": pr["first_message"],
+                          "variables":     pr["variables"],
+                          "updated_at":    pr["updated_at"]}})
+        elif not existing:
+            await db.prompts.insert_one(pr)
     for rule in WHATSAPP_RULES_SEED:
         await db.whatsapp_rules.update_one(
             {"rule_key": rule["rule_key"]},
