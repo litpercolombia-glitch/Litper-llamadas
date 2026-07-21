@@ -5,8 +5,96 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Textarea } from "../components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
-import { PaperPlaneTilt, ArrowsClockwise, ArrowUpRight, ArrowDownLeft } from "@phosphor-icons/react";
+import { PaperPlaneTilt, ArrowsClockwise, ArrowUpRight, ArrowDownLeft, WhatsappLogo, Warning } from "@phosphor-icons/react";
 import { toast } from "sonner";
+
+// ----- WA Template Rules panel -----
+function WhatsappRulesPanel() {
+  const [templates, setTemplates] = useState([]);
+  const [rules, setRules] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const [t, r] = await Promise.all([
+        api.get("/whatsapp/templates").catch(() => ({ data: { templates: [] } })),
+        api.get("/whatsapp/rules"),
+      ]);
+      setTemplates((t.data?.templates || []).map((x) => x.name || x.template_name || x).filter(Boolean));
+      setRules(r.data || []);
+    } finally { setLoading(false); }
+  };
+  useEffect(() => { load(); }, []);
+
+  const patch = async (id, body) => {
+    await api.patch(`/whatsapp/rules/${id}`, body);
+    load();
+  };
+
+  return (
+    <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 backdrop-blur-md p-4 mb-4"
+      data-testid="wa-rules-panel">
+      <div className="flex items-center gap-2 mb-3">
+        <WhatsappLogo size={16} className="text-green-400" weight="duotone" />
+        <h3 className="text-sm font-semibold text-white">Reglas de plantillas WhatsApp</h3>
+        <span className="text-[10px] font-mono text-zinc-500 ml-auto">
+          {templates.length > 0
+            ? `${templates.length} plantillas Chatea Pro detectadas`
+            : "Chatea Pro no configurado o sin plantillas"}
+        </span>
+      </div>
+      <div className="text-xs text-zinc-400 mb-3">
+        <Warning size={11} className="inline text-amber-400 mr-1" />
+        La regla se aplica automáticamente al enviar el fallback WhatsApp según <b>días restantes en oficina</b>.
+      </div>
+      <div className="space-y-2">
+        {loading && <div className="text-xs text-zinc-500">Cargando reglas…</div>}
+        {rules.map((r) => (
+          <div key={r.id} className="border border-zinc-800 rounded p-3 grid grid-cols-1 md:grid-cols-[160px_1fr_1fr_100px] gap-2 items-center"
+            data-testid={`wa-rule-${r.rule_key}`}>
+            <div>
+              <div className="text-xs text-white font-semibold">{r.rule_key}</div>
+              <div className="text-[10px] font-mono text-zinc-500">
+                {r.days_min}–{r.days_max === 99 ? "+" : r.days_max} días
+              </div>
+            </div>
+            <div>
+              <label className="text-[10px] uppercase text-zinc-500 font-mono">Plantilla Chatea Pro</label>
+              {templates.length > 0 ? (
+                <select
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded text-xs px-2 py-1.5 text-white"
+                  value={r.template_name}
+                  onChange={(e) => patch(r.id, { template_name: e.target.value })}
+                  data-testid={`wa-rule-template-${r.rule_key}`}>
+                  {!templates.includes(r.template_name) && (
+                    <option value={r.template_name}>{r.template_name} (no en Chatea)</option>
+                  )}
+                  {templates.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+              ) : (
+                <Input value={r.template_name} onChange={(e) => patch(r.id, { template_name: e.target.value })}
+                  className="h-8 text-xs" data-testid={`wa-rule-template-${r.rule_key}`} />
+              )}
+            </div>
+            <div>
+              <label className="text-[10px] uppercase text-zinc-500 font-mono">Media URL (imagen)</label>
+              <Input value={r.media_url || ""} placeholder="https://…"
+                onChange={(e) => patch(r.id, { media_url: e.target.value })}
+                className="h-8 text-xs" data-testid={`wa-rule-media-${r.rule_key}`} />
+            </div>
+            <label className="text-xs text-zinc-400 flex items-center gap-2">
+              <input type="checkbox" checked={r.active !== false}
+                onChange={(e) => patch(r.id, { active: e.target.checked })}
+                data-testid={`wa-rule-active-${r.rule_key}`} />
+              Activa
+            </label>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function MessagesPage() {
   const [msgs, setMsgs] = useState([]);
@@ -68,6 +156,7 @@ export default function MessagesPage() {
         </div>
       }
     >
+      <WhatsappRulesPanel />
       <div className="border border-zinc-800 bg-zinc-900/40 divide-y divide-zinc-800">
         {msgs.length === 0 && (
           <div className="py-8 text-center text-zinc-500 text-sm">Sin mensajes aún.</div>

@@ -448,3 +448,83 @@ class VipLead(VipLeadIn):
     status: Literal["nuevo", "contactado", "unido", "descartado"] = "nuevo"
     welcome_sent: bool = False
     welcome_error: Optional[str] = None
+
+
+# ---------- PROMPTS MODULE ----------
+class PromptIn(BaseModel):
+    name: str
+    scope: Literal["global", "product", "campaign"] = "global"
+    country: Optional[Literal["CO", "EC", "CL"]] = None
+    product_id: Optional[str] = None
+    campaign_key: Optional[str] = Field(
+        None, description="Free-form key used to match a campaign (e.g. carrier slug or shopify campaign)")
+    system_prompt: str = Field(..., description="Sofía's full system prompt (Colombian, <60s, antifluido).")
+    first_message: str = Field("", description="Optional opening line.")
+    variables: list[str] = Field(default_factory=list,
+                                 description="Whitelist of allowed variables; UI-only reference.")
+    voice_id: Optional[str] = None
+    active: bool = True
+    priority: int = Field(0, description="Higher wins ties within the same scope.")
+
+
+class Prompt(PromptIn):
+    id: str = Field(default_factory=_uid)
+    created_at: str = Field(default_factory=_now_iso)
+    updated_at: str = Field(default_factory=_now_iso)
+
+
+class PromptUpdate(BaseModel):
+    name: Optional[str] = None
+    scope: Optional[Literal["global", "product", "campaign"]] = None
+    country: Optional[Literal["CO", "EC", "CL"]] = None
+    product_id: Optional[str] = None
+    campaign_key: Optional[str] = None
+    system_prompt: Optional[str] = None
+    first_message: Optional[str] = None
+    variables: Optional[list[str]] = None
+    voice_id: Optional[str] = None
+    active: Optional[bool] = None
+    priority: Optional[int] = None
+
+
+class PromptGenerateIn(BaseModel):
+    product: str
+    beneficios: str = ""
+    objeciones: str = ""
+    transportadora: str = ""
+    tono: str = Field("colombiano cálido y directo",
+                      description="Adjective/style for Sofía's tone.")
+    country: Literal["CO", "EC", "CL"] = "CO"
+    model: Optional[str] = None  # forwarded to the LLM router
+
+
+class PromptResolveIn(BaseModel):
+    order_id: Optional[str] = None
+    product_id: Optional[str] = None
+    country: Optional[Literal["CO", "EC", "CL"]] = None
+    carrier_slug: Optional[str] = None
+
+
+# ---------- WHATSAPP TEMPLATE RULES ----------
+class WhatsappRuleIn(BaseModel):
+    rule_key: Literal["reclamo_oficina", "no_oficina"] = "reclamo_oficina"
+    template_name: str = Field(..., description="Chatea Pro template name (as returned by /whatsapp-template/list)")
+    template_language: str = "es"
+    days_min: int = 0
+    days_max: int = 3
+    media_url: Optional[str] = Field(None, description="Optional image (guía) to attach.")
+    active: bool = True
+    notes: str = ""
+
+
+class WhatsappRule(WhatsappRuleIn):
+    id: str = Field(default_factory=_uid)
+    created_at: str = Field(default_factory=_now_iso)
+    updated_at: str = Field(default_factory=_now_iso)
+
+
+# ---------- TELNYX ----------
+class TelnyxRegisterIn(BaseModel):
+    telnyx_phone_number: Optional[str] = None
+    telnyx_connection_id: Optional[str] = None
+    friendly_name: Optional[str] = None

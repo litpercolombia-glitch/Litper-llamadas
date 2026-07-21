@@ -39,6 +39,7 @@ from routes.skills import router as skills_router  # noqa: E402
 from routes.files import router as files_router  # noqa: E402
 from routes.dropi import router as dropi_router  # noqa: E402
 from routes.products import router as products_router  # noqa: E402
+from routes.prompts import router as prompts_router  # noqa: E402
 from routes.vip import public_router as vip_public_router, admin_router as vip_admin_router  # noqa: E402
 from routes.llm import router as llm_router  # noqa: E402
 
@@ -83,6 +84,8 @@ async def _ensure_seed():
     await db.catalog_products.create_index("id", unique=True)
     await db.vip_leads.create_index("id", unique=True)
     await db.vip_leads.create_index("whatsapp")
+    await db.prompts.create_index("id", unique=True)
+    await db.whatsapp_rules.create_index("id", unique=True)
 
     # Seed novedades (idempotent by carrier+estatus_carrier)
     for n in NOVEDADES_SEED:
@@ -115,6 +118,19 @@ async def _ensure_seed():
             {"nombre": p["nombre"]},
             {"$setOnInsert": p},
             upsert=True,
+        )
+
+    # Seed the default Sofía global prompt (LIT-LOG-RO flow)
+    from data import PROMPTS_SEED, WHATSAPP_RULES_SEED
+    for pr in PROMPTS_SEED:
+        await db.prompts.update_one(
+            {"name": pr["name"], "scope": pr["scope"], "country": pr.get("country")},
+            {"$setOnInsert": pr}, upsert=True,
+        )
+    for rule in WHATSAPP_RULES_SEED:
+        await db.whatsapp_rules.update_one(
+            {"rule_key": rule["rule_key"]},
+            {"$setOnInsert": rule}, upsert=True,
         )
 
 
@@ -177,6 +193,7 @@ api.include_router(skills_router)
 api.include_router(files_router)
 api.include_router(dropi_router)
 api.include_router(products_router)
+api.include_router(prompts_router)
 api.include_router(vip_public_router)
 api.include_router(vip_admin_router)
 api.include_router(llm_router)

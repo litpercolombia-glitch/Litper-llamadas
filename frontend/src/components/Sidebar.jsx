@@ -2,7 +2,7 @@ import { NavLink } from "react-router-dom";
 import {
   ChartBar, Queue, ClockCountdown, ChatCircleDots, ListChecks,
   Plugs, Truck, House, Microphone, PhoneCall, Warning, Robot, Sparkle,
-  FileXls, Package, UsersThree,
+  FileXls, Package, UsersThree, ChatText,
 } from "@phosphor-icons/react";
 
 const NAV = [
@@ -12,6 +12,7 @@ const NAV = [
   { to: "/app/queue",      label: "Cola",          icon: Queue,           testId: "sidebar-nav-queue" },
   { to: "/app/import",     label: "Importar",      icon: FileXls,         testId: "sidebar-nav-import" },
   { to: "/app/products",   label: "Productos",     icon: Package,         testId: "sidebar-nav-products" },
+  { to: "/app/prompts",    label: "Prompts",       icon: ChatText,        testId: "sidebar-nav-prompts" },
   { to: "/app/cadence",    label: "Cadencia",      icon: ClockCountdown,  testId: "sidebar-nav-cadence" },
   { to: "/app/tasks",      label: "Tickets",       icon: ListChecks,      testId: "sidebar-nav-tasks" },
   { to: "/app/messages",   label: "Mensajes",      icon: ChatCircleDots,  testId: "sidebar-nav-messages" },

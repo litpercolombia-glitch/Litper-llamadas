@@ -21,7 +21,7 @@ from typing import List
 from db import get_db
 from deps import require_api_key
 from models import (ConnectedNumber, NumberVerifyStart, NumberVerifyConfirm,
-                    NumberImport, SipConnectionIn, PlaceCallIn)
+                    NumberImport, SipConnectionIn, PlaceCallIn, TelnyxRegisterIn)
 from twilio_client import get_client as get_twilio
 from elevenlabs_client import get_client as get_eleven
 
@@ -240,3 +240,71 @@ async def place_test_call(payload: PlaceCallIn):
     return {"ok": True, "conversation_id": res.get("conversation_id"),
             "to": to_num, "from": num.get("caller_id_number"),
             "voice": (voice or {}).get("name")}
+
+
+# ---------------------------------------------------------------------------
+# TELNYX SIP TRUNK (primary provider going forward — DIDWW/Twilio secondary).
+# ---------------------------------------------------------------------------
+@router.post("/telnyx/register",
+             summary="Register the Telnyx SIP trunk in ElevenLabs so the agent can dial out.")
+async def telnyx_register(payload: TelnyxRegisterIn | None = None):
+    """
+    Uses TELNYX_* env by default; body fields override for one-off setups.
+    Requires:
+      - TELNYX_SIP_USERNAME / TELNYX_SIP_PASSWORD  (SIP credentials for outbound)
+      - TELNYX_SIP_DOMAIN                         (usually sip.telnyx.com)
+      - TELNYX_PHONE_NUMBER                       (E.164 caller ID from the trunk)
+    """
+    caller = (payload.telnyx_phone_number if payload else None) \
+        or os.environ.get("TELNYX_PHONE_NUMBER", "").strip()
+    domain = os.environ.get("TELNYX_SIP_DOMAIN", "sip.telnyx.com").strip()
+    user   = os.environ.get("TELNYX_SIP_USERNAME", "").strip()
+    pw     = os.environ.get("TELNYX_SIP_PASSWORD", "").strip()
+    conn_id = (payload.telnyx_connection_id if payload else None) \
+        or os.environ.get("TELNYX_CONNECTION_ID", "").strip()
+    label  = (payload.friendly_name if payload else None) or f"Litper Telnyx {caller}"
+
+    missing: list[str] = []
+    if not caller: missing.append("TELNYX_PHONE_NUMBER")
+    if not user:   missing.append("TELNYX_SIP_USERNAME")
+    if not pw:     missing.append("TELNYX_SIP_PASSWORD")
+    if missing:
+        raise HTTPException(400, f"Faltan variables en backend/.env: {', '.join(missing)}")
+
+    res = await get_eleven().register_sip_trunk(
+        label=label, address=domain, username=user, password=pw, phone_number=caller)
+    if not res.get("ok"):
+        raise HTTPException(400, detail={"error": "ElevenLabs SIP register failed",
+                                        "elevenlabs": res})
+
+    pn_id = res.get("phone_number_id")
+    db = get_db()
+    rec = ConnectedNumber(
+        phone_number=caller, friendly_name=label, country="CO",
+        provider="telnyx_sip", status="sip_registered",
+        elevenlabs_phone_number_id=pn_id,
+        sip_domain=domain, caller_id_number=caller,
+    )
+    await db.connected_numbers.update_one(
+        {"phone_number": caller, "provider": "telnyx_sip"},
+        {"$set": {**rec.model_dump(),
+                  "telnyx_connection_id": conn_id or None}},
+        upsert=True)
+    return {**rec.model_dump(), "telnyx_connection_id": conn_id or None}
+
+
+@router.get("/telnyx/config",
+            summary="Return the current Telnyx env config (masked) — for the UI.")
+async def telnyx_config():
+    ap = os.environ.get("TELNYX_API_KEY", "")
+    return {
+        "provider": "telnyx",
+        "api_key_present":       bool(ap),
+        "connection_id_present": bool(os.environ.get("TELNYX_CONNECTION_ID")),
+        "phone_number":          os.environ.get("TELNYX_PHONE_NUMBER", ""),
+        "sip_domain":            os.environ.get("TELNYX_SIP_DOMAIN", "sip.telnyx.com"),
+        "sip_username_present":  bool(os.environ.get("TELNYX_SIP_USERNAME")),
+        "sip_password_present":  bool(os.environ.get("TELNYX_SIP_PASSWORD")),
+        # never leak the full key
+        "api_key_masked":        (ap[:4] + "…" + ap[-4:]) if len(ap) > 8 else "",
+    }

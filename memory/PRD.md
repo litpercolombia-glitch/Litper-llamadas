@@ -114,3 +114,9 @@ Same as v1.0 plus:
 - Silver base + gradient neon glow applied consistently to Copilot mascot ring, Login mascot, and all internal pages via Layout constellation background.
 - Screenshots verified: funnel (day + night) + Copilot home (day + night).
 - Tests: iteration_6 = 100% pass. No functionality regression (all data-testids retained + new ones added: `hero-wireframe`, `funnel-marquee`, `funnel-connector-pills`, `connector-pill-*`).
+
+## 2026-02-21 — Completion Round: Prompts + Telnyx + WhatsApp Rules
+- **Prompts module** (Task 2): full CRUD `/api/prompts`, hierarchy resolver (campaign > product > global with country + priority tiebreaker), `POST /prompts/generate` meta-prompt via LLM router (Groq default) that authors a complete Sofía script following the LIT-LOG-RO flow, `POST /prompts/test-voice` returns MP3 via ElevenLabs. Frontend `/app/prompts` with Pegar/Generar tabs, variable chips, live preview. Seeded 2 defaults (Sofía CO + EC).
+- **Telnyx connector** (Task 1): env vars TELNYX_API_KEY / TELNYX_CONNECTION_ID / TELNYX_PHONE_NUMBER / TELNYX_SIP_USERNAME / TELNYX_SIP_PASSWORD / TELNYX_SIP_DOMAIN. `POST /api/numbers/telnyx/register` registers the trunk in ElevenLabs. `GET /api/numbers/telnyx/config` returns masked config. Frontend Conexiones page rewritten with a per-connector "Cómo conectar" step-by-step guide in Spanish + env var chips + Probar button, for: Chatea Pro, Telnyx, ElevenLabs, Twilio, Supabase, Dropi, Groq, Gemini, Claude, Mistral, Cerebras.
+- **WhatsApp template rules** (Task 4): `WhatsappRule` model + `/api/whatsapp/rules` CRUD + `/api/whatsapp/templates` (proxies Chatea Pro). Scheduler wires the rule based on days_left (0–3 → "Reclamo en Oficina", +3 → "No Oficina"). UI: WhatsappRulesPanel embedded on Messages page.
+- Existing combo-safe Dropi import + promotions matching verified live.

@@ -12,10 +12,49 @@ oficina* — before they get returned.
   Grupo VIP capture).
 - `/funnel`         — alias to `/`.
 - `/login`          — operator login (validates the `PUBLIC_API_KEY`).
-- `/app/*`          — internal Command Center (Copilot home, Cola, Cadencia,
-  Métricas, Tickets, Mensajes, Voces, Números, Transportadoras, Novedades,
-  Importar, Productos & Promociones, Leads VIP, Conexiones). Every internal
-  route is gated by the operator token stored in `localStorage`.
+- `/app/*`          — internal Command Center (Copilot, Cola, Cadencia, Métricas,
+  Tickets, Mensajes+WA rules, Voces, Números, Transportadoras, Novedades,
+  Importar, Productos & Promociones, **Prompts**, Leads VIP, **Conexiones**
+  con instrucciones paso a paso). Every internal route is gated by the
+  operator token stored in `localStorage`.
+
+## Prompts module (Sofía)
+
+`/api/prompts` CRUD + `/api/prompts/resolve` picks the best-matching prompt
+using the hierarchy **campaign > product > global** (with country + priority
+tiebreaker). `/api/prompts/generate` calls the LLM router (Groq default) with
+a meta-prompt that produces a full Sofía script following the official
+LIT-LOG-RO flow (verify identity → office claim in {carrier}/{city}/{office_address}
+→ urgency {days_left}/{deadline_text} → ask exact pickup date → offer Dropi
+extension up to 10 days → close with {guia}). Colombian tone, &lt;60s,
+**"antifluido" NEVER "impermeable"**. `/api/prompts/test-voice` returns an
+MP3 preview via ElevenLabs. Frontend `/app/prompts` has Pegar and Generar
+con IA tabs plus a live variable preview.
+
+Allowed variables: `{customer_first_name} {product_name} {carrier_name}
+{city} {office_address} {days_left} {deadline_text} {total_to_pay} {guia}
+{promo_name} {promo_price}`.
+
+## Telnyx SIP (primary) · DIDWW / Twilio (secondary)
+
+Env vars: `TELNYX_API_KEY`, `TELNYX_CONNECTION_ID`, `TELNYX_PHONE_NUMBER`,
+`TELNYX_SIP_USERNAME`, `TELNYX_SIP_PASSWORD`, `TELNYX_SIP_DOMAIN` (defaults
+to `sip.telnyx.com`). `POST /api/numbers/telnyx/register` registers the
+Telnyx trunk into ElevenLabs and stores the returned
+`elevenlabs_phone_number_id`. `GET /api/numbers/telnyx/config` returns masked
+env config for the UI.
+
+## WhatsApp template rules
+
+`/api/whatsapp/templates` proxies Chatea Pro's approved template list.
+`/api/whatsapp/rules` CRUD lets the operator map:
+* **0–3 días** en oficina → template `reclamo_oficina` (+ imagen guía).
+* **+3 días** → template `no_oficina` (urgente + aviso devolución).
+The scheduler picks the matching rule via
+`resolve_rule_for_days_left(days_left)` and fires
+`chatea.send_template(...)` when Chatea Pro is configured.
+
+## Route layout (LEGACY — kept for reference)
 
 Old flat URLs (`/copilot`, `/queue`, `/metrics`, …) redirect to `/app/*`
 automatically so existing links keep working.

@@ -37,18 +37,43 @@ async def dispatch_due_attempts():
                 order = await _order_for_queue(sched["queue_id"])
                 product_name = ""
                 customer_name = ""
+                days_left = 0
                 if order:
                     product_name = (order.get("products_display")
                                     or (order.get("items") or [{}])[0].get("product", "")
                                     or "tu pedido")
                     customer_name = order.get("customer_name", "") or ""
+                # Fetch queue for days_left (semaphore-driven WA rule)
+                q_doc = await db.call_queue.find_one({"id": sched["queue_id"]},
+                                                     {"_id": 0, "days_left": 1})
+                if q_doc and q_doc.get("days_left") is not None:
+                    try: days_left = int(q_doc["days_left"])
+                    except Exception: days_left = 0
                 greet = f"Hola {customer_name}, " if customer_name else "Hola, "
                 body_text = (
                     f"{greet}seguimos pendientes de tu pedido de "
                     f"{product_name or 'la orden'} en oficina. "
                     f"¿Puedes confirmar si lo recogerás hoy?")
+
+                # WhatsApp rule: 0–3 días → reclamo_oficina · +3 → no_oficina
+                from routes.whatsapp import resolve_rule_for_days_left
+                rule = await resolve_rule_for_days_left(days_left)
+                template_name = None
+                if rule:
+                    template_name = rule.get("template_name")
+
                 if phone and chatea.configured:
-                    res = await chatea.send_message(phone, body_text)
+                    if template_name:
+                        params = {
+                            "customer_name": customer_name or "",
+                            "product_name":  product_name  or "",
+                            "days_left":     str(days_left),
+                        }
+                        res = await chatea.send_template(phone, template_name,
+                                                         params=params,
+                                                         language=(rule or {}).get("template_language", "es"))
+                    else:
+                        res = await chatea.send_message(phone, body_text)
                     att["status"] = "dispatched"
                     att["result"] = "whatsapp_sent" if res.get("ok") else "whatsapp_failed"
                     att["executed_at"] = now_iso
@@ -58,7 +83,8 @@ async def dispatch_due_attempts():
                         "direction": "outbound",
                         "channel": "whatsapp",
                         "phone": phone,
-                        "body": body_text,
+                        "body": body_text if not template_name else f"[template:{template_name}] {days_left}d",
+                        "template_name": template_name,
                         "provider": "chatea_pro",
                         "provider_message_id": res.get("provider_message_id"),
                         "status": "sent" if res.get("ok") else "failed",

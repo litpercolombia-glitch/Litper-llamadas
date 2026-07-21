@@ -1,0 +1,37 @@
+{
+  "summary": "iteration_8 (Prompts + Telnyx + WA rules + Regression) tested. Backend: 15/16 pytest pass (the LLM-generated Sofía script is missing the 'antifluido' keyword the meta-prompt demands — quality issue, not a crash). Dropi regression 5/5 pass, products.match promo detection pass. Frontend: /app/prompts, /app/connectors, /app/messages, and funnel landing all render with every required data-testid.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/prompts/generate", "issue": "LLM output does NOT contain the required token 'antifluido' — meta-prompt says 'SIEMPRE antifluido — NUNCA impermeable' but the model (returned 200) omitted it entirely. Meta-prompt may need stronger constraint or a post-generation validation/repair loop. Currently returns a first-message-style short paragraph instead of the FULL LIT-LOG-RO system prompt requested."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/app/prompts editor preview", "issues": ["prompt-preview-system renders the raw system_prompt but does not substitute example variable values in the visible sample text (e.g. no 'María'/'Servientrega'/'Medellín' seen). Not blocking but the spec asked for live rendered preview with example values."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration_8.py",
+    "/app/backend/tests/test_dropi_import.py",
+    "/app/test_reports/pytest/iteration_8.xml"
+  ],
+  "action_items": [
+    "Strengthen /api/prompts/generate meta-prompt or add post-validation so the returned system_prompt always contains 'antifluido' (never 'impermeable') and covers the full LIT-LOG-RO flow, not just the opener.",
+    "Optional: make /app/prompts preview substitute example vars (María/Servientrega/Medellín/…) so operators see the rendered result at a glance."
+  ],
+  "critical_code_review_comments": [
+    "routes/prompts.py: generate() has no server-side guardrail that verifies the LLM output contains 'antifluido' and excludes 'impermeable'. Given this is a NO-NEGOTIABLE brand rule, add a validation pass + retry (or automatic string replace + repair prompt).",
+    "routes/whatsapp.py resolve_rule_for_days_left(): days_left > days_max (e.g. 999) returns no rule. If 'no_oficina' should catch everything ≥4, extend seed to days_max=9999 or add a fallback."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration_8.py"],
+  "success_rate": {"backend": "94% (15/16 pytest incl. dropi regression 5/5)", "frontend": "100%"},
+  "test_credentials": "PUBLIC_API_KEY=litper_hub_pk_2026_prod_ChangeMe_9x2Kf7bQvE4mLnT8sZ3H; frontend gate: localStorage litper_operator_ok=1 + litper_operator_key=<KEY>",
+  "seed_data_creation": "Created & then deleted TEST_Sofia Servientrega campaign prompt during CRUD test. Telnyx env intentionally empty (expected).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "iteration_8 verified: Prompts CRUD+resolve (campaign>global scoring works), Telnyx config masked + register 400 guard-rail, WA rules CRUD+resolve, WA templates proxy (returns configured=true with 10 templates because CHATEA_PRO_API_KEY IS set in .env — spec said 'if empty return empty'; it's set, so we got 10 templates). Frontend: all data-testids present on /app/prompts, /app/connectors, /app/messages, funnel landing. Only real issue: /api/prompts/generate doesn't enforce 'antifluido' in output.",
+  "rca of the issue": "TestPrompts.test_generate_prompt failure — RCA: The meta prompt in routes/prompts.py GENERATE_META contains 'SIEMPRE decir antifluido — NUNCA impermeable' but the LLM (Groq default) returned only an opener paragraph, dropping the antifluido keyword and the full 6-step flow. This is a model-compliance issue. Mitigation: (a) increase temperature=0 / add JSON-schema constraint, (b) after LLM call verify output contains 'antifluido' and does NOT contain 'impermeable'; if it fails, run one repair prompt or fallback to seeded CO prompt, (c) also assert output length > 500 chars to make sure the full LIT-LOG-RO script was authored."
+}
