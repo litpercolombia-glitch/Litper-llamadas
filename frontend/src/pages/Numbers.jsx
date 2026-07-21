@@ -6,14 +6,15 @@ import { Input } from "../components/ui/input";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "../components/ui/select";
-import { Phone, CheckCircle, WarningCircle, ArrowsClockwise } from "@phosphor-icons/react";
+import { Phone, CheckCircle, WarningCircle, ArrowsClockwise, SimCard, Broadcast } from "@phosphor-icons/react";
 import { toast } from "sonner";
 
 const STATUS_CLS = {
-  verified: "border-green-500/30 bg-green-500/10 text-green-400",
-  pending:  "border-yellow-500/30 bg-yellow-500/10 text-yellow-400",
-  failed:   "border-red-500/30 bg-red-500/10 text-red-400",
-  imported: "border-blue-500/30 bg-blue-500/10 text-blue-400",
+  verified:       "border-green-500/30 bg-green-500/10 text-green-400",
+  sip_registered: "border-green-500/30 bg-green-500/10 text-green-400",
+  pending:        "border-yellow-500/30 bg-yellow-500/10 text-yellow-400",
+  failed:         "border-red-500/30 bg-red-500/10 text-red-400",
+  imported:       "border-blue-500/30 bg-blue-500/10 text-blue-400",
 };
 
 export default function NumbersPage() {
@@ -24,12 +25,44 @@ export default function NumbersPage() {
   const [starting, setStarting] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [lastStart, setLastStart] = useState(null);
+  const [provider, setProvider] = useState("twilio");
+  const [sipCfg, setSipCfg] = useState(null);
+  const [sipStatus, setSipStatus] = useState(null);
+  const [registering, setRegistering] = useState(false);
+  const [testCall, setTestCall] = useState({ to: "+57", loading: false });
 
   const load = async () => {
-    const r = await api.get("/numbers");
-    setNumbers(r.data || []);
+    const [n, cfg, st] = await Promise.all([
+      api.get("/numbers"),
+      api.get("/numbers/sip/config").catch(() => ({ data: null })),
+      api.post("/numbers/sip/test").catch(() => ({ data: null })),
+    ]);
+    setNumbers(n.data || []);
+    setSipCfg(cfg.data);
+    setSipStatus(st.data);
   };
   useEffect(() => { load(); }, []);
+
+  const registerSip = async () => {
+    setRegistering(true);
+    try {
+      const r = await api.post("/numbers/sip/register", {});
+      toast.success(`SIP registrado — phone_number_id: ${r.data.elevenlabs_phone_number_id || "?"}`);
+      load();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail?.error || e?.response?.data?.detail || e.message);
+    } finally { setRegistering(false); }
+  };
+
+  const placeTestCall = async () => {
+    setTestCall(t => ({ ...t, loading: true }));
+    try {
+      const r = await api.post("/numbers/call/test", { queue_id: "test", to_number: testCall.to });
+      toast.success(`Llamada iniciada (voz ${r.data.voice}) → ${r.data.to}`);
+    } catch (e) {
+      toast.error(e?.response?.data?.detail?.error || e?.response?.data?.detail || e.message);
+    } finally { setTestCall(t => ({ ...t, loading: false })); }
+  };
 
   const start = async () => {
     if (!phone.startsWith("+")) return toast.error("Usa formato E.164: +573001234567");
@@ -64,6 +97,103 @@ export default function NumbersPage() {
         </Button>
       }
     >
+      <div className="metal-surface p-6 mb-6" data-testid="sip-panel">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.15em] font-mono text-zinc-500 mb-1">
+              Flujo · DIDWW SIP → ElevenLabs
+            </div>
+            <h3 className="text-lg text-white font-semibold flex items-center gap-2">
+              <SimCard size={20} weight="duotone" /> Conectar por SIP Trunk
+            </h3>
+            <p className="text-xs text-zinc-500 font-mono mt-1">
+              1. Conectar DIDWW SIP · 2. Registrar en ElevenLabs · 3. Probar llamada
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Select value={provider} onValueChange={setProvider}>
+              <SelectTrigger className="w-44 bg-zinc-900 border-zinc-800 rounded-sm text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-zinc-950 border-zinc-800">
+                <SelectItem value="twilio">Twilio Verified ID</SelectItem>
+                <SelectItem value="didww_sip">DIDWW SIP Trunk</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {provider === "didww_sip" && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="lg:col-span-2 space-y-3">
+              <div className="text-[10px] uppercase tracking-widest font-mono text-zinc-500 mb-1">
+                Estado de configuración (backend/.env)
+              </div>
+              {sipCfg && (
+                <table className="w-full text-xs font-mono">
+                  <tbody>
+                    {[
+                      ["SIP_PROVIDER", sipCfg.provider],
+                      ["DIDWW_SIP_DOMAIN", sipCfg.sip_domain || "—"],
+                      ["DIDWW_SIP_USERNAME", sipCfg.sip_username_set ? "•••••• (set)" : "—"],
+                      ["DIDWW_SIP_PASSWORD", sipCfg.sip_password_set ? "•••••• (set)" : "—"],
+                      ["DIDWW_OUTBOUND_TRUNK_ID", sipCfg.outbound_trunk_id || "—"],
+                      ["CALLER_ID_NUMBER", sipCfg.caller_id_number || "—"],
+                      ["ELEVENLABS_AGENT_ID", sipCfg.elevenlabs_agent_id || "—"],
+                    ].map(([k, v]) => (
+                      <tr key={k} className="border-b border-zinc-800/60">
+                        <td className="py-1.5 text-zinc-500 pr-4">{k}</td>
+                        <td className="py-1.5 text-zinc-200">{v}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+              {sipStatus && sipStatus.issues && sipStatus.issues.length > 0 && (
+                <div className="text-xs text-amber-400 mt-2">
+                  {sipStatus.issues.length} campo(s) pendientes: {sipStatus.issues.join(" · ")}
+                </div>
+              )}
+              <p className="text-[11px] text-zinc-500 font-mono">
+                Añade los valores en backend/.env y reinicia el backend, luego
+                pulsa "Registrar en ElevenLabs".
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <Button onClick={registerSip} disabled={registering || (sipStatus && !sipStatus.ok)}
+                data-testid="sip-register"
+                className="w-full bg-white text-black hover:bg-zinc-200 rounded-sm">
+                <Broadcast size={14} className="mr-1" />
+                {registering ? "Registrando…" : "Registrar en ElevenLabs"}
+              </Button>
+              <div className="border-t border-zinc-800 pt-3">
+                <label className="text-[10px] uppercase font-mono tracking-widest text-zinc-500 block mb-1">
+                  Llamada de prueba
+                </label>
+                <Input value={testCall.to}
+                  onChange={(e) => setTestCall(t => ({ ...t, to: e.target.value }))}
+                  data-testid="sip-test-to"
+                  className="bg-zinc-900 border-zinc-800 rounded-sm font-mono mb-2" />
+                <Button onClick={placeTestCall} disabled={testCall.loading}
+                  data-testid="sip-test-call"
+                  variant="outline"
+                  className="w-full border-zinc-700 rounded-sm bg-transparent">
+                  {testCall.loading ? "Llamando…" : "Llamada de prueba"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {provider === "twilio" && (
+          <p className="text-xs text-zinc-400">
+            Usa el formulario Twilio abajo para verificar un caller ID (útil sólo para pruebas o
+            despliegues con Twilio como proveedor de voz).
+          </p>
+        )}
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
         <div className="lg:col-span-2 border border-zinc-800 bg-zinc-900/50 p-6">
           <h3 className="text-xs uppercase tracking-[0.15em] font-mono text-zinc-500 mb-4">Conectar nuevo número</h3>

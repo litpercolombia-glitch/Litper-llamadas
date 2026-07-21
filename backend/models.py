@@ -279,13 +279,30 @@ class ConnectedNumber(BaseModel):
     phone_number: str
     friendly_name: Optional[str] = None
     country: str = "CO"
-    provider: Literal["twilio", "manual"] = "twilio"
-    status: Literal["pending", "verified", "failed", "imported"] = "pending"
+    provider: Literal["twilio", "manual", "didww_sip"] = "twilio"
+    status: Literal["pending", "verified", "failed", "imported", "sip_registered"] = "pending"
     validation_code: Optional[str] = None
     call_sid: Optional[str] = None
     twilio_sid: Optional[str] = None
+    elevenlabs_phone_number_id: Optional[str] = None
+    sip_domain: Optional[str] = None
+    caller_id_number: Optional[str] = None
     created_at: str = Field(default_factory=_now_iso)
     updated_at: str = Field(default_factory=_now_iso)
+
+
+class SipConnectionIn(BaseModel):
+    sip_username: str
+    sip_password: str
+    sip_domain: str
+    outbound_trunk_id: Optional[str] = None
+    caller_id_number: str = Field(..., description="E.164 (ej +573001234567)")
+    friendly_name: Optional[str] = None
+
+
+class PlaceCallIn(BaseModel):
+    queue_id: str
+    to_number: Optional[str] = Field(None, description="Sólo para llamada de prueba (override).")
 
 
 # ---------- NOVEDADES (carrier status reference) ----------

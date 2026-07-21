@@ -1,0 +1,33 @@
+{
+  "summary": "Litper Connect Hub v1.5 DIDWW SIP-trunk backend testing: 14/14 tests passed. Covered all 4 new SIP endpoints (GET /api/numbers/sip/config, POST /api/numbers/sip/test, POST /api/numbers/sip/register, POST /api/numbers/call/test) + regressions (/health, /queue, /voices=6, /metrics, /webhooks/events). Verified: config endpoint masks secrets (only *_set booleans exposed), sip/test enumerates all 5 missing env vars in Spanish, sip/register returns 400 with 'SIP credentials incompletas' when no creds and 502 (propagating ElevenLabs error dict) when given fake creds, call/test returns 400 'No hay número SIP registrado...' with no didww_sip entry and 400 mentioning ELEVENLABS_AGENT_ID after inserting a fake registered SIP doc, GET /api/numbers returns didww_sip entries with correct provider field, and all endpoints enforce X-API-Key (401 without).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "POST /api/numbers/sip/register (public URL)",
+        "issue": "Backend returns HTTP 502 with proper JSON detail dict (ElevenLabs error). However the Emergent ingress/CDN intercepts upstream 5xx responses and rewrites the body to a generic HTML '502 Bad gateway' page, so API consumers hitting the public URL cannot read the ElevenLabs error dict — only the status code. Backend behavior is correct; this is an ingress limitation. If exposing the ElevenLabs error dict to callers matters, change sip/register to return HTTP 200 with {ok:false, error:{...}} (or 400) instead of 502."
+      }
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_hub_v15.py",
+    "/app/test_reports/pytest/v15.xml"
+  ],
+  "action_items": [
+    "Optional: consider returning 200/400 (not 502) for downstream provider errors on sip/register so ingress does not mask the ElevenLabs error detail; alternatively document that consumers must hit the internal service or the ingress must be configured to preserve upstream 5xx bodies."
+  ],
+  "critical_code_review_comments": [
+    "routes/numbers.py sip_test() manually invokes sip_config_read() as a helper — fine but the two endpoints share duplicated env-var reads; extract a private _read_sip_env() to avoid drift.",
+    "sip_register()/place_test_call() call ElevenLabs without a timeout on httpx (verify elevenlabs_client.py sets a bounded timeout to avoid backend hanging).",
+    "call/test relies on find_one(sort=[('updated_at', -1)]) but freshly inserted docs may not have updated_at set consistently in every code path; consider defaulting updated_at at insert time uniformly."
+  ],
+  "updated_files": ["/app/backend/tests/test_hub_v15.py"],
+  "success_rate": {"backend": "100%", "frontend": "n/a"},
+  "test_credentials": "X-API-Key: litper_hub_pk_2026_prod_ChangeMe_9x2Kf7bQvE4mLnT8sZ3H",
+  "seed_data_creation": "Tests insert and clean up ephemeral connected_numbers docs with friendly_name prefix 'TEST_' (didww_sip provider). All test data is deleted in teardown.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "v1.5 backend fully green (14/14). Note: Emergent ingress replaces upstream 5xx bodies with HTML — tests targeting response bodies for 5xx must use http://localhost:8001 directly (already done in test_hub_v15.py). Prior iterations 1-3 covered v1.2/v1.3/v1.4 (LLM router + webhooks). The v1.4 minor issue (Attempt model missing call_sid/duration/etc) is still open per iteration_3.json but not related to v1.5 scope.",
+  "rca of the issue": "Not applicable — no bugs found in v1.5 backend surface. Only ingress-level observation documented in minor issues."
+}

@@ -14,14 +14,16 @@ Flow:
   DELETE /numbers/{id}         → remove local record (does NOT unverify in Twilio).
 """
 from datetime import datetime, timezone
+import os
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List
 
 from db import get_db
 from deps import require_api_key
 from models import (ConnectedNumber, NumberVerifyStart, NumberVerifyConfirm,
-                    NumberImport)
+                    NumberImport, SipConnectionIn, PlaceCallIn)
 from twilio_client import get_client as get_twilio
+from elevenlabs_client import get_client as get_eleven
 
 router = APIRouter(prefix="/numbers", tags=["numbers"],
                    dependencies=[Depends(require_api_key)])
@@ -116,3 +118,124 @@ async def delete_number(number_id: str):
     if r.deleted_count == 0:
         raise HTTPException(404, "Número no encontrado")
     return {"ok": True, "id": number_id}
+
+
+
+# ============================================================================
+# DIDWW SIP TRUNK  ·  register in ElevenLabs · place outbound calls via Sofía
+# ============================================================================
+@router.get("/sip/config", summary="Read the current SIP config (mask secrets).")
+async def sip_config_read():
+    """Report which SIP env vars are set. Secrets NEVER leak — only booleans."""
+    return {
+        "provider":            os.environ.get("SIP_PROVIDER", "didww"),
+        "sip_domain":          os.environ.get("DIDWW_SIP_DOMAIN", ""),
+        "sip_username_set":    bool(os.environ.get("DIDWW_SIP_USERNAME")),
+        "sip_password_set":    bool(os.environ.get("DIDWW_SIP_PASSWORD")),
+        "outbound_trunk_id":   os.environ.get("DIDWW_OUTBOUND_TRUNK_ID", ""),
+        "caller_id_number":    os.environ.get("CALLER_ID_NUMBER", ""),
+        "elevenlabs_agent_id": os.environ.get("ELEVENLABS_AGENT_ID", ""),
+    }
+
+
+@router.post("/sip/test", summary="Validate SIP configuration (format + reachability).")
+async def sip_test():
+    cfg = await sip_config_read()
+    problems = []
+    if not cfg["sip_domain"]:            problems.append("DIDWW_SIP_DOMAIN vacío")
+    if not cfg["sip_username_set"]:      problems.append("DIDWW_SIP_USERNAME vacío")
+    if not cfg["sip_password_set"]:      problems.append("DIDWW_SIP_PASSWORD vacío")
+    caller = cfg["caller_id_number"]
+    if not caller:                       problems.append("CALLER_ID_NUMBER vacío")
+    elif not caller.startswith("+"):     problems.append("CALLER_ID_NUMBER debe ser E.164 (+57…)")
+    if not cfg["elevenlabs_agent_id"]:   problems.append("ELEVENLABS_AGENT_ID vacío")
+    return {"ok": len(problems) == 0, "provider": cfg["provider"],
+            "issues": problems, "config": cfg}
+
+
+@router.post("/sip/register", response_model=ConnectedNumber,
+             summary="Register the DIDWW SIP trunk in ElevenLabs so the agent can dial out.")
+async def sip_register(payload: SipConnectionIn | None = None):
+    caller = (payload.caller_id_number if payload else os.environ.get("CALLER_ID_NUMBER", "")).strip()
+    domain = (payload.sip_domain if payload else os.environ.get("DIDWW_SIP_DOMAIN", "")).strip()
+    user   = (payload.sip_username if payload else os.environ.get("DIDWW_SIP_USERNAME", "")).strip()
+    pw     = (payload.sip_password if payload else os.environ.get("DIDWW_SIP_PASSWORD", "")).strip()
+    label  = (payload.friendly_name if payload else None) or f"Litper DIDWW {caller}"
+    if not (caller and domain and user and pw):
+        raise HTTPException(400, "SIP credentials incompletas. Añade DIDWW_* + CALLER_ID_NUMBER en backend/.env "
+                                "o envíalos en el body.")
+
+    res = await get_eleven().register_sip_trunk(
+        label=label, address=domain, username=user, password=pw, phone_number=caller)
+    if not res.get("ok"):
+        raise HTTPException(502, detail=res)
+    pn_id = res.get("phone_number_id")
+    db = get_db()
+    rec = ConnectedNumber(
+        phone_number=caller, friendly_name=label, country="CO",
+        provider="didww_sip", status="sip_registered",
+        elevenlabs_phone_number_id=pn_id,
+        sip_domain=domain, caller_id_number=caller,
+    )
+    await db.connected_numbers.update_one(
+        {"phone_number": caller, "provider": "didww_sip"},
+        {"$set": rec.model_dump()}, upsert=True)
+    return rec
+
+
+@router.post("/call/test",
+             summary="Place a test outbound call via ElevenLabs + the registered SIP number.")
+async def place_test_call(payload: PlaceCallIn):
+    db = get_db()
+    num = await db.connected_numbers.find_one(
+        {"provider": "didww_sip", "status": "sip_registered"},
+        {"_id": 0}, sort=[("updated_at", -1)])
+    if not num or not num.get("elevenlabs_phone_number_id"):
+        raise HTTPException(400, "No hay número SIP registrado en ElevenLabs. Regístralo primero.")
+
+    to_num = payload.to_number
+    country = "CO"
+    queue = None
+    if payload.queue_id and payload.queue_id != "test":
+        queue = await db.call_queue.find_one({"id": payload.queue_id}, {"_id": 0})
+        if not queue:
+            raise HTTPException(404, "queue_id no encontrado")
+        order = await db.orders.find_one({"id": queue["order_id"]}, {"_id": 0})
+        if not to_num and order:
+            to_num = order.get("customer_phone")
+        country = (order or {}).get("country", "CO")
+    if not to_num:
+        raise HTTPException(400, "Falta 'to_number' o un queue_id válido.")
+
+    voice = await db.voice_profiles.find_one(
+        {"country": country, "is_default": True}, {"_id": 0}) \
+        or await db.voice_profiles.find_one({}, {"_id": 0})
+
+    agent_id = os.environ.get("ELEVENLABS_AGENT_ID", "").strip()
+    if not agent_id:
+        raise HTTPException(400, "ELEVENLABS_AGENT_ID no configurado en backend/.env.")
+
+    metadata = {"queue_id": payload.queue_id or "test", "country": country,
+                "voice_name": (voice or {}).get("name", ""),
+                "caller_id": num.get("caller_id_number")}
+    res = await get_eleven().sip_outbound_call(
+        phone_number_id=num["elevenlabs_phone_number_id"],
+        agent_id=agent_id, to_number=to_num, metadata=metadata)
+    if not res.get("ok"):
+        raise HTTPException(502, detail=res)
+
+    import uuid as _u
+    await db.message_log.insert_one({
+        "id": str(_u.uuid4()),
+        "order_id": (queue or {}).get("order_id"),
+        "queue_id": payload.queue_id,
+        "direction": "outbound", "channel": "call",
+        "phone": to_num,
+        "body": f"Llamada SIP iniciada (agent {agent_id}, voz {(voice or {}).get('name','?')}).",
+        "provider": "elevenlabs_sip",
+        "provider_message_id": res.get("conversation_id"),
+        "status": "sent", "created_at": _now(),
+    })
+    return {"ok": True, "conversation_id": res.get("conversation_id"),
+            "to": to_num, "from": num.get("caller_id_number"),
+            "voice": (voice or {}).get("name")}
