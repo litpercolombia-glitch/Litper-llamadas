@@ -15,6 +15,7 @@ import CarriersPage   from "@/pages/Carriers";
 import VoicesPage     from "@/pages/Voices";
 import NumbersPage    from "@/pages/Numbers";
 import NovedadesPage  from "@/pages/Novedades";
+import ImportPage     from "@/pages/Import";
 
 function App() {
   useTheme();  // initialises html.matrix-night / matrix-day from localStorage
@@ -34,6 +35,7 @@ function App() {
         <Route path="/numbers"    element={<NumbersPage />} />
         <Route path="/carriers"   element={<CarriersPage />} />
         <Route path="/novedades"  element={<NovedadesPage />} />
+        <Route path="/import"     element={<ImportPage />} />
         <Route path="/connectors" element={<ConnectorsPage />} />
       </Routes>
     </BrowserRouter>

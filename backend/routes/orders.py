@@ -78,3 +78,32 @@ async def get_order(order_id: str):
     if not doc:
         raise HTTPException(404, "Order not found")
     return doc
+
+
+@router.get("/{order_id}/prompt-vars",
+            summary="Return the variables used to render Sofía's outbound call script "
+                    "for this order (combo-aware).")
+async def order_prompt_vars(order_id: str):
+    doc = await get_db().orders.find_one({"id": order_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(404, "Order not found")
+    items = doc.get("items") or []
+    references = ", ".join(
+        [i.get("sku") for i in items if i.get("sku")]) or ""
+    product_name = (doc.get("products_display")
+                    or (items[0].get("product", "") if items else "")
+                    or "tu pedido")
+    return {
+        "customer_name":  doc.get("customer_name", ""),
+        "customer_phone": doc.get("customer_phone", ""),
+        "tracking":       doc.get("tracking_number", ""),
+        "carrier":        doc.get("carrier_slug", ""),
+        "city":           doc.get("city", ""),
+        "address":        doc.get("address", ""),
+        "product_name":   product_name,
+        "items_count":    len(items),
+        "references":     references,
+        "is_combo":       doc.get("is_combo", False),
+        "total_amount":   doc.get("total_amount", 0),
+        "currency":       doc.get("currency", "COP"),
+    }

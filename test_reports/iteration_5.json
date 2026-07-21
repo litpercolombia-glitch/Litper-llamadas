@@ -1,0 +1,27 @@
+{
+  "summary": "Dropi Excel importer verified end-to-end. Backend unit tests (5) + HTTP tests (6) all pass. Frontend /import page uploaded a synthetic 4-row xlsx, showed Órdenes reales=2, Recaudo $235.000, amber multi-row warning, and committed imported=2 with 0 errors.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_dropi_import.py",
+    "/app/backend/tests/test_dropi_api.py",
+    "/app/test_reports/pytest/dropi_test.xml",
+    "/app/test_reports/pytest/dropi_api.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "dropi.py preview endpoint stores full consolidated payload in Mongo (dropi_previews) with no TTL — could grow unbounded; consider a TTL index on created_at.",
+    "dropi_import.py collects `naive_sum` across ALL rows regardless of whether a group had multi-row combos; the reported naive-vs-correct delta is correct as-is, but the semantic is 'sum every row's TOTAL DE LA ORDEN' (which is what a naive importer would do) — fine, just document.",
+    "routes/dropi.py::dropi_import uses `carrier_by_slug` lookup but doesn't 400 when carriers collection is empty (only per-row error). Fine, but a preflight check would be a nicer UX.",
+    "Order.customer_phone fallback '+000000000' when phone missing may silently corrupt data — surface as an error instead of coercion."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_dropi_api.py (new HTTP-level regression tests)"
+  ],
+  "success_rate": {"backend": "100% (11/11)", "frontend": "100% (all assertions)"},
+  "test_credentials": "X-API-Key from /app/memory/test_credentials.md",
+  "seed_data_creation": "Synthetic xlsx generated in-memory for each test run; unique IDs (timestamp-suffixed) to avoid dedup collisions between runs. Test orders remain in Mongo (external_ref prefix FE1/FE2/T*) — safe, no cleanup implemented.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All Dropi importer specs from the review request are green. If retesting, remember the dedup step relies on external_ref/tracking_number so prior TEST_/FE* orders persist in Mongo and will show as skipped on re-runs — this is EXPECTED behaviour (validated by test_import_and_dedup)."
+}

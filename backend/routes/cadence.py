@@ -91,8 +91,12 @@ async def attempt_result(payload: AttemptResult):
         order = await db.orders.find_one({"id": q["order_id"]}, {"_id": 0}) if q else None
         if order:
             chatea = get_chatea()
+            product_name = (order.get("products_display")
+                            or (order.get("items") or [{}])[0].get("product", "")
+                            or "tu pedido")
             text = (f"Hola {order.get('customer_name', '')}, hemos intentado llamarte "
-                    f"por tu pedido en oficina. ¿Puedes confirmar si lo recogerás?")
+                    f"por tu pedido de {product_name} en oficina. "
+                    f"¿Puedes confirmar si lo recogerás?")
             res = await chatea.send_message(order["customer_phone"], text) \
                 if chatea.configured else {"ok": False, "error": "unconfigured"}
             await db.message_log.insert_one({

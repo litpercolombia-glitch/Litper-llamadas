@@ -34,10 +34,21 @@ async def dispatch_due_attempts():
             if att["channel"] == "whatsapp":
                 chatea = get_chatea()
                 phone = await _phone_for_queue(sched["queue_id"])
+                order = await _order_for_queue(sched["queue_id"])
+                product_name = ""
+                customer_name = ""
+                if order:
+                    product_name = (order.get("products_display")
+                                    or (order.get("items") or [{}])[0].get("product", "")
+                                    or "tu pedido")
+                    customer_name = order.get("customer_name", "") or ""
+                greet = f"Hola {customer_name}, " if customer_name else "Hola, "
+                body_text = (
+                    f"{greet}seguimos pendientes de tu pedido de "
+                    f"{product_name or 'la orden'} en oficina. "
+                    f"¿Puedes confirmar si lo recogerás hoy?")
                 if phone and chatea.configured:
-                    res = await chatea.send_message(
-                        phone, "Hola, seguimos pendientes de tu pedido en oficina. "
-                               "¿Puedes confirmar si lo recogerás hoy?")
+                    res = await chatea.send_message(phone, body_text)
                     att["status"] = "dispatched"
                     att["result"] = "whatsapp_sent" if res.get("ok") else "whatsapp_failed"
                     att["executed_at"] = now_iso
@@ -47,7 +58,7 @@ async def dispatch_due_attempts():
                         "direction": "outbound",
                         "channel": "whatsapp",
                         "phone": phone,
-                        "body": "Confirmación automática de recogida.",
+                        "body": body_text,
                         "provider": "chatea_pro",
                         "provider_message_id": res.get("provider_message_id"),
                         "status": "sent" if res.get("ok") else "failed",
@@ -81,6 +92,14 @@ async def _phone_for_queue(queue_id: str) -> str | None:
         return None
     o = await db.orders.find_one({"id": q["order_id"]}, {"_id": 0, "customer_phone": 1})
     return o.get("customer_phone") if o else None
+
+
+async def _order_for_queue(queue_id: str) -> dict | None:
+    db = get_db()
+    q = await db.call_queue.find_one({"id": queue_id}, {"_id": 0, "order_id": 1})
+    if not q:
+        return None
+    return await db.orders.find_one({"id": q["order_id"]}, {"_id": 0})
 
 
 def _uuid():

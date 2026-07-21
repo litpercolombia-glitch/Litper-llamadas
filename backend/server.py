@@ -37,6 +37,7 @@ from routes.novedades import router as novedades_router  # noqa: E402
 from routes.copilot import router as copilot_router  # noqa: E402
 from routes.skills import router as skills_router  # noqa: E402
 from routes.files import router as files_router  # noqa: E402
+from routes.dropi import router as dropi_router  # noqa: E402
 from routes.llm import router as llm_router  # noqa: E402
 
 logging.basicConfig(level=logging.INFO,
@@ -160,6 +161,7 @@ api.include_router(novedades_router)
 api.include_router(copilot_router)
 api.include_router(skills_router)
 api.include_router(files_router)
+api.include_router(dropi_router)
 api.include_router(llm_router)
 
 

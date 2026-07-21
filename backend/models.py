@@ -21,6 +21,15 @@ class Product(BaseModel):
     price: float = 0
 
 
+class OrderItem(BaseModel):
+    product: str = ""
+    variation: str = ""
+    sku: str = ""
+    product_id: str = ""
+    variation_id: str = ""
+    qty: int = 1
+
+
 class OrderIn(BaseModel):
     external_ref: Optional[str] = Field(None, description="External order ID (Dropi/Shopify)")
     customer_name: str
@@ -34,6 +43,13 @@ class OrderIn(BaseModel):
     carrier_slug: str = Field(..., description="Slug of the carrier (see /carriers)")
     tracking_number: Optional[str] = None
     products: list[Product] = []
+    # Dropi combo/promo support: many rows per order collapse into one order
+    # with a list of items. products_display renders it e.g.
+    #   "Protector Antifluido (Verde Menta/Doble) + Protector Antifluido (Lila/Semi)"
+    items: list[OrderItem] = []
+    items_count: int = 0
+    is_combo: bool = False
+    products_display: str = ""
     office_arrival_date: Optional[str] = Field(
         None, description="ISO date the parcel arrived at the office. Defaults to today.")
     metadata: dict[str, Any] = {}

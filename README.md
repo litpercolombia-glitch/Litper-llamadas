@@ -6,6 +6,49 @@ dashboard, purpose-built for COD e-commerce call-center operations in LATAM
 (Chatea Pro) to confirm COD orders sitting at carrier offices — *llamadas a
 oficina* — before they get returned.
 
+## Dropi import (Excel / CSV) — combo-safe
+
+Real Dropi "Reclamos en Oficina" exports store **one order as multiple rows**:
+each product/variation inside a combo/promo appears on its own line but
+repeats the customer + tracking + total. Naive row-by-row import triples the
+queue count and inflates the recaudo.
+
+The `/api/dropi/*` endpoints (and the "Importar" page in the UI) implement
+the correct rules:
+
+1. **Group** rows by `ID` (or `NÚMERO GUIA` if ID is missing) → 1 order per group.
+2. **Recaudo** (total_amount) = column **`TOTAL DE LA ORDEN`** taken **once**
+   per group. Never summed across rows. `PRECIO PROVEEDOR` is supplier cost
+   and is **never** used for recaudo.
+3. **Combos**: every row's `PRODUCTO` + `VARIACION` is collapsed into an
+   `items[]` list and a display string like
+   `"Protector Antifluido (Verde Menta/Doble) + Protector Antifluido (Lila/Semi)"`,
+   with `is_combo = true` when `items > 1`.
+4. **References**: `SKU`, `PRODUCTO ID`, `VARIACION ID`, `VARIACION` are kept
+   per item.
+5. **Carrier normalization**: `TRANSPORTADORA` is mapped to the carrier slugs
+   in `/api/carriers` (INTERRAPIDISIMO→interrapidisimo, SERVIENTREGA→servientrega, …).
+6. **Preview first, import second**: preview shows the *consolidated* view
+   (1 row per order, combos flagged) plus a heuristic warning if any
+   multi-row order is detected. The user picks which orders to import and can
+   override carriers per row.
+
+Endpoints:
+
+- `POST /api/dropi/sheets` (multipart) → list workbook sheet names.
+- `POST /api/dropi/preview` (multipart, form field `sheet` optional) → parses
+  the file, returns `preview_id`, the column map, the consolidated orders,
+  and warnings.
+- `POST /api/dropi/import` (JSON `{ preview_id, order_keys?, carrier_overrides?, default_carrier_slug?, country }`)
+  → commits the selected orders to `orders` + `call_queue`; dedupes by
+  `external_ref` / `tracking_number`.
+- `GET /api/orders/{id}/prompt-vars` → renders Sofía's call variables
+  (`product_name`, `items_count`, `references`, `is_combo`, …) — for combos
+  `product_name` is the full combo string so the AI mentions it naturally.
+
+Tests: `backend/tests/test_dropi_import.py` (4 raw rows → 2 orders, correct
+$235,000 vs naive $535,000).
+
 ## Stack
 
 - **Backend:** FastAPI (Python 3.11+), Motor (async MongoDB), APScheduler,
