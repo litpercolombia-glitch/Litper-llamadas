@@ -1,0 +1,21 @@
+{
+  "summary": "Backend testing complete for Litper Connect Hub — 25/25 pytest tests passed on the public REACT_APP_BACKEND_URL. Covered auth guard, health, all carriers (12 seeded), office semaphore rules, orders CRUD, queue enrichment (Sandra=rojo, Carlos=verde 5-8d, María=gris), compressed cadence for Envía (5 attempts same day, windows never back-to-back, attempt 5 = whatsapp), spread cadence for Servientrega (2 unique dates, final whatsapp), attempt-result confirmado stop, no_contesta x3 WhatsApp fallback, numero_incorrecto cambio_direccion/ai task, WhatsApp send survives Chatea failure, tasks CRUD, metrics keys, translate library provider, unauthenticated Chatea+VAPI webhooks, connectors list + Chatea/Supabase tests, and /docs+/redoc HTML.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/test_hub.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "routes/webhooks._parse_chatea: template_name ternary has ambiguous precedence — `tpl = body.get('template_name') or (msg.get('template', {}) or {}).get('name') if isinstance(msg, dict) else None` — parses as `body.get(...) or ((...).get('name') if isinstance else None)`; harmless but obscure. Add parentheses.",
+    "routes/cadence.attempt_result: `sched['attempts']` mutated in place and also collected into `updated`; the two references point to the same list — redundant. Not a bug but confusing.",
+    "cadence.build_plan: when start_date lands on a holiday, day-0 & day-1 both bump to the same next business day, collapsing 'spread' plans to fewer unique dates (observed with Servientrega yesterday=2026-07-20 holiday → 2 unique dates instead of 3). Consider bumping each day_off independently so distinct offsets always land on distinct business days.",
+    "Small: /api/whatsapp/send inserts msg.model_dump() into message_log with id already set (Message default_factory + explicit id) — fine, but two id generators is redundant."
+  ],
+  "updated_files": ["/app/backend/tests/test_hub.py"],
+  "success_rate": {"backend": "100%", "frontend": "not_tested"},
+  "test_credentials": "X-API-Key litper_hub_pk_2026_prod_ChangeMe_9x2Kf7bQvE4mLnT8sZ3H",
+  "seed_data_creation": "Created transient TEST_ orders/tasks via API for CRUD & cadence-mutation tests. Existing demo seed (Sandra Ruiz Envía, Carlos Mejía Servientrega, María Torres 99-minutos, etc.) was reused for assertions; note test_webhook_chatea mutates Sandra's queue status to 'ya_recogio' — re-running requires reseed or a new order for that assertion.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All 25 backend tests pass against the deployed URL. The Chatea webhook test consumes Sandra Ruiz's queue by transitioning it to 'ya_recogio'; if you run tests twice on same DB, drop the litper_hub DB or reseed to keep Sandra pending. Server date observed 2026-07-21 (Colombia holiday on 07-20 affected Servientrega spread dates → 2 unique dates instead of 3, which is within the accepted 2-3 range).",
+  "rca of the issue": "N/A — no failures."
+}
