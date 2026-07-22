@@ -507,7 +507,7 @@ class PromptResolveIn(BaseModel):
 
 # ---------- WHATSAPP TEMPLATE RULES ----------
 class WhatsappRuleIn(BaseModel):
-    rule_key: Literal["reclamo_oficina", "no_oficina"] = "reclamo_oficina"
+    rule_key: Literal["reclamo_oficina", "recordatorio_7d", "no_oficina"] = "reclamo_oficina"
     template_name: str = Field(..., description="Chatea Pro template name (as returned by /whatsapp-template/list)")
     template_language: str = "es"
     days_min: int = 0

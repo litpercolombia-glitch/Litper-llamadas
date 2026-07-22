@@ -27,6 +27,20 @@ function WhatsappRulesPanel() {
   };
   useEffect(() => { load(); }, []);
 
+  const [syncing, setSyncing] = useState(false);
+  const syncTemplates = async () => {
+    setSyncing(true);
+    try {
+      const r = await api.post("/whatsapp/templates/sync");
+      const d = r.data || {};
+      if (d.ok) toast.success(d.detail || "Las 3 plantillas requeridas están aprobadas.");
+      else toast.error(d.detail || "Faltan plantillas por aprobar.");
+      load();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Error consultando Chatea Pro.");
+    } finally { setSyncing(false); }
+  };
+
   const patch = async (id, body) => {
     await api.patch(`/whatsapp/rules/${id}`, body);
     load();
@@ -38,11 +52,15 @@ function WhatsappRulesPanel() {
       <div className="flex items-center gap-2 mb-3">
         <WhatsappLogo size={16} className="text-green-400" weight="duotone" />
         <h3 className="text-sm font-semibold text-white">Reglas de plantillas WhatsApp</h3>
-        <span className="text-[10px] font-mono text-zinc-500 ml-auto">
+        <span className="text-[10px] font-mono text-zinc-500 ml-auto mr-2">
           {templates.length > 0
             ? `${templates.length} plantillas Chatea Pro detectadas`
             : "Chatea Pro no configurado o sin plantillas"}
         </span>
+        <Button size="sm" variant="outline" onClick={syncTemplates} disabled={syncing}
+          data-testid="wa-templates-sync">
+          {syncing ? "…" : "Sincronizar plantillas"}
+        </Button>
       </div>
       <div className="text-xs text-zinc-400 mb-3">
         <Warning size={11} className="inline text-amber-400 mr-1" />

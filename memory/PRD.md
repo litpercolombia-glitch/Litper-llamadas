@@ -133,3 +133,10 @@ Same as v1.0 plus:
 - Every card carries an explicit `BYOK · Tú traes tus llaves` (emerald) or `Managed · Nosotros ponemos las llaves` (blue) banner.
 - New "Trae tus propias herramientas" (BYOK) section with a 5-row comparison table (BYOK vs Managed): pricing, fees, ideal use-case.
 - New guided **Onboarding wizard** at `/app/onboarding` — 5-step stepper (Chatea Pro · ElevenLabs · Telnyx · Dropi · LLM), progress bar (n/5), inline "Probar conexión", "Guardar & siguiente". Auto-detects LLM step from 5 options (Groq/Gemini/Claude/Mistral/Cerebras). "Listo para operar" state when Chatea Pro + ≥1 LLM are connected. Backend `GET /api/config/onboarding` returns the state.
+
+## 2026-02-22 — Finalize for Launch
+- VIP_GROUP_URL set to real invite: https://chat.whatsapp.com/Gb9z8fWAiOwJ36dFp4FBDN?mode=gi_t (funnel thank-you screen now links to it directly).
+- WhatsApp rules updated to the 3 real approved Chatea Pro templates + auto-migration on boot: `reclamo_oficina_whatsaap` (0–3d) · `oficina_7_dias` (4–7d) · `no__oficina__` (8+ vencido). Rule resolver returns the correct template for each days_left band.
+- New endpoint `POST /api/whatsapp/templates/sync` reports which of the 3 required templates are approved in Chatea Pro (found/missing). UI button "Sincronizar plantillas" on Messages WhatsappRulesPanel.
+- Stale $297/$497/$997 pricing REMOVED. Old "Precio fundador" block replaced with a BYOK-oriented Value vs Platform block ("Desde $19 USD/mes · Trae tus llaves"). Scarcity note updated to reflect BYOK Growth $39.
+- Full architecture validation across the app: multi-tenant credentials encrypted, /app auth gate, funnel public, WA 24h window enforces templates only, prompts still 6-block antifluido, Dropi combo import intact (5/5 pytest).

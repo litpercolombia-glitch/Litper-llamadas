@@ -222,3 +222,41 @@ async def mark_inbound(phone: str, body: str = ""):
                   "last_inbound_body": (body or "manual test")[:400]}},
         upsert=True)
     return await window_status(phone)
+
+
+REQUIRED_TEMPLATE_NAMES = ["reclamo_oficina_whatsaap", "oficina_7_dias", "no__oficina__"]
+
+
+@router.post("/templates/sync",
+             summary="Fetch templates from Chatea Pro and confirm the 3 required "
+                     "office-cadence templates exist. Returns per-template presence.")
+async def sync_templates():
+    chatea = get_chatea()
+    if not chatea.configured:
+        return {"ok": False, "configured": False,
+                "found": [], "missing": REQUIRED_TEMPLATE_NAMES,
+                "detail": "CHATEA_PRO_API_KEY no configurada — no se pudo consultar la lista."}
+    r = await chatea.list_templates()
+    body = r.get("body") or {}
+    live: list[str] = []
+    if isinstance(body, list):
+        live = [x.get("name") or x.get("template_name") or "" for x in body if isinstance(x, dict)]
+    elif isinstance(body, dict):
+        for k in ("templates", "data", "result"):
+            if isinstance(body.get(k), list):
+                live = [x.get("name") or x.get("template_name") or "" for x in body[k] if isinstance(x, dict)]
+                break
+    live = [n for n in live if n]
+    found   = [n for n in REQUIRED_TEMPLATE_NAMES if n in live]
+    missing = [n for n in REQUIRED_TEMPLATE_NAMES if n not in live]
+    return {
+        "ok":       len(missing) == 0,
+        "configured": True,
+        "live_count": len(live),
+        "required": REQUIRED_TEMPLATE_NAMES,
+        "found":    found,
+        "missing":  missing,
+        "detail":   ("Las 3 plantillas requeridas están aprobadas en Chatea Pro."
+                     if not missing else
+                     f"Faltan plantillas por aprobar en Chatea Pro: {', '.join(missing)}."),
+    }

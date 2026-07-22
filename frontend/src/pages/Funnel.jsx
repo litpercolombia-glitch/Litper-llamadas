@@ -388,22 +388,22 @@ export default function FunnelPage() {
         </div>
 
         {/* PRICE MATH */}
-        <div id="pricing" className="mt-10 rounded-2xl border border-[var(--border)] bg-gradient-to-b from-[color-mix(in_oklab,var(--accent)_10%,var(--surface))] to-[var(--surface)] backdrop-blur-xl p-6 md:p-8"
+        <div id="value-math" className="mt-10 rounded-2xl border border-[var(--border)] bg-gradient-to-b from-[color-mix(in_oklab,var(--accent)_10%,var(--surface))] to-[var(--surface)] backdrop-blur-xl p-6 md:p-8"
           data-testid="funnel-price-math">
           <div className="grid md:grid-cols-2 gap-4">
             <div>
-              <div className="text-[11px] font-mono uppercase tracking-widest text-zinc-400 mb-2">Valor total</div>
+              <div className="text-[11px] font-mono uppercase tracking-widest text-zinc-400 mb-2">Valor total (si lo armas por separado)</div>
               <div className="text-3xl font-semibold text-white line-through decoration-red-400/80 decoration-2">
                 $10.100.000 <span className="text-sm font-normal text-zinc-400">COP / setup</span>
               </div>
-              <div className="text-xs text-zinc-400 mt-1">(si lo construyeras y contrataras por separado)</div>
+              <div className="text-xs text-zinc-400 mt-1">(desarrollo + agente + infraestructura)</div>
             </div>
             <div>
-              <div className="text-[11px] font-mono uppercase tracking-widest text-zinc-400 mb-2">Precio fundador</div>
+              <div className="text-[11px] font-mono uppercase tracking-widest text-zinc-400 mb-2">Plataforma Litper Connect · BYOK</div>
               <div className="text-4xl md:text-5xl font-semibold text-white">
-                $497.000 <span className="text-sm font-normal text-zinc-400">COP / mes</span>
+                Desde $19 <span className="text-sm font-normal text-zinc-400">USD / mes</span>
               </div>
-              <div className="text-xs text-emerald-300 mt-1">Sube a $997.000 al cerrar el cupo fundador.</div>
+              <div className="text-xs text-emerald-300 mt-1">Trae tus llaves. El uso lo pagas al proveedor. Sin markup.</div>
             </div>
           </div>
         </div>
@@ -485,7 +485,7 @@ export default function FunnelPage() {
             ))}
           </div>
           <p className="text-xs text-zinc-400 mt-4">
-            Después el precio fundador expira y sube a $997.000/mes.
+            Después el precio fundador expira y sube al precio normal Growth ($39 USD/mes).
           </p>
         </div>
       </section>

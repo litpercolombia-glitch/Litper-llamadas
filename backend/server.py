@@ -146,9 +146,16 @@ async def _ensure_seed():
         elif not existing:
             await db.prompts.insert_one(pr)
     for rule in WHATSAPP_RULES_SEED:
+        # Force-migrate legacy template names to the real approved ones.
         await db.whatsapp_rules.update_one(
             {"rule_key": rule["rule_key"]},
-            {"$setOnInsert": rule}, upsert=True,
+            {"$setOnInsert": {"id": rule["id"], "created_at": rule["created_at"]},
+             "$set": {"template_name":     rule["template_name"],
+                      "template_language": rule["template_language"],
+                      "days_min":          rule["days_min"],
+                      "days_max":          rule["days_max"],
+                      "updated_at":        rule["updated_at"]}},
+            upsert=True,
         )
 
 

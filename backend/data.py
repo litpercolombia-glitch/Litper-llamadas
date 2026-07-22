@@ -435,29 +435,43 @@ PROMPTS_SEED = [
 ]
 
 # ---------- WHATSAPP RULES ----------
+# The 3 approved Chatea Pro templates for the office-claim cadence.
+# Names are EXACT — do not rename (they must match Chatea Pro).
 WHATSAPP_RULES_SEED = [
     {
         "id":                 _new_uid(),
         "rule_key":           "reclamo_oficina",
-        "template_name":      "reclamo_en_oficina",
+        "template_name":      "reclamo_oficina_whatsaap",
         "template_language":  "es",
         "days_min":           0,
         "days_max":           3,
         "media_url":          None,
         "active":             True,
-        "notes":              "0–3 días: recordatorio + imagen de guía.",
+        "notes":              "0–3 días en oficina: primer aviso amable + imagen de guía.",
+        "created_at": _iso_now(), "updated_at": _iso_now(),
+    },
+    {
+        "id":                 _new_uid(),
+        "rule_key":           "recordatorio_7d",
+        "template_name":      "oficina_7_dias",
+        "template_language":  "es",
+        "days_min":           4,
+        "days_max":           7,
+        "media_url":          None,
+        "active":             True,
+        "notes":              "4–7 días: recordatorio urgente.",
         "created_at": _iso_now(), "updated_at": _iso_now(),
     },
     {
         "id":                 _new_uid(),
         "rule_key":           "no_oficina",
-        "template_name":      "no_oficina_urgente",
+        "template_name":      "no__oficina__",
         "template_language":  "es",
-        "days_min":           4,
+        "days_min":           8,
         "days_max":           99,
         "media_url":          None,
         "active":             True,
-        "notes":              "+3 días: aviso urgente de devolución.",
+        "notes":              "+8 días / vencido: aviso final de devolución.",
         "created_at": _iso_now(), "updated_at": _iso_now(),
     },
 ]
