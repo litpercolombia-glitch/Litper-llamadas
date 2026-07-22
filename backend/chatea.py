@@ -85,7 +85,7 @@ class ChateaProClient:
         }
 
     async def list_templates(self) -> dict[str, Any]:
-        return await self._req("POST", self.template_list_path, json={})
+        return await self._req("POST", self.template_list_path, json={"limit": 200})
 
     async def get_subscriber(self, phone: str) -> dict[str, Any]:
         # Try GET with phone_number query param first
