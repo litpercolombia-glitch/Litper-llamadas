@@ -410,6 +410,8 @@ export default function FunnelPage() {
       </section>
 
       {/* PRECIOS — 3 planes con spotlight */}
+      {/* PRECIOS — BYOK explainer + 5 planes */}
+      <ByokSection />
       <PricingSection />
 
       {/* FUNCIONES — grid con tilted cards */}
@@ -642,7 +644,7 @@ function PricingSection() {
               {p.badge && (
                 <div className={`absolute -top-3 left-5 pill-grad ${p.highlight ? "" : "opacity-90"}`}
                      data-testid={p.highlight ? "pricing-recommended" : `pricing-badge-${p.name.toLowerCase().replace(/[·\s]+/g,'-').replace(/[^a-z0-9-]/g,'')}`}>
-                  {p.badge}
+                  {p.badge.toUpperCase()}
                 </div>
               )}
               <div className="text-[11px] text-[var(--text-muted)]">{p.subtitle}</div>
