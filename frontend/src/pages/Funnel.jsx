@@ -14,7 +14,7 @@ import {
   Robot, PhoneCall, WhatsappLogo, ChartLineUp, Clock, Package,
   ShieldCheck, Sparkle, Timer, Fire, CheckCircle, Lightning,
   Trophy, ArrowRight, Users, LockKey, Storefront, ShoppingBag,
-  FileXls, GearSix, MetaLogo, PlugsConnected,
+  FileXls, GearSix, MetaLogo, PlugsConnected, Key,
 } from "@phosphor-icons/react";
 import { Link } from "react-router-dom";
 
@@ -525,65 +525,95 @@ export default function FunnelPage() {
 // -----------------------------------------------------------------------
 function PricingSection() {
   const [annual, setAnnual] = useState(false);
+  // FX placeholder — editable from the panel. Approx COP 4.100 per USD.
+  const COP_PER_USD = 4100;
+  const cop = (usd) => Math.round((usd * COP_PER_USD) / 1000); // return "thousands" for the .toLocaleString display
 
   const plans = [
     {
-      name: "Starter", subtitle: "Para probar el sistema.",
-      monthly: 297, annualMul: 10, // 2 meses gratis
+      name: "Prueba 14 días", subtitle: "Descubre si es para ti. Gratis.",
+      usd: 0, annualMul: 12, byok: true,
       features: [
-        "1 usuario operador",
-        "Hasta 200 órdenes/mes en cola",
-        "Importador Dropi combo-safe",
-        "WhatsApp + reglas 24h",
-        "1 voz Sofía",
-        "Soporte por email",
+        "BYOK — trae tus propias llaves",
+        "Hasta 50 pedidos/mes",
+        "1 usuario",
+        "Sin tarjeta al inicio",
       ],
-      cta: "Empezar",
+      cta: "Empieza gratis",
+      highlight: false,
+      badge: "14 días",
+    },
+    {
+      name: "Starter", subtitle: "Para vendedores COD independientes.",
+      usd: 19, annualMul: 10, byok: true,
+      features: [
+        "BYOK — trae tus propias llaves",
+        "Hasta 500 pedidos/mes",
+        "WhatsApp Chatea Pro + Sofía voz IA",
+        "Importador Dropi combo-safe",
+        "1 usuario",
+      ],
+      cta: "Empezar Starter",
       highlight: false,
     },
     {
-      name: "Growth", subtitle: "Recomendado. Escala el equipo.",
-      monthly: 497, annualMul: 10,
+      name: "Growth", subtitle: "Recomendado. Escala tu operación.",
+      usd: 39, annualMul: 10, byok: true,
       features: [
-        "5 usuarios operadores",
-        "Hasta 2.000 órdenes/mes",
-        "Voces Sofía por país (CO · EC · CL)",
-        "Multi-LLM router (Groq · Claude · Gemini)",
-        "Prompts pro (6-block ElevenLabs)",
+        "BYOK — trae tus propias llaves",
+        "Hasta 2.000 pedidos/mes",
         "Métricas de recuperación",
-        "Onboarding 1:1",
+        "Multiusuario (hasta 5)",
+        "Prompts pro (6-block ElevenLabs)",
+        "Multi-LLM router (Groq · Claude · Gemini)",
       ],
-      cta: "Reservar plaza",
+      cta: "Reservar Growth",
       highlight: true,
+      badge: "Más popular",
     },
     {
-      name: "Scale · Fundador", subtitle: "Cupo limitado antes del lanzamiento.",
-      monthly: 997, annualMul: 10,
+      name: "Agencia · Scale", subtitle: "Multi-marca / multi-org.",
+      usd: 79, annualMul: 10, byok: true,
       features: [
+        "BYOK — trae tus propias llaves",
+        "Pedidos ilimitados",
+        "Multi-organización (agencias)",
         "Usuarios ilimitados",
-        "Órdenes ilimitadas",
-        "Voces custom clonadas (2 incluidas)",
-        "SIP dedicado Telnyx",
-        "Integración custom (Supabase / n8n / Meta Ads)",
-        "Soporte prioritario 24/7",
-        "Precio fundador congelado",
+        "Soporte prioritario",
       ],
       cta: "Hablar con ventas",
       highlight: false,
     },
+    {
+      name: "Hecho por ti · Managed", subtitle: "Nosotros ponemos las llaves.",
+      usd: 149, annualMul: 10, byok: false,
+      features: [
+        "SIN llaves — nosotros incluimos el uso",
+        "Llamadas + WhatsApp incluidos (justos)",
+        "Onboarding 1:1 en <3 horas",
+        "Ideal para no-técnicos",
+        "Facturación única",
+      ],
+      cta: "Contáctame",
+      highlight: false,
+      badge: "Managed",
+    },
   ];
 
   return (
-    <section id="pricing-plans" className="max-w-6xl mx-auto px-5 pb-16" data-testid="funnel-pricing">
+    <section id="pricing-plans" className="max-w-7xl mx-auto px-5 pb-16" data-testid="funnel-pricing">
       <div className="text-center mb-8">
         <div className="pill-grad inline-flex items-center gap-2 mb-3">
-          <Sparkle size={12} weight="fill" /> Precios
+          <Sparkle size={12} weight="fill" /> Precios · BYOK
         </div>
         <h2 className="text-3xl md:text-4xl font-semibold">
-          Plan simple. <span className="grad-text">ROI inmediato.</span>
+          Cobramos solo la <span className="grad-text">plataforma</span>.<br/>
+          El uso lo pagas TÚ, directo a los proveedores.
         </h2>
-        <p className="text-sm text-[var(--text-secondary)] max-w-xl mx-auto mt-3">
-          Precios en pesos colombianos (COP), miles. Editables desde el panel — solo son sugerencia.
+        <p className="text-sm text-[var(--text-secondary)] max-w-2xl mx-auto mt-3">
+          Trae tus propias llaves (ElevenLabs, Telnyx, Chatea Pro, Dropi, LLM) — sin sobrecosto
+          de minutos ni margen escondido. Es la manera honesta de precios.
+          &nbsp;<a href="#byok" className="text-emerald-300 hover:text-emerald-200 underline underline-offset-2">¿Qué es BYOK?</a>
         </p>
         <div className="mt-5 inline-flex rounded-full border border-[var(--border)] p-1 bg-[var(--surface)] backdrop-blur">
           <button onClick={() => setAnnual(false)}
@@ -597,54 +627,125 @@ function PricingSection() {
         </div>
       </div>
 
-      <div className="grid md:grid-cols-3 gap-4">
+      <div className="grid md:grid-cols-3 lg:grid-cols-5 gap-3">
         {plans.map((p) => {
-          const price = annual ? p.monthly * p.annualMul : p.monthly;
+          const usdEff = p.usd === 0 ? 0 : (annual ? p.usd * p.annualMul : p.usd);
+          const copEff = cop(usdEff);
           return (
             <div key={p.name}
-              className={`relative rounded-2xl border p-6 backdrop-blur-xl transition
+              className={`relative rounded-2xl border p-5 backdrop-blur-xl transition h-full flex flex-col
                 ${p.highlight
                   ? "border-transparent bg-gradient-to-b from-[color-mix(in_oklab,var(--accent)_20%,var(--surface))] to-[var(--surface)]"
                   : "border-[var(--border)] bg-[var(--surface)]"}`}
-              data-testid={`pricing-plan-${p.name.toLowerCase().replace(/\W+/g,'-')}`}
-              style={p.highlight ? { boxShadow: "0 0 0 1px transparent, 0 20px 60px -20px rgba(10,132,255,0.35)" } : {}}>
-              {p.highlight && (
-                <div className="absolute -top-3 left-6 pill-grad" data-testid="pricing-recommended">
-                  Más popular
+              data-testid={`pricing-plan-${p.name.toLowerCase().replace(/[·\s]+/g,'-').replace(/[^a-z0-9-]/g,'')}`}
+              style={p.highlight ? { boxShadow: "0 20px 60px -20px rgba(10,132,255,0.35)" } : {}}>
+              {p.badge && (
+                <div className={`absolute -top-3 left-5 pill-grad ${p.highlight ? "" : "opacity-90"}`}
+                     data-testid={p.highlight ? "pricing-recommended" : `pricing-badge-${p.name.toLowerCase().replace(/[·\s]+/g,'-').replace(/[^a-z0-9-]/g,'')}`}>
+                  {p.badge}
                 </div>
               )}
-              <div className="text-sm text-[var(--text-secondary)]">{p.subtitle}</div>
-              <h3 className={`text-2xl font-semibold mt-1 ${p.highlight ? "grad-text" : ""}`}>{p.name}</h3>
-              <div className="mt-5 flex items-baseline gap-1">
-                <span className="text-4xl font-semibold">${price.toLocaleString("es-CO")}</span>
-                <span className="text-xs text-[var(--text-muted)]">
-                  .000 COP / {annual ? "año" : "mes"}
-                </span>
+              <div className="text-[11px] text-[var(--text-muted)]">{p.subtitle}</div>
+              <h3 className={`text-lg font-semibold mt-1 ${p.highlight ? "grad-text" : ""}`}>{p.name}</h3>
+
+              <div className="mt-4">
+                {p.usd === 0 ? (
+                  <div className="text-3xl font-semibold">Gratis</div>
+                ) : (
+                  <>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-3xl font-semibold">${usdEff}</span>
+                      <span className="text-[11px] text-[var(--text-muted)]">USD / {annual ? "año" : "mes"}</span>
+                    </div>
+                    <div className="text-[11px] text-[var(--text-muted)]">
+                      ≈ ${copEff.toLocaleString("es-CO")}.000 COP / {annual ? "año" : "mes"}
+                    </div>
+                  </>
+                )}
               </div>
-              {annual && (
-                <div className="text-[11px] text-emerald-400 mt-1">
-                  Ahorras ${(p.monthly * 2).toLocaleString("es-CO")}.000 vs pagar mensual.
-                </div>
-              )}
-              <ul className="mt-5 space-y-2">
+
+              {/* BYOK / Managed banner */}
+              <div className={`mt-3 rounded-md px-2 py-1.5 text-[10px] font-mono uppercase tracking-widest border ${
+                p.byok
+                  ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-300"
+                  : "border-blue-500/25 bg-blue-500/10 text-blue-300"
+              }`} data-testid={`pricing-model-${p.name.toLowerCase().replace(/[·\s]+/g,'-').replace(/[^a-z0-9-]/g,'')}`}>
+                {p.byok ? "BYOK · Tú traes tus llaves" : "Managed · Nosotros ponemos las llaves"}
+              </div>
+
+              <ul className="mt-4 space-y-1.5 flex-1">
                 {p.features.map((f) => (
-                  <li key={f} className="text-sm text-[var(--text-secondary)] flex items-start gap-2">
-                    <CheckCircle size={14} className="text-emerald-400 mt-0.5 shrink-0" weight="duotone" />
+                  <li key={f} className="text-[12px] text-[var(--text-secondary)] flex items-start gap-2">
+                    <CheckCircle size={12} className="text-emerald-400 mt-0.5 shrink-0" weight="duotone" />
                     <span>{f}</span>
                   </li>
                 ))}
               </ul>
+
               <Button
                 onClick={() => document.getElementById("vip")?.scrollIntoView({ behavior: "smooth" })}
-                className={`w-full mt-6 h-11 ${p.highlight ? "btn-cta-grad" : ""}`}
+                className={`w-full mt-5 h-10 text-xs ${p.highlight ? "btn-cta-grad" : ""}`}
                 variant={p.highlight ? undefined : "outline"}
-                data-testid={`pricing-cta-${p.name.toLowerCase().replace(/\W+/g,'-')}`}>
-                {p.cta} <ArrowRight size={14} weight="bold" />
+                data-testid={`pricing-cta-${p.name.toLowerCase().replace(/[·\s]+/g,'-').replace(/[^a-z0-9-]/g,'')}`}>
+                {p.cta} <ArrowRight size={12} weight="bold" />
               </Button>
             </div>
           );
         })}
       </div>
+
+      <p className="text-center text-[11px] text-[var(--text-muted)] mt-6">
+        Precios editables — placeholder. Facturación mediante Stripe o transferencia. Cambia de plan cuando quieras.
+      </p>
+    </section>
+  );
+}
+
+// -----------------------------------------------------------------------
+// BYOK EXPLAINER + COMPARISON
+// -----------------------------------------------------------------------
+function ByokSection() {
+  const rows = [
+    { feat: "Costo por minuto de llamada",       byok: "Al costo real (ElevenLabs/Telnyx te factura directo)", managed: "Incluido en tu plan (todo-en-uno)" },
+    { feat: "Costo por WhatsApp",                byok: "Al costo real (Chatea Pro te factura directo)",         managed: "Incluido" },
+    { feat: "Marcado / margen escondido Litper", byok: "Cero. Sin sobrecosto de uso.",                           managed: "Simple: pagas 1 factura mensual" },
+    { feat: "Setup técnico",                     byok: "Pegas 3–5 llaves (guía paso a paso, ~10 min)",           managed: "Cero — nosotros lo configuramos" },
+    { feat: "Ideal para",                        byok: "Vendedor con volumen que quiere costos reales",         managed: "No-técnicos que quieren precio fijo" },
+  ];
+  return (
+    <section id="byok" className="max-w-5xl mx-auto px-5 pb-16" data-testid="funnel-byok">
+      <div className="text-center mb-8">
+        <div className="pill-grad inline-flex items-center gap-2 mb-3">
+          <Key size={12} weight="fill" /> Trae tus propias herramientas
+        </div>
+        <h2 className="text-3xl md:text-4xl font-semibold">
+          <span className="grad-text">BYOK</span>: precios honestos, sin markup.
+        </h2>
+        <p className="text-sm text-[var(--text-secondary)] max-w-2xl mx-auto mt-3">
+          Conectas tus llaves de ElevenLabs, Telnyx, Chatea Pro, Dropi y tu LLM una sola vez.
+          Litper solo cobra la plataforma — nunca ponemos un margen sobre tus minutos o mensajes.
+          Es la misma filosofía que usan Vapi, Synthflow y Dapta.
+        </p>
+      </div>
+
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] backdrop-blur-xl overflow-hidden">
+        <div className="grid grid-cols-3 text-[11px] font-mono uppercase tracking-widest text-[var(--text-muted)] border-b border-[var(--border)]">
+          <div className="p-3">Comparación</div>
+          <div className="p-3 border-l border-[var(--border)]"><span className="text-emerald-300">BYOK</span> · Trae tus llaves</div>
+          <div className="p-3 border-l border-[var(--border)]"><span className="text-blue-300">Managed</span> · Hecho por ti</div>
+        </div>
+        {rows.map((r, i) => (
+          <div key={i} className="grid grid-cols-3 text-sm border-b border-[var(--border)] last:border-b-0"
+               data-testid={`byok-row-${i}`}>
+            <div className="p-3 text-[var(--text-primary)] font-medium">{r.feat}</div>
+            <div className="p-3 border-l border-[var(--border)] text-[var(--text-secondary)]">{r.byok}</div>
+            <div className="p-3 border-l border-[var(--border)] text-[var(--text-secondary)]">{r.managed}</div>
+          </div>
+        ))}
+      </div>
+      <p className="text-center text-[11px] text-[var(--text-muted)] mt-4">
+        ¿No sabes qué plan escoger? Empieza con la prueba de 14 días — es BYOK y sin tarjeta.
+      </p>
     </section>
   );
 }

@@ -127,3 +127,9 @@ Same as v1.0 plus:
 - **Prompts 6-block ElevenLabs structure**: seeded Sofía CO/EC + _template_sofia_script emit `# Personalidad / # Entorno / # Tono / # Objetivo / # Guardrails / # Herramientas`. Antifluido rule repeated twice. Validation requires the 3 core headers. On boot, existing legacy prompts are force-migrated to the new structure (idempotent).
 - **Landing Pricing + Features + FAQ**: 3 plans (Starter $297 / Growth $497 highlighted / Scale·Fundador $997) with monthly/annual toggle (annual = ×10 = 2 free months); 6-item feature grid; 6-question FAQ accordion. All in ZYNEX Silver design.
 - **Fixes on iteration_10**: (1) Seed migration replaces legacy 'Eres Sofía...' with new 6-block via $set. (2) Config toast Probar conexión now stringifies detail objects.
+
+## 2026-02-22 — BYOK Pricing Pivot
+- Landing pricing restructured to 5 BYOK tiers: Prueba 14 días (gratis) · Starter $19 · Growth $39 (recomendado) · Agencia·Scale $79 · Hecho por ti·Managed $149. USD + COP shown per card; monthly/annual toggle (annual = ×10 = 2 free months).
+- Every card carries an explicit `BYOK · Tú traes tus llaves` (emerald) or `Managed · Nosotros ponemos las llaves` (blue) banner.
+- New "Trae tus propias herramientas" (BYOK) section with a 5-row comparison table (BYOK vs Managed): pricing, fees, ideal use-case.
+- New guided **Onboarding wizard** at `/app/onboarding` — 5-step stepper (Chatea Pro · ElevenLabs · Telnyx · Dropi · LLM), progress bar (n/5), inline "Probar conexión", "Guardar & siguiente". Auto-detects LLM step from 5 options (Groq/Gemini/Claude/Mistral/Cerebras). "Listo para operar" state when Chatea Pro + ≥1 LLM are connected. Backend `GET /api/config/onboarding` returns the state.

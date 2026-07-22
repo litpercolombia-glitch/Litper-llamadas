@@ -1,0 +1,30 @@
+{
+  "summary": "Iteration 12 BYOK pricing pivot + Onboarding wizard testing. Backend 100% (7/7 iteration_12 tests + 5/5 dropi_import). Frontend Onboarding wizard fully functional (progress, 5 stepper testids, chatea_pro save->connected, LLM picker with 5 pills, save under selected provider, minimum_ok -> launch btn nav to /app, dropi info step with /app/import link, sidebar entry present). Funnel Pricing renders 5 tiers with correct testids (using generated slugs prueba-14-das, starter, growth, agencia-scale, hecho-por-ti-managed), BYOK/Managed banners text-accurate, USD+COP prices present, monthly<->annual toggle multiplies by 10 correctly. HOWEVER: ByokSection component is defined in Funnel.jsx but NEVER rendered — data-testid='funnel-byok' and byok-row-0..4 are MISSING from the DOM. This fails multiple frontend acceptance criteria.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Funnel.jsx / FunnelPage", "issue": "ByokSection is defined (line 707) but never rendered in the FunnelPage JSX. `<ByokSection />` must be inserted before `<PricingSection />` (around line 413). Currently funnel-byok testid and byok-row-0..4 are absent from the page — the entire BYOK explainer comparison table is missing.", "selector": "[data-testid='funnel-byok']", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Funnel pricing card badge", "issues": ["'pricing-recommended' badge text is 'Más popular' (title case). Review asserts 'MÁS POPULAR' literal. If a case-sensitive assertion is used it will fail. Consider uppercasing the string or rely on CSS text-transform + normalized comparison."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iteration_12.py", "/app/test_reports/pytest/iter12.xml"],
+  "action_items": [
+    "Render <ByokSection /> in Funnel.jsx FunnelPage — insert it just before <PricingSection /> (line ~413). This restores funnel-byok + byok-row-0..4 testids required by the spec.",
+    "(Optional) Change the recommended badge string to 'MÁS POPULAR' (uppercase) for case-sensitive assertions."
+  ],
+  "critical_code_review_comments": [
+    "Funnel.jsx is 848 lines — should be split into subcomponents (PricingSection, ByokSection, FeaturesGrid, FaqSection, VipForm) into separate files.",
+    "Slug builder in card testids produces 'prueba-14-das' (accent 'í' stripped by /[^a-z0-9-]/g). If future tests want 'prueba-14-dias', normalize accents (String.prototype.normalize('NFD').replace(/[\\u0300-\\u036f]/g,''))."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration_12.py"],
+  "success_rate": {"backend": "100%", "frontend": "90%"},
+  "test_credentials": "PUBLIC_API_KEY=litper_hub_pk_2026_prod_ChangeMe_9x2Kf7bQvE4mLnT8sZ3H; localStorage litper_operator_ok=1 + litper_operator_key=<KEY>",
+  "seed_data_creation": "Temporarily PUT chatea_pro (cp_ui_test_123 / cp_e2e_ABC) and groq (gsk_ui_test_XYZ / gsk_e2e_XYZ) then DELETEd both at end of tests to return to env fallback.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Only the ByokSection render is missing — everything else passes 100%. After main agent adds <ByokSection /> before <PricingSection /> in Funnel.jsx, re-run just the Funnel BYOK assertions (data-testid=funnel-byok, byok-row-0..4). Card testids use accent-stripped slugs (prueba-14-das, agencia-scale, hecho-por-ti-managed). Backend onboarding endpoint + regression fully green.",
+  "rca of the issue": "Funnel.jsx defines function ByokSection() at line 707 but the FunnelPage return JSX never invokes it. The comment on line 412 says '// PRECIOS — 3 planes con spotlight' and next line renders <PricingSection />, then <FeaturesGrid /> — a missing <ByokSection /> between problem section and PricingSection. Fix: add `<ByokSection />` line immediately before `<PricingSection />`."
+}

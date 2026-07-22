@@ -140,3 +140,65 @@ async def test_credentials(provider: str, request: Request):
         return {"ok": True, "detail": "Credenciales presentes (no se hizo llamada externa)."}
 
     return {"ok": False, "detail": "Test no implementado para este provider."}
+
+
+# ---------------------------------------------------------------------------
+# Onboarding progress — helper for the guided wizard.
+# ---------------------------------------------------------------------------
+REQUIRED_TO_OPERATE = ["chatea_pro"]      # must have at least these to send WA
+LLM_PROVIDERS       = ["groq", "gemini", "mistral", "cerebras", "claude"]
+
+_ONBOARDING_STEPS = [
+    {"key": "chatea_pro", "label": "Chatea Pro · WhatsApp",
+     "doc": "https://chateapro.app/settings#/api",
+     "instructions": "Entra a chateapro.app → Configuración → API tokens y crea uno."},
+    {"key": "elevenlabs", "label": "ElevenLabs · Voz IA",
+     "doc": "https://elevenlabs.io/app/settings/api-keys",
+     "instructions": "API Key con permisos ConvAI + TTS. Voice ID desde Voice Lab."},
+    {"key": "telnyx", "label": "Telnyx · SIP",
+     "doc": "https://portal.telnyx.com",
+     "instructions": "Compra un número CO/EC/CL, crea una Voice/SIP Connection y guarda API Key + Connection ID."},
+    {"key": "dropi", "label": "Dropi · Fuente de pedidos",
+     "doc": "https://dropi.co/",
+     "instructions": "No necesita llave — solo exporta 'Reclamos en Oficina' desde tu panel Dropi."},
+    {"key": "llm", "label": "Motor de IA (Groq / Gemini / Claude / Mistral / Cerebras)",
+     "doc": "https://console.groq.com/keys",
+     "instructions": "Con uno basta. Groq es gratis y muy rápido — ideal para empezar."},
+]
+
+
+@router.get("/onboarding",
+            summary="Return the guided wizard state: steps, per-step status, and whether the org "
+                    "has the MINIMUM connections to start operating (Chatea Pro + 1 LLM).")
+async def onboarding_state(request: Request):
+    org_id = _org_id(request)
+    prov_status = await status(org_id)
+    by_provider = {p["provider"]: p for p in prov_status}
+
+    def _connected(prov: str) -> bool:
+        p = by_provider.get(prov)
+        return bool(p and p.get("configured"))
+
+    steps_out = []
+    for s in _ONBOARDING_STEPS:
+        key = s["key"]
+        if key == "dropi":
+            connected = True   # file-based
+        elif key == "llm":
+            connected = any(_connected(p) for p in LLM_PROVIDERS)
+        else:
+            connected = _connected(key)
+        steps_out.append({**s, "connected": connected})
+
+    connected_count = sum(1 for s in steps_out if s["connected"])
+    minimum_ok = _connected("chatea_pro") and any(_connected(p) for p in LLM_PROVIDERS)
+
+    return {
+        "org_id":         org_id,
+        "steps":          steps_out,
+        "connected":      connected_count,
+        "total":          len(steps_out),
+        "minimum_ok":     minimum_ok,
+        "ready_message":  ("Todo listo — ya puedes operar." if minimum_ok
+                           else "Conecta Chatea Pro + un motor de IA para empezar."),
+    }

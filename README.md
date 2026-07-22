@@ -18,6 +18,33 @@ oficina* — before they get returned.
   con instrucciones paso a paso). Every internal route is gated by the
   operator token stored in `localStorage`.
 
+## Onboarding wizard (BYOK)
+
+New customers land on `/app/onboarding` — a 5-step guided flow (Chatea Pro →
+ElevenLabs → Telnyx → Dropi → LLM). Each step has real portal links, paste
+fields for the secret, a "Probar" button that hits `/api/config/credentials/{provider}/test`
+and a "Guardar & siguiente" that persists via
+`PUT /api/config/credentials/{provider}` and advances. Progress bar shows
+`n/5 conectado`. Backend endpoint `GET /api/config/onboarding` computes the
+state and marks `minimum_ok = chatea_pro && any(llm)` — once true a "Listo
+para operar" CTA appears and the wizard hands the operator off to the
+Copilot.
+
+## Pricing (BYOK)
+
+Public landing at `/` shows 5 tiers with an explicit **BYOK vs Managed**
+banner on every card:
+
+- **Prueba 14 días** — Gratis, hasta 50 pedidos/mes, sin tarjeta.
+- **Starter** — $19 USD/mes (~$78.000 COP), hasta 500 pedidos/mes.
+- **Growth** — $39 USD/mes (~$160.000 COP), hasta 2.000 pedidos/mes.
+- **Agencia · Scale** — $79 USD/mes (~$324.000 COP), pedidos ilimitados + multi-marca.
+- **Hecho por ti · Managed** — $149 USD/mes (~$611.000 COP), llaves incluidas.
+
+Prices are placeholders — edit the array in `pages/Funnel.jsx` → `PricingSection`.
+Annual toggle applies a ×10 multiplier (2 free months). USD → COP conversion
+uses `COP_PER_USD = 4100` (edit inline).
+
 ## Multi-tenant credentials (Configuración → Credenciales)
 
 Every organization stores its OWN provider keys — encrypted at rest with
