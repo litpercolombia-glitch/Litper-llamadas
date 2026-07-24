@@ -1,0 +1,33 @@
+{
+  "summary": "Iteration 15 — verified new auth (email+pass + Emergent Google session exchange), the 5-agent orchestrator, the shared RTO blacklist, and the Claude-style Copilot console. 11/11 pytest cases pass and 20/20 Playwright assertions pass (login, gating, greeting, 5 agent cards, right rail, KPIs, /agents/orchestrate wired to card click, logout + refresh gating, public funnel still renders).",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      { "screen": "global", "issues": ["Canvas2D warning: MatrixRain/Constellation call getImageData without willReadFrequently=true — perf-only, no functional impact."] }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_auth_agents.py",
+    "/app/test_reports/pytest/iter15.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "auth.py sets cookie with secure=True and samesite=lax — correct for the HTTPS preview domain, but local http testing (not required here) would fail; keep in mind for dev.",
+    "agents/orchestrate uses require_confirm_for_money+prepay/rescate as HITL trigger. When there is no order_id and no queue rows, rescate.action=='skip' → HITL never fires, so the frontend falls through to sendPrompt(). That matches the requested 'either send prompt OR open HITL' spec but means the HITL dialog cannot be exercised end-to-end from a clean DB without seeded queue rows.",
+    "Copilot.jsx: kpi.tasa_pct is read from metrics.norte.recovery_rate.value — if the metrics endpoint schema changes this silently shows 0; consider a small fallback badge.",
+    "Multiple canvas backgrounds (MatrixRain + Constellation) mounted at once on every gated page; consider mounting only on landing/login for lower CPU.",
+    "server.py registers novedades_router twice (lines 208 & 221) — harmless (FastAPI ignores dup routes with same path) but should be cleaned up."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_auth_agents.py (new)"
+  ],
+  "success_rate": { "backend": "100% (11/11)", "frontend": "100% (20/20)" },
+  "test_credentials": "qa2@litper.co / Litper!2026 (existing). A fresh qa+<timestamp>@litper.co org is created every pytest run — cleanup not implemented (documented in memory).",
+  "seed_data_creation": "None mandatory. Pytest creates one TEST user + org per run for the register-success case.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend cookie auth uses HttpOnly cookie 'litper_session' + JWT. In Playwright, `page.request.post('/api/auth/login')` bootstraps the browser context cookie jar. The 5-agent orchestrator lives at POST /api/agents/orchestrate and DOES require X-API-Key (auto-injected by frontend api.js). HITL modal only opens when risk.prepay_required=true OR novedades yields days_left → rescate.action=='cadence_planned' — seed a queue row with days_left<=7 to exercise the HITL yes/no buttons end-to-end.",
+  "rca of the issue": "N/A — no bugs found this iteration."
+}

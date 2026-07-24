@@ -42,6 +42,8 @@ from routes.products import router as products_router  # noqa: E402
 from routes.prompts import router as prompts_router  # noqa: E402
 from routes.vip import public_router as vip_public_router, admin_router as vip_admin_router  # noqa: E402
 from routes.config import router as config_router  # noqa: E402
+from routes.auth import router as auth_router  # noqa: E402
+from routes.agents import router as agents_router  # noqa: E402
 from routes.llm import router as llm_router  # noqa: E402
 
 logging.basicConfig(level=logging.INFO,
@@ -89,6 +91,9 @@ async def _ensure_seed():
     await db.whatsapp_rules.create_index("id", unique=True)
     await db.org_credentials.create_index([("org_id", 1), ("provider", 1)], unique=True)
     await db.whatsapp_contacts.create_index("phone", unique=True)
+    await db.users.create_index("email", unique=True)
+    await db.orgs.create_index("id", unique=True)
+    await db.rto_blacklist.create_index("phone", unique=True)
 
     # Seed novedades (idempotent by carrier+estatus_carrier)
     for n in NOVEDADES_SEED:
@@ -189,7 +194,8 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=os.environ.get("CORS_ORIGINS", "*").split(","),
+    allow_origins=[o for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip()],
+    allow_origin_regex=r"https://.*\.preview\.emergentagent\.com|http://localhost:\d+",
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -222,6 +228,8 @@ api.include_router(prompts_router)
 api.include_router(vip_public_router)
 api.include_router(vip_admin_router)
 api.include_router(config_router)
+api.include_router(auth_router)
+api.include_router(agents_router)
 api.include_router(llm_router)
 
 

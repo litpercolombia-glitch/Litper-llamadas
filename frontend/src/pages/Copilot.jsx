@@ -2,18 +2,22 @@ import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import Sidebar from "../components/Sidebar";
-import { api } from "../lib/api";
+import { api, formatCOP } from "../lib/api";
 import { Toaster, toast } from "sonner";
 import { Button } from "../components/ui/button";
 import { Textarea } from "../components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "../components/ui/select";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "../components/ui/dialog";
 import { Switch } from "../components/ui/switch";
 import {
   Robot, PaperPlaneRight, Plus, TrashSimple, Wrench,
   CheckCircle, WarningCircle, User, Lightning, Sparkle,
-  Queue, ClockCountdown, Warning, ChartLineUp,
+  WarningDiamond, PhoneCall, Warning, Lifebuoy, ChartLineUp,
+  CurrencyCircleDollar, Plug, SignOut, PlayCircle,
 } from "@phosphor-icons/react";
 import { useNavigate } from "react-router-dom";
 import MatrixRain from "../components/MatrixRain";
@@ -145,6 +149,11 @@ export default function CopilotPage() {
   const [autoMode, setAutoMode] = useState(false);
   const [input, setInput] = useState("");
   const [running, setRunning] = useState(false);
+  const [me, setMe] = useState(null);
+  const [connectors, setConnectors] = useState([]);
+  const [kpi, setKpi] = useState({ recuperados: 0, total: 0, dinero_cop: 0, tasa_pct: 0 });
+  const [hitl, setHitl] = useState(null); // {agent, message, payload}
+  const [orchestrating, setOrchestrating] = useState(false);
   const scrollRef = useRef(null);
 
   const loadThreads = async () => {
@@ -155,6 +164,36 @@ export default function CopilotPage() {
     const r = await api.get("/skills");
     setSkills(r.data || []);
   };
+  const loadMe = async () => {
+    try {
+      const r = await api.get("/auth/me");
+      setMe(r.data?.user || null);
+    } catch { /* AuthGate should redirect */ }
+  };
+  const loadConnectors = async () => {
+    try {
+      const r = await api.get("/connectors");
+      setConnectors(r.data || []);
+    } catch { setConnectors([]); }
+  };
+  const loadKpi = async () => {
+    try {
+      const r = await api.get("/metrics");
+      const d = r.data || {};
+      const norte = d.norte || {};
+      const roi = norte.roi_cop || {};
+      const recRate = norte.recovery_rate || {};
+      // Try to derive counts from the queue_by_status legacy map.
+      const qbs = d.queue_by_status || {};
+      const recovered = (qbs.confirmado || 0) + (qbs.ya_recogio || 0);
+      setKpi({
+        recuperados: recovered,
+        total:       d.queue_total ?? d.orders_total ?? 0,
+        dinero_cop:  roi.recovered_value_cop ?? 0,
+        tasa_pct:    recRate.value ?? 0,
+      });
+    } catch { /* metrics endpoint optional */ }
+  };
   const loadMessages = async (tid) => {
     if (!tid) { setMessages([]); return; }
     const r = await api.get(`/threads/${tid}/messages`);
@@ -164,6 +203,9 @@ export default function CopilotPage() {
   useEffect(() => {
     loadThreads();
     loadSkills();
+    loadMe();
+    loadConnectors();
+    loadKpi();
   }, []);
 
   useEffect(() => { loadMessages(activeId); }, [activeId]);
@@ -207,6 +249,91 @@ export default function CopilotPage() {
     setSkillId(s.id);
     setInput(prev => prev ? prev : `/${s.trigger} `);
     toast.info(`Skill activada: ${s.name}`);
+  };
+
+  const doLogout = async () => {
+    try { await api.post("/auth/logout"); } catch {}
+    localStorage.removeItem("litper_operator_ok");
+    navigate("/login", { replace: true });
+  };
+
+  // 5 operational agents shown on the empty state / right rail.
+  const AGENTS = [
+    { key: "riesgo_rto",          name: "Riesgo RTO",
+      icon: WarningDiamond, tone: "text-orange-300",
+      hint: "Puntúa el riesgo del pedido y decide si exigir prepago.",
+      prompt: "Ejecuta Riesgo RTO sobre los últimos 50 pedidos y muéstrame los de riesgo alto (score ≥ 60)." },
+    { key: "confirmacion_cod",    name: "Confirmación COD",
+      icon: PhoneCall, tone: "text-sky-300",
+      hint: "Verifica intención + dirección por voz y WhatsApp.",
+      prompt: "Programa Confirmación COD para todos los pedidos nuevos de hoy. Prioriza los de riesgo medio." },
+    { key: "novedades",           name: "Novedades",
+      icon: Warning, tone: "text-yellow-300",
+      hint: "Sweep del carrier, semáforo y disparo de Rescate.",
+      prompt: "Corre el sweep de Novedades y dame el semáforo por transportadora." },
+    { key: "rescate_oficina",     name: "Rescate Oficina",
+      icon: Lifebuoy, tone: "text-emerald-300",
+      hint: "Cadencia hasta 5 intentos con templates aprobados.",
+      prompt: "Recupera los pedidos rojos en oficina con la cadencia 0-3d / 4-7d / 8+ y muéstrame el impacto." },
+    { key: "analitica_operativa", name: "Analítica Operativa",
+      icon: ChartLineUp, tone: "text-fuchsia-300",
+      hint: "Recuperación, entrega efectiva y $ recuperado.",
+      prompt: "Dame el reporte CEO del día: recuperación, devoluciones evitadas y $ recuperado." },
+  ];
+
+  const runAgent = async (agent) => {
+    // 1) Ask the orchestrator (deterministic; returns a HITL flag for money actions).
+    setOrchestrating(true);
+    try {
+      const r = await api.post("/agents/orchestrate", {
+        require_confirm_for_money: true,
+      });
+      const data = r.data;
+      const line = (data?.chain?.[agent.key]);
+      const summary = line ? JSON.stringify(line, null, 2) : "Orquestador ejecutado sin cambios.";
+      const requires = !!data?.requires_human_confirmation
+        && (agent.key === "rescate_oficina" || agent.key === "confirmacion_cod");
+      if (requires) {
+        setHitl({
+          agent,
+          summary,
+          note: data?.note || "Acción con costo. Confirma para ejecutar.",
+        });
+      } else {
+        // Auto-run: send the agent prompt to Marcus (LLM) so he can act using tools.
+        await sendPrompt(agent.prompt);
+      }
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Falló el orquestador.");
+    } finally { setOrchestrating(false); }
+  };
+
+  const confirmHitl = async () => {
+    if (!hitl) return;
+    const a = hitl.agent;
+    setHitl(null);
+    toast.success(`Ejecutando ${a.name}…`);
+    await sendPrompt(a.prompt);
+  };
+
+  const sendPrompt = async (text) => {
+    if (!text) return;
+    setInput("");
+    setRunning(true);
+    setMessages(m => [...m, { id: "tmp", role: "user", content: text, tool_calls: [] }]);
+    try {
+      const r = await api.post("/agent/run", {
+        thread_id: activeId, text,
+        model_override: modelOverride !== "auto" ? modelOverride : undefined,
+        auto_mode: autoMode,
+      }, { timeout: 120000 });
+      if (!activeId) setActiveId(r.data.thread_id);
+      await loadMessages(r.data.thread_id);
+      loadThreads();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || e.message);
+      loadMessages(activeId);
+    } finally { setRunning(false); }
   };
 
   const activeSkill = skills.find(s => s.id === skillId);
@@ -265,6 +392,16 @@ export default function CopilotPage() {
                   data-testid="copilot-auto-toggle" />
               </div>
               <ThemeToggle />
+              {me && (
+                <Button
+                  variant="outline"
+                  onClick={doLogout}
+                  data-testid="copilot-logout"
+                  className="h-8 text-xs rounded-sm border-zinc-700 bg-zinc-900 hover:bg-zinc-800">
+                  <SignOut size={12} className="mr-1" />
+                  {me.nombre?.split(" ")[0] || "Salir"}
+                </Button>
+              )}
             </div>
           </div>
         </header>
@@ -280,31 +417,27 @@ export default function CopilotPage() {
 
                 <h1 className="text-3xl md:text-4xl font-semibold text-white mb-3 tracking-tight"
                     data-testid="copilot-greeting">
-                  Hola, soy <span className="neon-text">Marcus</span>{" "}
-                  <span className="text-white">— Tu agente logístico COD.</span>
+                  Hola {me?.nombre ? <span className="text-white">{me.nombre}</span> : ""}, soy{" "}
+                  <span className="neon-text">Marcus</span>{" "}
+                  <span className="text-white">— tu Copilot de 5 agentes.</span>
                 </h1>
                 <p className="text-sm text-zinc-400 mb-10 max-w-lg mx-auto">
-                  Consulto la cola, programo cadencias, envío WhatsApp y creo tickets — con datos reales del Hub.
+                  Elige un agente operativo — yo pido tu confirmación cuando la acción tiene costo.
                 </p>
 
-                {/* 4 quick action cards */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-3xl mx-auto mb-10">
-                  {[
-                    { icon: Queue, label: "Semáforo",   sub: "Ver cola prioritaria",
-                      to: "/app/queue", testId: "quick-semaforo" },
-                    { icon: ClockCountdown, label: "Vencimientos", sub: "Oficina — deadline",
-                      to: "/app/cadence", testId: "quick-vencimientos" },
-                    { icon: Warning, label: "Novedades", sub: "Estatus por carrier",
-                      to: "/app/novedades", testId: "quick-novedades" },
-                    { icon: ChartLineUp, label: "Recuperación", sub: "KPI del día",
-                      to: "/app/metrics", testId: "quick-recuperacion" },
-                  ].map((q) => (
-                    <div key={q.label} className="zx-suggest-card text-left"
-                         onClick={() => navigate(q.to)}
-                         data-testid={q.testId}>
-                      <q.icon size={22} className="text-white mb-2" weight="duotone" />
-                      <div className="text-sm font-semibold text-white">{q.label}</div>
-                      <div className="text-[11px] text-zinc-400 mt-0.5">{q.sub}</div>
+                {/* 5 operational agents */}
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-3 max-w-4xl mx-auto mb-10">
+                  {AGENTS.map((a) => (
+                    <div key={a.key}
+                         className="zx-suggest-card text-left flex flex-col gap-2 h-full"
+                         onClick={() => runAgent(a)}
+                         data-testid={`agent-card-${a.key}`}>
+                      <a.icon size={22} className={`${a.tone} mb-1`} weight="duotone" />
+                      <div className="text-sm font-semibold text-white leading-tight">{a.name}</div>
+                      <div className="text-[11px] text-zinc-400 leading-snug">{a.hint}</div>
+                      <div className="mt-auto pt-2 text-[10px] font-mono uppercase tracking-widest text-zinc-500 flex items-center gap-1">
+                        <PlayCircle size={11} /> Ejecutar
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -375,6 +508,114 @@ export default function CopilotPage() {
           </div>
         </footer>
       </div>
+
+      {/* Right rail: $ recuperado + BYOK connectors */}
+      <aside className="hidden xl:flex w-72 shrink-0 border-l border-zinc-800 bg-zinc-950/70 flex-col h-screen sticky top-0"
+             data-testid="copilot-right-rail">
+        <div className="p-5 border-b border-zinc-800">
+          <div className="text-[10px] uppercase tracking-widest font-mono text-zinc-500 mb-2 flex items-center gap-2">
+            <CurrencyCircleDollar size={12} /> $ Recuperado (hoy)
+          </div>
+          <div className="text-2xl font-semibold text-white" data-testid="kpi-dinero">
+            {formatCOP(kpi.dinero_cop)}
+          </div>
+          <div className="mt-1 text-[11px] text-zinc-400">
+            <span data-testid="kpi-recuperados">{kpi.recuperados}</span>
+            {" / "}
+            <span data-testid="kpi-total">{kpi.total}</span> pedidos
+            {" · "}
+            <span className="text-emerald-400" data-testid="kpi-tasa">{kpi.tasa_pct}%</span>
+          </div>
+        </div>
+
+        <div className="p-5 border-b border-zinc-800">
+          <div className="text-[10px] uppercase tracking-widest font-mono text-zinc-500 mb-3 flex items-center gap-2">
+            <Plug size={12} /> Conectores BYOK
+          </div>
+          <div className="space-y-1.5">
+            {(connectors || []).slice(0, 8).map((c) => {
+              const ok = c.status === "connected" || c.status === "configured";
+              return (
+                <div key={c.key} className="flex items-center justify-between text-xs"
+                     data-testid={`connector-${c.key}`}>
+                  <span className="text-zinc-300 truncate">{c.name || c.key}</span>
+                  <span className={`text-[10px] font-mono uppercase tracking-widest ${
+                    ok ? "text-emerald-400" : "text-zinc-500"}`}>
+                    {ok ? "OK" : "—"}
+                  </span>
+                </div>
+              );
+            })}
+            {(!connectors || connectors.length === 0) && (
+              <div className="text-xs text-zinc-500">Sin conectores configurados.</div>
+            )}
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => navigate("/app/config")}
+            data-testid="copilot-open-credentials"
+            className="w-full mt-3 h-8 text-xs rounded-sm border-zinc-700 bg-zinc-900 hover:bg-zinc-800">
+            Configurar credenciales
+          </Button>
+        </div>
+
+        <div className="p-5 flex-1 overflow-y-auto">
+          <div className="text-[10px] uppercase tracking-widest font-mono text-zinc-500 mb-3">
+            5 agentes operativos
+          </div>
+          <div className="space-y-2">
+            {AGENTS.map(a => (
+              <button
+                key={a.key}
+                onClick={() => runAgent(a)}
+                disabled={orchestrating}
+                data-testid={`agent-rail-${a.key}`}
+                className="w-full text-left border border-zinc-800 bg-zinc-900/40 hover:bg-zinc-800/60 rounded-sm px-3 py-2 flex items-center gap-2 transition">
+                <a.icon size={16} className={a.tone} weight="duotone" />
+                <span className="text-sm text-zinc-200 flex-1 truncate">{a.name}</span>
+                <PlayCircle size={12} className="text-zinc-500" />
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="border-t border-zinc-800 p-4 text-[10px] font-mono text-zinc-500">
+          {me?.email ? <div className="truncate">{me.email}</div> : null}
+          <div>org · <span className="text-zinc-300">{me?.org_id?.slice(0, 22)}</span></div>
+        </div>
+      </aside>
+
+      {/* Human-in-the-loop confirmation modal (money / mass actions) */}
+      <Dialog open={!!hitl} onOpenChange={(o) => !o && setHitl(null)}>
+        <DialogContent data-testid="hitl-dialog" className="bg-zinc-950 border-zinc-800 text-white">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <WarningDiamond size={18} className="text-yellow-400" weight="duotone" />
+              Confirmar acción con costo
+            </DialogTitle>
+            <DialogDescription className="text-zinc-400">
+              {hitl?.note} — Agente: <b className="text-white">{hitl?.agent?.name}</b>
+            </DialogDescription>
+          </DialogHeader>
+          <pre className="text-[11px] font-mono bg-black/40 border border-zinc-800 rounded-sm p-3 max-h-52 overflow-auto whitespace-pre-wrap"
+               data-testid="hitl-summary">
+{hitl?.summary}
+          </pre>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setHitl(null)}
+                    data-testid="hitl-no"
+                    className="rounded-sm border-zinc-700 bg-zinc-900 hover:bg-zinc-800">
+              No, cancelar
+            </Button>
+            <Button onClick={confirmHitl}
+                    data-testid="hitl-yes"
+                    className="btn-cta-grad rounded-sm">
+              Sí, ejecutar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Toaster theme="dark" position="top-right"
         toastOptions={{ style: { background: "#18181b", border: "1px solid #27272a", color: "#f4f4f5" } }} />
     </div>

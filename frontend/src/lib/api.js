@@ -15,6 +15,7 @@ function currentKey() {
 export const api = axios.create({
   baseURL: `${BACKEND_URL}/api`,
   timeout: 20000,
+  withCredentials: true, // sends `litper_session` HttpOnly cookie
 });
 
 api.interceptors.request.use((config) => {

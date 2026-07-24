@@ -23,6 +23,33 @@ Same as v1.0 plus:
   15+ tools mapped to the Hub's own endpoints, seeded skills, and file upload
   → bulk import.
 
+
+### v2.0 (2026-07-24) — Real Auth + 5-agent Claude Console (Zynex OS shift)
+- **Backend Auth (email + password)** with bcrypt + JWT stored in an HttpOnly
+  cookie named `litper_session`. Endpoints: `POST /api/auth/register`,
+  `/api/auth/login`, `/api/auth/logout`, `GET /api/auth/me`. Users belong to
+  auto-provisioned orgs (multi-tenant BYOK groundwork).
+- **Emergent-managed Google OAuth** via `POST /api/auth/google/session`. The
+  frontend redirects to `auth.emergentagent.com`, the callback URL fragment
+  `#session_id=...` is exchanged server-side (calls
+  `demobackend.emergentagent.com/auth/v1/env/oauth/session-data`) and the same
+  `litper_session` cookie is issued so both flows share ONE session model.
+- **CORS locked** to `*.preview.emergentagent.com` + explicit list (needed
+  for cookies + credentials).
+- **Frontend Auth**: `withCredentials: true` on the axios client; new
+  `Login.jsx` (email/pass + "Continuar con Google") and `Register.jsx`
+  (org self-serve); `App.js` gains `AuthGate` (server-authoritative
+  `/api/auth/me` probe with checking/authed/guest states) and `AuthRouter`
+  that detects `session_id` in the URL fragment before any routing.
+- **Claude-style Copilot Console**: rebuilt `Copilot.jsx` to feature the
+  five operational agents (Riesgo RTO · Confirmación COD · Novedades ·
+  Rescate Oficina · Analítica Operativa) as executable cards, plus a right
+  rail with live `$ recuperado`, BYOK connectors status, quick-agent list,
+  logged-in user info and Logout. Ads/Copies/Social agents removed.
+- **Human-in-the-loop modal**: when the orchestrator returns
+  `requires_human_confirmation: true` (money/mass actions) the UI opens a
+  `Sí / No` dialog before Marcus is allowed to act.
+
 ## Implementation Status
 
 ### v1.3 (2026-02-21) — Silver Matrix + Real ElevenLabs + Full Metrics
