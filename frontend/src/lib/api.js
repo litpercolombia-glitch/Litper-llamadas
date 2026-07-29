@@ -2,27 +2,33 @@ import axios from "axios";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
-// The operator API key is entered at /login (see LoginPage). We fall back to
-// a public hardcoded key ONLY for pre-login (public funnel) so screenshots +
-// health can still work; the sensitive endpoints require the header regardless.
-const FALLBACK_KEY = "litper_hub_pk_2026_prod_ChangeMe_9x2Kf7bQvE4mLnT8sZ3H";
-
-function currentKey() {
-  if (typeof window === "undefined") return FALLBACK_KEY;
-  return localStorage.getItem("litper_operator_key") || FALLBACK_KEY;
-}
-
+// Zynex OS v2 uses HttpOnly cookie auth (`litper_session`). No more operator
+// key on the client — internal routes now accept either the JWT cookie OR
+// the legacy X-API-Key (kept for external agents). The browser stops
+// shipping the static key entirely.
 export const api = axios.create({
   baseURL: `${BACKEND_URL}/api`,
   timeout: 20000,
-  withCredentials: true, // sends `litper_session` HttpOnly cookie
+  withCredentials: true,
 });
 
-api.interceptors.request.use((config) => {
-  config.headers = config.headers || {};
-  config.headers["X-API-Key"] = currentKey();
-  return config;
-});
+// Automatic 401 → /login redirect. Prevents blank pages when the session
+// expires or is invalidated on the backend.
+api.interceptors.response.use(
+  (r) => r,
+  (err) => {
+    if (err?.response?.status === 401
+        && typeof window !== "undefined"
+        && !window.location.pathname.startsWith("/login")
+        && !window.location.pathname.startsWith("/register")
+        && !window.location.pathname.startsWith("/funnel")
+        && window.location.pathname !== "/") {
+      localStorage.removeItem("litper_operator_ok");
+      window.location.href = "/login";
+    }
+    return Promise.reject(err);
+  }
+);
 
 export const semaforoStyles = {
   rojo:     { dot: "#ef4444", label: "Rojo",     cls: "bg-red-500/10 text-red-400 border-red-500/30" },

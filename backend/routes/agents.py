@@ -181,3 +181,128 @@ async def blacklist_add(payload: BlacklistIn):
 async def blacklist_remove(phone: str):
     await get_db().rto_blacklist.delete_one({"phone": phone})
     return {"ok": True}
+
+
+# ---------- CEO Reports (populated by the daily cron) ----------
+@router.get("/ceo-report",
+            summary="Latest daily CEO report snapshot (or the one for a specific date).")
+async def ceo_report(date: Optional[str] = None):
+    db = get_db()
+    q = {"id": date} if date else {}
+    cursor = db.ceo_reports.find(q, {"_id": 0}).sort("date", -1).limit(1)
+    docs = await cursor.to_list(1)
+    if not docs:
+        return {"available": False, "note": "Aún no hay reporte CEO. El cron corre 08:00 America/Bogotá."}
+    return {"available": True, "report": docs[0]}
+
+
+@router.post("/ceo-report/run-now",
+             summary="Manually generate the CEO snapshot for today (debug/preview).")
+async def ceo_report_now():
+    from scheduler import daily_ceo_report
+    await daily_ceo_report()
+    return {"ok": True}
+
+
+@router.get("/novedades-ticks",
+            summary="Recent semaphore snapshots from the 15-min sweep.")
+async def novedades_ticks(limit: int = 20):
+    docs = await get_db().novedades_ticks.find({}, {"_id": 0}).sort("ts", -1).limit(limit).to_list(limit)
+    return docs
+
+
+# ---------- Cascade (run 5-agent chain across a segment) ----------
+class CascadeIn(BaseModel):
+    segment: str = "red_this_week"  # red_this_week | new_today | office_all | custom
+    limit: int = 25                  # cap to keep response snappy
+    require_confirm_for_money: bool = True
+
+
+async def _pick_segment(db, segment: str, limit: int) -> list[dict]:
+    """Return a list of {order_id, phone, city, product} dicts for the segment."""
+    q: dict = {}
+    if segment == "red_this_week":
+        # rojo semaphore in queue → days_left <= 3
+        rows = await db.call_queue.find(
+            {"status": {"$in": ["pending", "in_progress"]}},
+            {"_id": 0, "order_id": 1, "days_left": 1}).to_list(500)
+        picked = [r["order_id"] for r in rows if (r.get("days_left") is not None
+                                                   and r["days_left"] <= 3)][:limit]
+        q = {"id": {"$in": picked}}
+    elif segment == "new_today":
+        from datetime import datetime, timezone, timedelta
+        cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+        q = {"created_at": {"$gte": cutoff}}
+    elif segment == "office_all":
+        q = {"status": {"$in": ["office_arrived", "pending", "in_progress"]}}
+    else:
+        q = {}
+    orders = await db.orders.find(q, {"_id": 0}).limit(limit).to_list(limit)
+    return orders
+
+
+@router.post("/cascade",
+             summary="Run the 5-agent chain across a segment (up to `limit` orders).")
+async def cascade(payload: CascadeIn):
+    db = get_db()
+    orders = await _pick_segment(db, payload.segment, payload.limit)
+    if not orders:
+        return {"segment": payload.segment, "processed": 0, "results": [],
+                "hitl_required": [], "summary": {"total_orders": 0},
+                "note": "Sin pedidos en ese segmento."}
+
+    results: list[dict] = []
+    hitl_required: list[dict] = []
+    high_risk_ct = 0
+    rescate_ct = 0
+    for o in orders:
+        phone = o.get("customer_phone") or ""
+        city  = o.get("city") or ""
+        product = (o.get("products_display")
+                   or (o.get("items") or [{}])[0].get("product", "")
+                   or "")
+        risk    = await _run_riesgo(db, phone, city, product)
+        conf    = await _run_confirmacion(risk)
+        nov     = await _run_novedades(db, o.get("id"))
+        rescate = await _run_rescate(nov.get("days_left"))
+        needs_conf = payload.require_confirm_for_money and (
+            risk["prepay_required"] or rescate.get("action") == "cadence_planned"
+        )
+        if risk["level"] == "alto":
+            high_risk_ct += 1
+        if rescate.get("action") == "cadence_planned":
+            rescate_ct += 1
+        item = {
+            "order_id": o.get("id"),
+            "tracking": o.get("tracking_number"),
+            "customer": o.get("customer_name"),
+            "phone": phone, "city": city,
+            "chain": {"riesgo_rto": risk, "confirmacion_cod": conf,
+                      "novedades": nov, "rescate_oficina": rescate},
+            "requires_human_confirmation": needs_conf,
+        }
+        if needs_conf:
+            hitl_required.append({
+                "order_id": o.get("id"),
+                "customer": o.get("customer_name"),
+                "reason": ("Riesgo alto — exigir prepago." if risk["prepay_required"]
+                            else "Rescate con costo (llamada + WhatsApp)."),
+            })
+        results.append(item)
+
+    kpis = await _run_analitica(db)
+    summary = {
+        "processed":    len(results),
+        "high_risk":    high_risk_ct,
+        "rescate_planned": rescate_ct,
+        "hitl_pending": len(hitl_required),
+        "kpis":         kpis,
+    }
+    return {
+        "segment": payload.segment,
+        "processed": len(results),
+        "results": results,
+        "hitl_required": hitl_required,
+        "summary": summary,
+        "at": _iso(),
+    }

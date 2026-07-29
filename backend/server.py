@@ -94,6 +94,8 @@ async def _ensure_seed():
     await db.users.create_index("email", unique=True)
     await db.orgs.create_index("id", unique=True)
     await db.rto_blacklist.create_index("phone", unique=True)
+    await db.ceo_reports.create_index("id", unique=True)
+    await db.novedades_ticks.create_index("ts")
 
     # Seed novedades (idempotent by carrier+estatus_carrier)
     for n in NOVEDADES_SEED:

@@ -4,12 +4,19 @@ We don't actually place VAPI calls or WhatsApp sends here — that is done by th
 external AI agent that consumes this Hub. This job just flips 'pending' →
 'dispatched' when an attempt's scheduled_at is due, and moves the queue item
 forward. WhatsApp attempts also emit a real Chatea Pro send.
+
+Zynex OS v2 adds two more jobs:
+  • novedades_sweep — every 15 min, re-classify the semaphore for every
+    active queue item and record the count per bucket.
+  • daily_ceo_report — every day at 08:00 America/Bogotá, snapshot the
+    NORTE KPIs into `ceo_reports` so we have a durable audit trail.
 """
 from __future__ import annotations
 import logging
 import os
 from datetime import datetime, timezone
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
 
 from db import get_db
 from chatea import get_client as get_chatea
@@ -159,6 +166,59 @@ def _uuid():
 _scheduler: AsyncIOScheduler | None = None
 
 
+async def novedades_sweep():
+    """Re-classify semaphore for every active queue item and log the counts."""
+    from cadence import days_left as _days_left
+    from data import semaphore_for
+    db = get_db()
+    rows = await db.call_queue.find(
+        {"status": {"$in": ["pending", "in_progress"]}},
+        {"_id": 0, "id": 1, "office_arrival_date": 1,
+         "office_claim_max_days": 1, "days_left": 1, "semaphore": 1}
+    ).to_list(2000)
+    buckets = {"rojo": 0, "amarillo": 0, "verde": 0, "gris": 0}
+    for r in rows:
+        dl = _days_left(r.get("office_arrival_date"),
+                        r.get("office_claim_max_days"))
+        sem = semaphore_for(r.get("office_claim_max_days"), dl)
+        buckets[sem] = buckets.get(sem, 0) + 1
+        if r.get("days_left") != dl or r.get("semaphore") != sem:
+            await db.call_queue.update_one(
+                {"id": r["id"]},
+                {"$set": {"days_left": dl, "semaphore": sem,
+                          "updated_at": datetime.now(timezone.utc).isoformat()}})
+    await db.novedades_ticks.insert_one({
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "buckets": buckets, "total": len(rows),
+    })
+    log.info("novedades_sweep: %s active items, buckets=%s", len(rows), buckets)
+
+
+async def daily_ceo_report():
+    """Snapshot the current NORTE KPIs into `ceo_reports` (idempotent per day)."""
+    db = get_db()
+    from routes.metrics import metrics as _metrics_endpoint
+    try:
+        # Call as a plain function — no Query params.
+        m = await _metrics_endpoint(None, None, None, None)
+    except Exception as e:
+        log.warning("daily_ceo_report: metrics call failed: %s", e)
+        return
+    today = datetime.now(timezone.utc).date().isoformat()
+    doc = {
+        "id": today,
+        "date": today,
+        "norte":     m.get("norte"),
+        "operacion": m.get("operacion"),
+        "costos":    m.get("costos"),
+        "queue_total":   m.get("queue_total"),
+        "orders_total":  m.get("orders_total"),
+        "generated_at":  datetime.now(timezone.utc).isoformat(),
+    }
+    await db.ceo_reports.update_one({"id": today}, {"$set": doc}, upsert=True)
+    log.info("daily_ceo_report generated for %s", today)
+
+
 def start():
     global _scheduler
     if _scheduler is not None:
@@ -167,8 +227,15 @@ def start():
     tick = int(os.environ.get("SCHEDULER_TICK_MINUTES", "2"))
     _scheduler.add_job(dispatch_due_attempts, "interval", minutes=tick,
                        id="dispatch_due_attempts", next_run_time=datetime.now(timezone.utc))
+    _scheduler.add_job(novedades_sweep, "interval", minutes=15,
+                       id="novedades_sweep",
+                       next_run_time=datetime.now(timezone.utc))
+    # 08:00 America/Bogotá == 13:00 UTC (Colombia doesn't observe DST).
+    _scheduler.add_job(daily_ceo_report,
+                       CronTrigger(hour=13, minute=0, timezone="UTC"),
+                       id="daily_ceo_report")
     _scheduler.start()
-    log.info("APScheduler started; tick=%s min", tick)
+    log.info("APScheduler started; dispatch tick=%s min · novedades every 15 min · CEO report @ 13:00 UTC", tick)
     return _scheduler
 
 

@@ -18,6 +18,7 @@ import {
   CheckCircle, WarningCircle, User, Lightning, Sparkle,
   WarningDiamond, PhoneCall, Warning, Lifebuoy, ChartLineUp,
   CurrencyCircleDollar, Plug, SignOut, PlayCircle,
+  Stack, CheckSquare,
 } from "@phosphor-icons/react";
 import { useNavigate } from "react-router-dom";
 import MatrixRain from "../components/MatrixRain";
@@ -154,6 +155,11 @@ export default function CopilotPage() {
   const [kpi, setKpi] = useState({ recuperados: 0, total: 0, dinero_cop: 0, tasa_pct: 0 });
   const [hitl, setHitl] = useState(null); // {agent, message, payload}
   const [orchestrating, setOrchestrating] = useState(false);
+  const [cascadeOpen, setCascadeOpen] = useState(false);
+  const [cascadeSegment, setCascadeSegment] = useState("red_this_week");
+  const [cascadeLimit, setCascadeLimit] = useState(25);
+  const [cascadeBusy, setCascadeBusy] = useState(false);
+  const [cascadeHitl, setCascadeHitl] = useState(null); // {segment, hitl_required[], report}
   const scrollRef = useRef(null);
 
   const loadThreads = async () => {
@@ -336,6 +342,54 @@ export default function CopilotPage() {
     } finally { setRunning(false); }
   };
 
+  // ---- Cascade: run the 5 agents across a segment ------------------
+  const SEGMENTS = [
+    { key: "red_this_week", label: "Rojos esta semana",  hint: "días_left ≤ 3 en oficina" },
+    { key: "new_today",     label: "Nuevos hoy",         hint: "orders creadas < 24 h" },
+    { key: "office_all",    label: "Toda la oficina",    hint: "todo pedido activo en oficina" },
+  ];
+
+  const runCascade = async () => {
+    setCascadeBusy(true);
+    try {
+      const r = await api.post("/agents/cascade", {
+        segment: cascadeSegment,
+        limit: Number(cascadeLimit) || 25,
+        require_confirm_for_money: true,
+      });
+      const rep = r.data || {};
+      setCascadeOpen(false);
+      // If there are HITL items → open a big confirmation dialog. Otherwise
+      // pipe the summary straight to Marcus so he narrates it in the chat.
+      if ((rep.hitl_required || []).length > 0) {
+        setCascadeHitl(rep);
+      } else {
+        toast.success(`Cascada ejecutada · ${rep.processed} pedidos`);
+        const s = rep.summary || {};
+        const seg = SEGMENTS.find(x => x.key === rep.segment)?.label || rep.segment;
+        await sendPrompt(
+          `Corrí la cascada sobre "${seg}" (${rep.processed} pedidos). ` +
+          `Riesgo alto: ${s.high_risk || 0}. Rescate planificado: ${s.rescate_planned || 0}. ` +
+          `Muéstrame el resumen accionable en español y sugiere los próximos pasos.`
+        );
+      }
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Falló la cascada.");
+    } finally { setCascadeBusy(false); }
+  };
+
+  const confirmCascadeHitl = async () => {
+    const rep = cascadeHitl;
+    setCascadeHitl(null);
+    if (!rep) return;
+    toast.success(`Ejecutando ${rep.hitl_required.length} acciones confirmadas…`);
+    const seg = SEGMENTS.find(x => x.key === rep.segment)?.label || rep.segment;
+    await sendPrompt(
+      `Autorizo las ${rep.hitl_required.length} acciones con costo del segmento "${seg}". ` +
+      `Ejecuta Rescate Oficina (cadencia + WhatsApp templates) y muéstrame el resultado por pedido.`
+    );
+  };
+
   const activeSkill = skills.find(s => s.id === skillId);
 
   return (
@@ -426,7 +480,7 @@ export default function CopilotPage() {
                 </p>
 
                 {/* 5 operational agents */}
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-3 max-w-4xl mx-auto mb-10">
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-3 max-w-4xl mx-auto mb-6">
                   {AGENTS.map((a) => (
                     <div key={a.key}
                          className="zx-suggest-card text-left flex flex-col gap-2 h-full"
@@ -440,6 +494,25 @@ export default function CopilotPage() {
                       </div>
                     </div>
                   ))}
+                </div>
+
+                {/* Cascade CTA — one click, 5 agents, whole segment */}
+                <div className="max-w-4xl mx-auto mb-10">
+                  <button
+                    onClick={() => setCascadeOpen(true)}
+                    data-testid="cascade-open-btn"
+                    className="w-full group rounded-sm border border-white/15 bg-gradient-to-r from-cyan-500/10 via-fuchsia-500/10 to-cyan-500/10 hover:from-cyan-500/20 hover:via-fuchsia-500/20 hover:to-cyan-500/20 transition px-5 py-4 flex items-center gap-3">
+                    <Stack size={22} className="text-white" weight="duotone" />
+                    <div className="text-left flex-1">
+                      <div className="text-sm font-semibold text-white">
+                        Ejecutar los 5 agentes en cascada
+                      </div>
+                      <div className="text-[11px] text-zinc-400">
+                        Un clic → Riesgo → Confirmación → Novedades → Rescate → Analítica, sobre el segmento que elijas.
+                      </div>
+                    </div>
+                    <PlayCircle size={22} className="text-white opacity-60 group-hover:opacity-100 transition" weight="duotone" />
+                  </button>
                 </div>
 
                 {/* Skill chips */}
@@ -577,6 +650,13 @@ export default function CopilotPage() {
               </button>
             ))}
           </div>
+
+          <Button
+            onClick={() => setCascadeOpen(true)}
+            data-testid="cascade-rail-btn"
+            className="w-full mt-4 h-9 rounded-sm btn-cta-grad text-white text-xs font-semibold">
+            <Stack size={14} className="mr-1" /> Ejecutar cascada
+          </Button>
         </div>
 
         <div className="border-t border-zinc-800 p-4 text-[10px] font-mono text-zinc-500">
@@ -611,6 +691,111 @@ export default function CopilotPage() {
                     data-testid="hitl-yes"
                     className="btn-cta-grad rounded-sm">
               Sí, ejecutar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cascade segment picker */}
+      <Dialog open={cascadeOpen} onOpenChange={setCascadeOpen}>
+        <DialogContent data-testid="cascade-dialog" className="bg-zinc-950 border-zinc-800 text-white">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Stack size={18} weight="duotone" />
+              Ejecutar los 5 agentes en cascada
+            </DialogTitle>
+            <DialogDescription className="text-zinc-400">
+              Elige el segmento a procesar. Las acciones con costo (llamadas, WhatsApp masivo,
+              prepago) piden confirmación antes de ejecutarse.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2">
+            {SEGMENTS.map((s) => (
+              <button
+                key={s.key}
+                onClick={() => setCascadeSegment(s.key)}
+                data-testid={`cascade-segment-${s.key}`}
+                className={`w-full text-left border rounded-sm px-3 py-2.5 transition flex items-start gap-3 ${
+                  cascadeSegment === s.key
+                    ? "border-white bg-white/5"
+                    : "border-zinc-800 bg-zinc-900/40 hover:bg-zinc-800/60"
+                }`}>
+                <CheckSquare
+                  size={16}
+                  weight={cascadeSegment === s.key ? "fill" : "regular"}
+                  className={cascadeSegment === s.key ? "text-white" : "text-zinc-500"}
+                />
+                <div>
+                  <div className="text-sm font-semibold text-white">{s.label}</div>
+                  <div className="text-[11px] text-zinc-400">{s.hint}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-3 mt-2">
+            <span className="text-xs font-mono text-zinc-500">Máx. pedidos:</span>
+            <input
+              type="number"
+              min={1}
+              max={100}
+              value={cascadeLimit}
+              onChange={(e) => setCascadeLimit(e.target.value)}
+              data-testid="cascade-limit"
+              className="w-20 h-8 rounded-sm bg-black/40 border border-zinc-800 px-2 text-sm text-white focus:outline-none focus:border-zinc-500"
+            />
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setCascadeOpen(false)}
+                    data-testid="cascade-cancel"
+                    className="rounded-sm border-zinc-700 bg-zinc-900 hover:bg-zinc-800">
+              Cancelar
+            </Button>
+            <Button onClick={runCascade} disabled={cascadeBusy}
+                    data-testid="cascade-run"
+                    className="btn-cta-grad rounded-sm">
+              {cascadeBusy ? "Ejecutando…" : "Ejecutar cascada"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cascade HITL — batch confirmation for money actions across many orders */}
+      <Dialog open={!!cascadeHitl} onOpenChange={(o) => !o && setCascadeHitl(null)}>
+        <DialogContent data-testid="cascade-hitl-dialog" className="bg-zinc-950 border-zinc-800 text-white max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <WarningDiamond size={18} className="text-yellow-400" weight="duotone" />
+              {cascadeHitl?.hitl_required?.length || 0} pedidos requieren tu confirmación
+            </DialogTitle>
+            <DialogDescription className="text-zinc-400">
+              La cascada procesó <b className="text-white">{cascadeHitl?.processed}</b> pedidos.
+              Los listados abajo implican costo (llamadas, WhatsApp o prepago).
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="max-h-64 overflow-y-auto border border-zinc-800 rounded-sm bg-black/40 divide-y divide-zinc-800"
+               data-testid="cascade-hitl-list">
+            {(cascadeHitl?.hitl_required || []).map((h) => (
+              <div key={h.order_id} className="px-3 py-2 text-xs">
+                <div className="text-white font-mono">{h.order_id?.slice(0, 12)} · {h.customer || "—"}</div>
+                <div className="text-zinc-400">{h.reason}</div>
+              </div>
+            ))}
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setCascadeHitl(null)}
+                    data-testid="cascade-hitl-no"
+                    className="rounded-sm border-zinc-700 bg-zinc-900 hover:bg-zinc-800">
+              No, revisar 1×1
+            </Button>
+            <Button onClick={confirmCascadeHitl}
+                    data-testid="cascade-hitl-yes"
+                    className="btn-cta-grad rounded-sm">
+              Sí, ejecutar todo
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -1,0 +1,32 @@
+{
+  "summary": "Iteration 16 — verified dual auth (JWT cookie OR X-API-Key), /agents/cascade endpoint (3 segments + bogus), CEO report run-now/get, novedades-ticks and the new frontend cascade UX (open-btn, rail-btn, dialog, 3 segments, HITL dialog with 24 rojos, HITL yes/no). Backend 17/17 pytest cases passing, Playwright 14/14 assertions passing. No critical issues.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      { "screen": "global", "issues": ["Canvas2D getImageData warning persists on MatrixRain/Constellation (perf-only, no functional impact — noted in iter 15 as well)."] }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration_16.py",
+    "/app/test_reports/pytest/iter16.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "deps.py cleanly accepts JWT cookie OR bearer OR X-API-Key with a single dependency — good migration pattern.",
+    "agents.py `_pick_segment` fallback for unknown segment returns first N orders (q={}); works but could log a warning so callers see they mistyped the segment.",
+    "scheduler.py `daily_ceo_report` invokes metrics endpoint with 4 positional None params — brittle if signature changes. Consider calling an internal helper instead of the FastAPI route function.",
+    "Copilot.jsx runCascade sends the summary to sendPrompt but doesn't guard against Marcus being mid-response (running=true). Under rapid clicks the cascade could pile up requests. Consider disabling cascade-run while chat is busy.",
+    "Right-rail visibility below xl breakpoint: rail button (cascade-rail-btn) becomes inaccessible on tablet/mobile — cascade-open-btn covers it, so acceptable."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration_16.py (new)"
+  ],
+  "success_rate": { "backend": "100% (17/17)", "frontend": "100% (14/14)" },
+  "test_credentials": "qa2@litper.co / Litper!2026 for cookie auth; legacy X-API-Key still accepted.",
+  "seed_data_creation": "None. Existing seed has ~24 rojos which correctly triggered HITL flow.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Dual-auth is live via /app/backend/deps.py — routes accept both cookie and X-API-Key. Frontend api.js no longer sends X-API-Key. Cascade endpoint returns HITL for red_this_week (24 rojos in seed). Scheduler endpoints: POST /api/agents/ceo-report/run-now → snapshots today's KPIs; GET /api/agents/novedades-ticks?limit=N reads recent 15-min sweeps."
+}
