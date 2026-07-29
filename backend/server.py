@@ -96,6 +96,7 @@ async def _ensure_seed():
     await db.rto_blacklist.create_index("phone", unique=True)
     await db.ceo_reports.create_index("id", unique=True)
     await db.novedades_ticks.create_index("ts")
+    await db.settings.create_index("key", unique=True)
 
     # Seed novedades (idempotent by carrier+estatus_carrier)
     for n in NOVEDADES_SEED:

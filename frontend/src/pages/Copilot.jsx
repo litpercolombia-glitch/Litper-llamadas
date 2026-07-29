@@ -18,7 +18,7 @@ import {
   CheckCircle, WarningCircle, User, Lightning, Sparkle,
   WarningDiamond, PhoneCall, Warning, Lifebuoy, ChartLineUp,
   CurrencyCircleDollar, Plug, SignOut, PlayCircle,
-  Stack, CheckSquare,
+  Stack, CheckSquare, WhatsappLogo,
 } from "@phosphor-icons/react";
 import { useNavigate } from "react-router-dom";
 import MatrixRain from "../components/MatrixRain";
@@ -160,6 +160,9 @@ export default function CopilotPage() {
   const [cascadeLimit, setCascadeLimit] = useState(25);
   const [cascadeBusy, setCascadeBusy] = useState(false);
   const [cascadeHitl, setCascadeHitl] = useState(null); // {segment, hitl_required[], report}
+  const [ceoOpen, setCeoOpen] = useState(false);
+  const [ceoTarget, setCeoTarget] = useState("");
+  const [ceoBusy, setCeoBusy] = useState(false);
   const scrollRef = useRef(null);
 
   const loadThreads = async () => {
@@ -390,6 +393,43 @@ export default function CopilotPage() {
     );
   };
 
+  // ---- Daily CEO Report → WhatsApp (Chatea Pro) --------------------
+  const openCeoDialog = async () => {
+    setCeoOpen(true);
+    try {
+      const r = await api.get("/agents/ceo-report/target");
+      setCeoTarget(r.data?.target || "");
+    } catch { /* keep empty */ }
+  };
+
+  const saveCeoTarget = async () => {
+    setCeoBusy(true);
+    try {
+      await api.put("/agents/ceo-report/target", { target: ceoTarget.trim() });
+      toast.success("Destinatario guardado.");
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "No se pudo guardar.");
+    } finally { setCeoBusy(false); }
+  };
+
+  const sendCeoNow = async () => {
+    if (!ceoTarget.trim()) { toast.error("Ingresa el número WhatsApp."); return; }
+    setCeoBusy(true);
+    try {
+      // Save first so the cron uses the same target.
+      await api.put("/agents/ceo-report/target", { target: ceoTarget.trim() });
+      const r = await api.post("/agents/ceo-report/send-wa");
+      if (r.data?.ok) {
+        toast.success("Reporte enviado por WhatsApp.");
+        setCeoOpen(false);
+      } else {
+        toast.error(r.data?.error || "Chatea rechazó el envío.");
+      }
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Falló el envío.");
+    } finally { setCeoBusy(false); }
+  };
+
   const activeSkill = skills.find(s => s.id === skillId);
 
   return (
@@ -599,6 +639,15 @@ export default function CopilotPage() {
             {" · "}
             <span className="text-emerald-400" data-testid="kpi-tasa">{kpi.tasa_pct}%</span>
           </div>
+
+          <Button
+            onClick={openCeoDialog}
+            data-testid="ceo-wa-btn"
+            variant="outline"
+            className="w-full mt-3 h-8 text-xs rounded-sm border-emerald-700/60 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-200">
+            <WhatsappLogo size={13} weight="fill" className="mr-1 text-emerald-300" />
+            Enviar reporte CEO por WhatsApp
+          </Button>
         </div>
 
         <div className="p-5 border-b border-zinc-800">
@@ -796,6 +845,54 @@ export default function CopilotPage() {
                     data-testid="cascade-hitl-yes"
                     className="btn-cta-grad rounded-sm">
               Sí, ejecutar todo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* CEO Report → WhatsApp destination + send-now */}
+      <Dialog open={ceoOpen} onOpenChange={setCeoOpen}>
+        <DialogContent data-testid="ceo-wa-dialog" className="bg-zinc-950 border-zinc-800 text-white">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <WhatsappLogo size={18} weight="fill" className="text-emerald-400" />
+              Reporte CEO diario por WhatsApp
+            </DialogTitle>
+            <DialogDescription className="text-zinc-400">
+              El snapshot del día se enviará automáticamente a las <b className="text-white">08:15 hora Bogotá</b>.
+              Ingresa el número del grupo/lider en formato internacional (ej. <code>+573001234567</code>).
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2 mt-2">
+            <label className="text-[10px] uppercase font-mono tracking-widest text-zinc-500">
+              Número WhatsApp destino
+            </label>
+            <input
+              type="text"
+              value={ceoTarget}
+              onChange={(e) => setCeoTarget(e.target.value)}
+              placeholder="+573001234567"
+              data-testid="ceo-wa-target"
+              className="w-full h-10 rounded-sm bg-black/40 border border-zinc-800 px-3 text-sm text-white focus:outline-none focus:border-zinc-500"
+            />
+            <p className="text-[11px] text-zinc-500 leading-snug">
+              Si el grupo tiene ID de Chatea Pro puedes pegarlo aquí también. Chatea Pro debe estar
+              configurado en <b className="text-zinc-300">Credenciales</b>.
+            </p>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={saveCeoTarget} disabled={ceoBusy || !ceoTarget.trim()}
+                    data-testid="ceo-wa-save"
+                    className="rounded-sm border-zinc-700 bg-zinc-900 hover:bg-zinc-800">
+              Guardar destinatario
+            </Button>
+            <Button onClick={sendCeoNow} disabled={ceoBusy || !ceoTarget.trim()}
+                    data-testid="ceo-wa-send"
+                    className="btn-cta-grad rounded-sm">
+              <WhatsappLogo size={13} weight="fill" className="mr-1" />
+              {ceoBusy ? "Enviando…" : "Enviar ahora"}
             </Button>
           </DialogFooter>
         </DialogContent>

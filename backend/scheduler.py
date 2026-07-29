@@ -219,6 +219,20 @@ async def daily_ceo_report():
     log.info("daily_ceo_report generated for %s", today)
 
 
+async def daily_ceo_report_wa():
+    """Push today's CEO snapshot to the configured WhatsApp destination.
+
+    Depends on `daily_ceo_report` having already run at 13:00 UTC — the cron
+    schedule guarantees this because we fire at 13:15 UTC (15 min later).
+    """
+    from routes.agents import ceo_report_send_wa
+    try:
+        r = await ceo_report_send_wa()
+        log.info("daily_ceo_report_wa: sent=%s target=%s", r.get("ok"), r.get("target"))
+    except Exception as e:
+        log.warning("daily_ceo_report_wa skipped: %s", e)
+
+
 def start():
     global _scheduler
     if _scheduler is not None:
@@ -234,8 +248,13 @@ def start():
     _scheduler.add_job(daily_ceo_report,
                        CronTrigger(hour=13, minute=0, timezone="UTC"),
                        id="daily_ceo_report")
+    # 08:15 Bogotá — WhatsApp push (only fires if a target is configured;
+    # the underlying function raises silently if not).
+    _scheduler.add_job(daily_ceo_report_wa,
+                       CronTrigger(hour=13, minute=15, timezone="UTC"),
+                       id="daily_ceo_report_wa")
     _scheduler.start()
-    log.info("APScheduler started; dispatch tick=%s min · novedades every 15 min · CEO report @ 13:00 UTC", tick)
+    log.info("APScheduler started; dispatch tick=%s min · novedades every 15 min · CEO report @ 13:00 UTC · CEO WA push @ 13:15 UTC", tick)
     return _scheduler
 
 

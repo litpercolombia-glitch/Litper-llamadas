@@ -211,6 +211,109 @@ async def novedades_ticks(limit: int = 20):
     return docs
 
 
+# ---------- CEO Report → WhatsApp (Chatea Pro) ----------
+_CEO_WA_KEY = "ceo_report_wa_target"
+
+
+async def _get_ceo_wa_target() -> str:
+    """DB setting overrides the env fallback. Returns "" if nothing is configured."""
+    import os as _os
+    doc = await get_db().settings.find_one({"key": _CEO_WA_KEY}, {"_id": 0, "value": 1})
+    if doc and doc.get("value"):
+        return str(doc["value"]).strip()
+    return (_os.environ.get("CEO_REPORT_WA_TARGET") or "").strip()
+
+
+def _fmt_cop(v) -> str:
+    try: return "$" + f"{int(round(float(v))):,}".replace(",", ".")
+    except Exception: return "$0"
+
+
+def _format_ceo_message(report: dict) -> str:
+    n = report.get("norte") or {}
+    rr  = (n.get("recovery_rate") or {}).get("value", 0)
+    rto = (n.get("rto_reduction") or {}).get("value", 0)
+    cpr = (n.get("cpr_cop") or {}).get("value", 0)
+    roi = n.get("roi_cop") or {}
+    recovered = roi.get("recovered_value_cop", 0)
+    margin    = roi.get("margin_recovered_cop", 0)
+    cost      = roi.get("total_cost_cop", 0)
+    net       = roi.get("value", 0)
+    return (
+        f"📊 *Reporte CEO — {report.get('date','hoy')}*\n"
+        f"\n"
+        f"• Recuperación: *{rr}%*  ·  RTO evitado: *{rto}%*\n"
+        f"• Recuperado: *{_fmt_cop(recovered)}*  (margen {_fmt_cop(margin)})\n"
+        f"• Costo del día: {_fmt_cop(cost)}  ·  CPR: {_fmt_cop(cpr)}\n"
+        f"• *ROI neto: {_fmt_cop(net)}*\n"
+        f"\n"
+        f"Pedidos totales: {report.get('orders_total',0)}  ·  En cola: {report.get('queue_total',0)}\n"
+        f"— Zynex OS · autogenerado"
+    )
+
+
+class CeoTargetIn(BaseModel):
+    target: str  # phone (E.164) OR chatea subscriber id
+
+
+@router.get("/ceo-report/target",
+            summary="Get the WhatsApp destination for the daily CEO report.")
+async def ceo_target_get():
+    return {"target": await _get_ceo_wa_target()}
+
+
+@router.put("/ceo-report/target",
+            summary="Set the WhatsApp destination (phone in E.164). Overrides the env default.")
+async def ceo_target_set(payload: CeoTargetIn):
+    val = (payload.target or "").strip()
+    await get_db().settings.update_one(
+        {"key": _CEO_WA_KEY},
+        {"$set": {"key": _CEO_WA_KEY, "value": val, "updated_at": _iso()}},
+        upsert=True,
+    )
+    return {"ok": True, "target": val}
+
+
+@router.post("/ceo-report/send-wa",
+             summary="Send today's CEO report to WhatsApp NOW (uses configured target).")
+async def ceo_report_send_wa():
+    db = get_db()
+    target = await _get_ceo_wa_target()
+    if not target:
+        raise HTTPException(400, "No hay destinatario configurado. Usa PUT /agents/ceo-report/target.")
+    docs = await db.ceo_reports.find({}, {"_id": 0}).sort("date", -1).limit(1).to_list(1)
+    if not docs:
+        # Generate on the fly if there's nothing yet
+        from scheduler import daily_ceo_report
+        await daily_ceo_report()
+        docs = await db.ceo_reports.find({}, {"_id": 0}).sort("date", -1).limit(1).to_list(1)
+    if not docs:
+        raise HTTPException(500, "No se pudo generar el reporte.")
+    from chatea import get_client as _get_chatea
+    chatea = _get_chatea()
+    if not chatea.configured:
+        raise HTTPException(400, "Chatea Pro no está configurado en el servidor.")
+    text = _format_ceo_message(docs[0])
+    res = await chatea.send_message(target, text, name="CEO Report")
+    await db.message_log.insert_one({
+        "id": _iso() + "-ceo",
+        "direction": "outbound",
+        "channel": "whatsapp",
+        "phone": target,
+        "body": text[:300],
+        "template_name": None,
+        "provider": "chatea_pro",
+        "provider_message_id": res.get("provider_message_id"),
+        "status": "sent" if res.get("ok") else "failed",
+        "error": res.get("error"),
+        "created_at": _iso(),
+        "kind": "ceo_report",
+    })
+    return {"ok": bool(res.get("ok")), "target": target,
+            "provider_message_id": res.get("provider_message_id"),
+            "error": res.get("error")}
+
+
 # ---------- Cascade (run 5-agent chain across a segment) ----------
 class CascadeIn(BaseModel):
     segment: str = "red_this_week"  # red_this_week | new_today | office_all | custom
