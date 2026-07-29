@@ -94,7 +94,9 @@ const CATALOG = [
       "En Litper → Importar → arrastra el archivo (.xlsx/.xls/.csv).",
       "El importador agrupa combos por ID y toma el recaudo una sola vez.",
     ],
-    // no testEndpoint — file-based
+    // File-based — 'Probar' abre el importador.
+    testHref: "/app/pedidos?tab=importar",
+    testLabel: "Probar (Importar)",
   },
   {
     key: "groq", label: "Groq · LLM primario", Icon: Sparkle,
@@ -232,6 +234,13 @@ export default function ConnectorsPage() {
                       onClick={() => testConnector(spec)}
                       data-testid={`connector-test-${spec.key}`}>
                       {testing[spec.key] ? "…" : (spec.testLabel || "Probar")}
+                    </Button>
+                  )}
+                  {!spec.testEndpoint && spec.testHref && (
+                    <Button size="sm" variant="outline"
+                      onClick={() => (window.location.href = spec.testHref)}
+                      data-testid={`connector-test-${spec.key}`}>
+                      {spec.testLabel || "Probar"}
                     </Button>
                   )}
                   <button className="text-[11px] text-zinc-400 hover:text-white flex items-center gap-1"

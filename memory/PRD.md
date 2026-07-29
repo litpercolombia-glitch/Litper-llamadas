@@ -24,6 +24,35 @@ Same as v1.0 plus:
   → bulk import.
 
 
+### v2.3 (2026-07-29) — Sidebar 18 → 5 · Hubs · Empty-States (Dapta/n8n vibe)
+- **Radical UX simplification**: sidebar cut from 18 to **5** top items —
+  Copilot · Pedidos · Conexiones · Métricas · Ajustes. Every legacy route
+  redirects into the correct hub tab so bookmarks keep working.
+- **HubContext** (`frontend/src/components/HubContext.js`): a React context
+  flag consumed by `Layout.jsx` to render *bare* when a page is embedded
+  inside a hub tab — no duplicated Sidebar/Header. This lets us reuse
+  every existing page inside the new tabbed hubs with zero rewrites.
+- **Pedidos hub** (Cola · Importar · Novedades · Tickets) — one page, four
+  tabs. Empty state guides: `Importar Excel de Dropi` + `Conectar Dropi`.
+- **Conexiones hub** (Conectores · Credenciales · Voces · Números) —
+  each connector already ships with 3-step howto + envVars badges +
+  official portal link + `Probar` (Dropi now has `Probar → Importar`).
+- **Métricas** trimmed to the North Star (`$ recuperado`, entrega efectiva,
+  devoluciones evitadas + break-down por transportadora/ciudad) with a
+  guiding empty state when `orders_total == 0`.
+- **Ajustes hub** (Productos · Prompts · Cadencia · Transportadoras ·
+  Habilidades · Leads VIP) — advanced config collapsed here, off the main
+  nav.
+- **Onboarding as first-run assistant**: `onboarding-banner` in Copilot
+  only appears when there are 0 configured connectors — never a permanent
+  menu item.
+- **Zero demo data**: purged `orders`, `call_queue`, `call_schedules`,
+  `customer_tasks`, `message_log`, `uploaded_files`, `ceo_reports`,
+  `novedades_ticks`, `chat_threads`, `chat_messages`. Reference data
+  (carriers, novedades reference, agents, prompts, WA rules, voice
+  profiles, catalog products, integration_connectors) preserved.
+- **Iteration 18 tests**: 8/8 backend + 100% required frontend.
+
 ### v2.2 (2026-07-29) — CEO Report → WhatsApp (Chatea Pro)
 - **Endpoints**: `GET /api/agents/ceo-report/target`,
   `PUT /api/agents/ceo-report/target {target}`,
