@@ -24,6 +24,21 @@ Same as v1.0 plus:
   → bulk import.
 
 
+### v2.2 (2026-07-29) — CEO Report → WhatsApp (Chatea Pro)
+- **Endpoints**: `GET /api/agents/ceo-report/target`,
+  `PUT /api/agents/ceo-report/target {target}`,
+  `POST /api/agents/ceo-report/send-wa`. Empty target → 400 (fail-fast);
+  send returns the Chatea provider result so the UI can show failure reason.
+- **Daily push**: new APScheduler cron `daily_ceo_report_wa` at 13:15 UTC
+  (08:15 America/Bogotá), 15 min AFTER the snapshot job runs.
+- **Storage**: `db.settings` collection keyed by `key` (unique index) —
+  survives restarts and overrides the `CEO_REPORT_WA_TARGET` env fallback.
+- **UI**: right-rail button `ceo-wa-btn` opens the dialog `ceo-wa-dialog`
+  with `ceo-wa-target` input + `ceo-wa-save` + `ceo-wa-send`. Pretty
+  Spanish snapshot: recuperación %, RTO evitado %, $ recuperado, CPR, ROI
+  neto + queue + orders totals.
+- **Iteration 17 tests**: 10/10 backend + 5/5 frontend at 100%.
+
 ### v2.1 (2026-07-29) — Cascade + Unified Auth + 24/7 Cron
 - **Cascade endpoint** `POST /api/agents/cascade` (segments: `red_this_week`,
   `new_today`, `office_all`, plus bogus-safe fallback). Runs the full 5-agent
