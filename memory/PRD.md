@@ -24,6 +24,25 @@ Same as v1.0 plus:
   → bulk import.
 
 
+### v2.1 (2026-07-29) — Cascade + Unified Auth + 24/7 Cron
+- **Cascade endpoint** `POST /api/agents/cascade` (segments: `red_this_week`,
+  `new_today`, `office_all`, plus bogus-safe fallback). Runs the full 5-agent
+  chain per order up to `limit` and returns `results`, `hitl_required`,
+  `summary`. Frontend adds a hero CTA + right-rail button + segment picker
+  dialog + batch HITL confirmation dialog (24 rojos on the seed dataset).
+- **Unified auth**: `deps.require_api_key` now accepts EITHER a valid
+  `litper_session` JWT cookie/bearer OR the legacy `X-API-Key`. All internal
+  routes (queue, orders, agents, prompts, …) work with just the session
+  cookie — the frontend no longer ships the operator key. External agents
+  keep working with `X-API-Key`.
+- **24/7 APScheduler**: added `novedades_sweep` (every 15 min — recomputes
+  the semaphore for every active queue item and logs bucket counts to
+  `novedades_ticks`) and `daily_ceo_report` (cron 13:00 UTC = 08:00
+  Bogotá — snapshots NORTE KPIs into `ceo_reports`, idempotent by day).
+- **Debug/preview endpoints**: `POST /api/agents/ceo-report/run-now`,
+  `GET /api/agents/ceo-report[?date=YYYY-MM-DD]`, `GET /api/agents/novedades-ticks`.
+- **Iteration 16 tests**: 17/17 backend + 14/14 frontend at 100%.
+
 ### v2.0 (2026-07-24) — Real Auth + 5-agent Claude Console (Zynex OS shift)
 - **Backend Auth (email + password)** with bcrypt + JWT stored in an HttpOnly
   cookie named `litper_session`. Endpoints: `POST /api/auth/register`,
