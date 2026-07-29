@@ -58,9 +58,19 @@ PROVIDER_SCHEMAS: dict[str, dict[str, dict[str, str]]] = {
         "account_sid": {"env": "TWILIO_ACCOUNT_SID", "label": "Account SID"},
         "auth_token":  {"env": "TWILIO_AUTH_TOKEN",  "label": "Auth Token"},
     },
+    "dropi": {
+        "api_token": {"env": "DROPI_API_TOKEN", "label": "API Token"},
+        "country":   {"env": "DROPI_COUNTRY",   "label": "País (CO / EC / CL / MX / PE)"},
+        "base_url":  {"env": "DROPI_BASE_URL",  "label": "URL panel (ej. app.dropi.co)"},
+    },
+    "shopify": {
+        "access_token": {"env": "SHOPIFY_ACCESS_TOKEN", "label": "Admin API access token"},
+        "store_url":    {"env": "SHOPIFY_STORE_URL",    "label": "URL de tu tienda (xxx.myshopify.com)"},
+    },
 }
 
-_SECRET_FIELDS = {"api_key", "auth_token", "sip_password", "connection_id"}
+_SECRET_FIELDS = {"api_key", "auth_token", "sip_password", "connection_id",
+                  "api_token", "access_token"}
 
 
 def _fernet() -> Fernet:

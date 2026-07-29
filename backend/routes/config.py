@@ -139,6 +139,42 @@ async def test_credentials(provider: str, request: Request):
             return {"ok": False, "detail": "Falta account_sid o auth_token."}
         return {"ok": True, "detail": "Credenciales presentes (no se hizo llamada externa)."}
 
+    if provider == "dropi":
+        import httpx
+        token   = creds.get("api_token") or ""
+        base    = (creds.get("base_url") or "https://api.dropi.co").rstrip("/")
+        country = (creds.get("country")  or "CO").upper()
+        if not token:
+            return {"ok": False, "detail": "Falta API Token de Dropi."}
+        try:
+            async with httpx.AsyncClient(timeout=10) as x:
+                # Dropi's public API returns a session/user echo on /me for a valid token.
+                r = await x.get(f"{base}/api/{country.lower()}/me",
+                                headers={"Authorization": f"Bearer {token}"})
+                if r.status_code < 400:
+                    return {"ok": True, "detail": f"Dropi {country}: token OK"}
+                return {"ok": False, "detail": f"HTTP {r.status_code} — revisa el token/país."}
+        except Exception as e:
+            return {"ok": False, "detail": str(e)}
+
+    if provider == "shopify":
+        import httpx
+        token = creds.get("access_token") or ""
+        store = (creds.get("store_url") or "").strip().replace("https://", "").replace("http://", "")
+        store = store.rstrip("/")
+        if not token or not store:
+            return {"ok": False, "detail": "Falta access_token o store_url."}
+        try:
+            async with httpx.AsyncClient(timeout=10) as x:
+                r = await x.get(f"https://{store}/admin/api/2024-07/shop.json",
+                                headers={"X-Shopify-Access-Token": token})
+                if r.status_code == 200:
+                    name = (r.json().get("shop") or {}).get("name", "")
+                    return {"ok": True, "detail": f"Tienda: {name}"}
+                return {"ok": False, "detail": f"HTTP {r.status_code}"}
+        except Exception as e:
+            return {"ok": False, "detail": str(e)}
+
     return {"ok": False, "detail": "Test no implementado para este provider."}
 
 

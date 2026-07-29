@@ -1,0 +1,30 @@
+{
+  "summary": "Iteration 19 verified end-to-end. Backend 7/7 pytest pass (auth/me, config providers now includes dropi+shopify, shopify PUT+POST test (200, ok:false as expected)+DELETE cleanup, dropi test branch shape, 5 agents list, cascade processed:0, WhatsApp 3 approved templates). Frontend 72/72 required assertions pass: Copilot right-rail is HIDDEN on empty state (kpi.total=0, kpi.dinero=0) — locator count == 0. All 5 agent cards + cascade-open-btn + copilot-input + copilot-logout + 5 sidebar nav-* items present. Connectors page renders all 5 cards (connector-card-dropi/chatea_pro/telnyx/elevenlabs/shopify). VERBATIM Spanish steps verified inside every connector-howto-* panel for all 5 connectors — every single required step string is an EXACT match. All required input fields (connector-input-*) present. All doc anchors (connector-doc-*) exist and open valid https URLs. Every card has connector-save-* and connector-test-* buttons (including Dropi — the iter18 gap is closed). Shopify save flow works end-to-end from the UI (backend PUT 200 + backend POST /test returns ok:false without 500). Queue empty state (queue-empty-import + queue-empty-connect) and metricas-empty present.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration_19.py",
+    "/app/test_reports/pytest/iter19.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Connectors.jsx is clean, declarative (single CONNECTORS array) — verbatim Spanish text is co-located with schema so future edits are safe.",
+    "org_credentials.py correctly adds api_token and access_token to _SECRET_FIELDS — the /config/credentials GET response will mask them properly.",
+    "routes/config.py test branches for dropi (GET /api/{country}/me on the panel base_url) and shopify (GET /admin/api/2024-07/shop.json) both wrapped in try/except → never return 500 on network errors, only ok:false + detail. Verified with a fake shopify domain (returned ok:false, HTTP 200).",
+    "Copilot.jsx wraps the right-rail with `{(kpi.total > 0 || kpi.dinero_cop > 0) && ...}` — perfectly satisfies the empty-state hide requirement.",
+    "Minor: routes/config.py list_providers() hardcodes secret-fields list at line 39; would be safer to reuse `_SECRET_FIELDS` from org_credentials to stay in sync. Not blocking."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration_19.py"
+  ],
+  "success_rate": { "backend": "100% (7/7)", "frontend": "100% (72/72 required assertions)" },
+  "test_credentials": "qa2@litper.co / Litper!2026 (HttpOnly JWT). X-API-Key litper_hub_pk_2026_... auto-injected.",
+  "seed_data_creation": "None. Verified empty state first (kpi.total=0 → right-rail absent). Shopify PUT/DELETE round-trip leaves DB clean.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Iteration 19 is green. Backend: dropi + shopify providers are live at /api/config/providers with test endpoints /api/config/credentials/{dropi|shopify}/test — both wrapped in try/except so external failures return ok:false, never 500. Frontend Connectors.jsx was rewritten as a declarative CONNECTORS array — 5 cards with verbatim Spanish steps + tagline (rendered in card header, NOT inside connector-howto-*) + inline inputs + Guardar + Probar conexión. Copilot right-rail wrapped in kpi>0 guard — invisible on empty demo DB. Note for future assertions: the connector card TAGLINE (e.g. 'Zynex leerá los pedidos en oficina y creará tickets de extensión.' or 'ventana de 24h') is rendered in the card HEADER (outside connector-howto-*). If you want to assert tagline text, target the parent `[data-testid=connector-card-<k>]`, NOT `[data-testid=connector-howto-<k>]`."
+}

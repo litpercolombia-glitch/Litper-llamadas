@@ -646,7 +646,9 @@ export default function CopilotPage() {
         </footer>
       </div>
 
-      {/* Right rail: $ recuperado + BYOK connectors */}
+      {/* Right rail: only when there's real activity. Empty state keeps
+          focus on the chat + agent cards (Dapta/n8n vibe). */}
+      {(kpi.total > 0 || kpi.dinero_cop > 0) && (
       <aside className="hidden xl:flex w-72 shrink-0 border-l border-zinc-800 bg-zinc-950/70 flex-col h-screen sticky top-0"
              data-testid="copilot-right-rail">
         <div className="p-5 border-b border-zinc-800">
@@ -737,6 +739,7 @@ export default function CopilotPage() {
           <div>org · <span className="text-zinc-300">{me?.org_id?.slice(0, 22)}</span></div>
         </div>
       </aside>
+      )}
 
       {/* Human-in-the-loop confirmation modal (money / mass actions) */}
       <Dialog open={!!hitl} onOpenChange={(o) => !o && setHitl(null)}>
