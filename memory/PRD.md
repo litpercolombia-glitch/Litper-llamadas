@@ -24,6 +24,23 @@ Same as v1.0 plus:
   → bulk import.
 
 
+### v2.4 (2026-07-29) — Verbatim connector onboarding + empty-first UI
+- **Connectors rewritten** (`frontend/src/pages/Connectors.jsx`): 5 cards
+  (Dropi · Chatea Pro · Telnyx · ElevenLabs · Shopify) with the EXACT
+  Spanish 3-4-step onboarding text the product owner dictated, inline
+  credential inputs, official-portal link, `Guardar` and `Probar conexión`
+  buttons. Zero jargon, one flow per card.
+- **New connectors**: `dropi` (api_token / country / base_url) and
+  `shopify` (access_token / store_url). Both are wired into
+  `org_credentials.PROVIDER_SCHEMAS` + `routes/config.test_credentials`
+  (live HTTP probes against `api.dropi.co/{country}/me` and
+  `<store>/admin/api/2024-07/shop.json`).
+- **Empty-first Copilot**: right rail (`copilot-right-rail`) is now
+  rendered ONLY when there is real data (`kpi.total > 0 ||
+  kpi.dinero_cop > 0`). On a fresh install the greeting + 5 agent cards +
+  cascade CTA + chat is all the operator sees — no noisy `$ 0` panel.
+- **Iteration 19 tests**: 7/7 backend + 72/72 required frontend at 100%.
+
 ### v2.3 (2026-07-29) — Sidebar 18 → 5 · Hubs · Empty-States (Dapta/n8n vibe)
 - **Radical UX simplification**: sidebar cut from 18 to **5** top items —
   Copilot · Pedidos · Conexiones · Métricas · Ajustes. Every legacy route
