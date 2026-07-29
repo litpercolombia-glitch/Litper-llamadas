@@ -185,6 +185,10 @@ export default function CopilotPage() {
       setConnectors(r.data || []);
     } catch { setConnectors([]); }
   };
+  const connectedCount = (connectors || []).filter(
+    c => c.status === "connected" || c.status === "configured" || c.status === "sip_registered"
+  ).length;
+  const needsOnboarding = !!me && connectors && connectors.length > 0 && connectedCount === 0;
   const loadKpi = async () => {
     try {
       const r = await api.get("/metrics");
@@ -270,24 +274,24 @@ export default function CopilotPage() {
   const AGENTS = [
     { key: "riesgo_rto",          name: "Riesgo RTO",
       icon: WarningDiamond, tone: "text-orange-300",
-      hint: "Puntúa el riesgo del pedido y decide si exigir prepago.",
-      prompt: "Ejecuta Riesgo RTO sobre los últimos 50 pedidos y muéstrame los de riesgo alto (score ≥ 60)." },
+      hint: "Detecta quién va a rechazar y lo marca antes de gastar plata.",
+      prompt: "Ejecuta Riesgo RTO sobre los últimos 50 pedidos y muéstrame los de riesgo alto." },
     { key: "confirmacion_cod",    name: "Confirmación COD",
       icon: PhoneCall, tone: "text-sky-300",
-      hint: "Verifica intención + dirección por voz y WhatsApp.",
-      prompt: "Programa Confirmación COD para todos los pedidos nuevos de hoy. Prioriza los de riesgo medio." },
+      hint: "Llama y escribe al cliente para confirmar entrega.",
+      prompt: "Programa Confirmación COD para los pedidos nuevos de hoy y prioriza los de riesgo medio." },
     { key: "novedades",           name: "Novedades",
       icon: Warning, tone: "text-yellow-300",
-      hint: "Sweep del carrier, semáforo y disparo de Rescate.",
+      hint: "Detecta qué pedidos entraron a oficina y necesitan rescate.",
       prompt: "Corre el sweep de Novedades y dame el semáforo por transportadora." },
     { key: "rescate_oficina",     name: "Rescate Oficina",
       icon: Lifebuoy, tone: "text-emerald-300",
-      hint: "Cadencia hasta 5 intentos con templates aprobados.",
-      prompt: "Recupera los pedidos rojos en oficina con la cadencia 0-3d / 4-7d / 8+ y muéstrame el impacto." },
+      hint: "Recupera pedidos varados con WhatsApp + llamadas.",
+      prompt: "Recupera los pedidos rojos en oficina y muéstrame el impacto." },
     { key: "analitica_operativa", name: "Analítica Operativa",
       icon: ChartLineUp, tone: "text-fuchsia-300",
-      hint: "Recuperación, entrega efectiva y $ recuperado.",
-      prompt: "Dame el reporte CEO del día: recuperación, devoluciones evitadas y $ recuperado." },
+      hint: "Muestra $ recuperado y devoluciones evitadas del día.",
+      prompt: "Dame el reporte CEO de hoy: recuperación, devoluciones evitadas y $ recuperado." },
   ];
 
   const runAgent = async (agent) => {
@@ -518,6 +522,26 @@ export default function CopilotPage() {
                 <p className="text-sm text-zinc-400 mb-10 max-w-lg mx-auto">
                   Elige un agente operativo — yo pido tu confirmación cuando la acción tiene costo.
                 </p>
+
+                {needsOnboarding && (
+                  <div className="max-w-3xl mx-auto mb-8 border border-cyan-500/40 bg-cyan-500/5 rounded-sm p-4 text-left flex items-center gap-4"
+                       data-testid="onboarding-banner">
+                    <div className="w-10 h-10 rounded-sm bg-cyan-500/15 border border-cyan-500/40 grid place-items-center shrink-0">
+                      <Lightning size={18} weight="fill" className="text-cyan-300" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-sm font-semibold text-white">Aún no conectas tus herramientas.</div>
+                      <p className="text-xs text-zinc-400 leading-snug">
+                        3 pasos rápidos: conecta Dropi, conecta Chatea Pro y corre tu primer rescate.
+                      </p>
+                    </div>
+                    <Button onClick={() => navigate("/app/onboarding")}
+                            data-testid="onboarding-start-btn"
+                            className="btn-cta-grad rounded-sm h-9 whitespace-nowrap">
+                      Empezar
+                    </Button>
+                  </div>
+                )}
 
                 {/* 5 operational agents */}
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-3 max-w-4xl mx-auto mb-6">

@@ -3,8 +3,14 @@ import MatrixRain from "./MatrixRain";
 import Constellation from "./Constellation";
 import ThemeToggle from "./ThemeToggle";
 import { Toaster } from "sonner";
+import { useInHub } from "./HubContext";
 
 export default function Layout({ children, title, subtitle, actions }) {
+  const inHub = useInHub();
+  // When embedded inside a hub tab, drop the chrome (Sidebar + Header) so we
+  // don't double it up. The hub owns the outer chrome.
+  if (inHub) return <div className="hub-embed">{children}</div>;
+
   return (
     <div className="min-h-screen flex bg-zinc-950 text-zinc-100 relative">
       <Constellation density={55} />

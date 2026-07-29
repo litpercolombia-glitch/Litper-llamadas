@@ -102,8 +102,32 @@ export default function QueuePage() {
             {loading && (
               <tr><td colSpan={10} className="py-6 text-center text-zinc-500 font-mono text-xs">Cargando…</td></tr>
             )}
-            {!loading && filtered.length === 0 && (
-              <tr><td colSpan={10} className="py-8 text-center text-zinc-500 text-sm">Sin resultados.</td></tr>
+            {!loading && rows.length === 0 && (
+              <tr><td colSpan={10} className="py-14 text-center">
+                <div className="max-w-md mx-auto">
+                  <div className="text-lg font-semibold text-white mb-1">Aún no hay pedidos</div>
+                  <p className="text-sm text-zinc-400 mb-4">
+                    Conecta Dropi o sube tu Excel de reclamos en oficina para empezar.
+                  </p>
+                  <div className="flex justify-center gap-2">
+                    <Link to="/app/pedidos?tab=importar">
+                      <Button className="btn-cta-grad rounded-sm" data-testid="queue-empty-import">
+                        Importar Excel de Dropi
+                      </Button>
+                    </Link>
+                    <Link to="/app/conexiones?tab=conectores">
+                      <Button variant="outline"
+                        className="rounded-sm border-zinc-700 bg-zinc-900 hover:bg-zinc-800"
+                        data-testid="queue-empty-connect">
+                        Conectar Dropi
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              </td></tr>
+            )}
+            {!loading && rows.length > 0 && filtered.length === 0 && (
+              <tr><td colSpan={10} className="py-8 text-center text-zinc-500 text-sm">Sin resultados con esos filtros.</td></tr>
             )}
             {filtered.map((r) => (
               <tr key={r.id} className="data-row" data-testid={`queue-row-${r.id}`}>

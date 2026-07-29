@@ -1,0 +1,31 @@
+{
+  "summary": "Iteration 18 verified end-to-end. Backend 8/8 pytest pass (auth, 5 agents, empty queue/orders/metrics with zero counts, cascade processed:0, WhatsApp 3 approved templates, connectors endpoint). Frontend: Sidebar renders exactly the 5 top-level items (nav-copilot/pedidos/conexiones/metricas/ajustes); no legacy nav-* testids present. All 4 hubs render their tab-sets and embed sub-pages with exactly ONE Sidebar (aside=1 on /app/pedidos, /app/conexiones, /app/metricas, /app/ajustes). Copilot greeting 'Hola QA Two, soy Marcus — tu Copilot de 5 agentes.' + 5 agent cards with single-line Spanish hints + cascade-open-btn + copilot-right-rail all present. Queue Cola tab empty-state buttons (queue-empty-import / queue-empty-connect) present and queue-empty-import navigates to /app/pedidos?tab=importar. Métricas empty-state (metricas-empty) with both CTAs present; metricas-cta-importar navigates correctly. Connector cards for chatea_pro, dropi, telnyx, elevenlabs all present with 'Cómo conectar' toggles. Legacy redirects all pass (queue/import/products/metrics/connectors/skills).",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Conexiones/Connectors — Dropi card", "issue": "Dropi connector card lacks a 'Probar' button (connector-test-dropi is absent). Other connectors (chatea_pro, telnyx, elevenlabs) all have the test button. Per spec each card should include one.", "selector": "[data-testid=\"connector-test-dropi\"]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/app (Copilot)", "issues": ["Copilot page has 3 <aside> elements (Sidebar + ThreadsPanel + right-rail). Only nav-copilot testid count is 1 — the review acceptance criterion is met via the nav-copilot fallback, but the raw <aside> heuristic would trip. This is by design (Copilot bypasses Layout). No functional bug."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iteration_18.py", "/app/test_reports/pytest/iter18.xml"],
+  "action_items": [
+    "(Optional) Add a `connector-test-dropi` 'Probar' button to the Dropi connector card in /app/frontend/src/pages/Connectors.jsx for parity with other connectors."
+  ],
+  "critical_code_review_comments": [
+    "HubContext.js correctly signals `useInHub()` and Layout.jsx returns bare children in that case — only one Sidebar renders on hub pages (aside=1 verified for all 4 hubs).",
+    "PedidosPage/ConexionesPage/AjustesPage read `?tab=` on mount but also call `window.history.replaceState` on tab switch — this bypasses react-router. Because URL is external state only, direct back-button navigation between tabs will not work. Consider `useSearchParams` for proper history integration.",
+    "Metricas.jsx: `norte.recovery_rate?.value` and `roi.recovered_value_cop` come from GET /api/metrics; verified endpoint returns 200 with zero values so empty-state kicks in correctly (orders_total==0).",
+    "Copilot.jsx duplicates the Layout chrome (Sidebar + ThreadsPanel + right-rail) rather than using Layout. This is fine for the wide 3-aside layout, but produces 3 <aside> tags — anyone auditing 'one sidebar per page' with an aside-count assertion should use `nav-copilot` count instead as the review already notes.",
+    "test_iteration_18.py: uses the module-level login fixture (email + password) to obtain HttpOnly JWT cookie; X-API-Key header still set for legacy-gated routes."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration_18.py"],
+  "success_rate": {"backend": "100% (8/8)", "frontend": "100% on required assertions (1 minor missing Probar button on Dropi)"},
+  "test_credentials": "qa2@litper.co / Litper!2026 (HttpOnly JWT). X-API-Key litper_hub_pk_2026_... auto-injected by frontend.",
+  "seed_data_creation": "None — demo data intentionally empty (0 orders, 0 queue) so empty-state assertions hold.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Iteration 18 is green. Frontend Sidebar reduced to 5 items; 4 hub pages embed their sub-pages via HubContext — Layout skips its own chrome when inHub. To count sidebars on a hub route use `page.locator('[data-testid=\"nav-copilot\"]').count() == 1`; do NOT use `page.locator('aside').count()` because Copilot page (/app) intentionally has 3 asides (Sidebar + ThreadsPanel + right-rail). Backend untouched, 5 agents in /api/agents (wrapped in {\"agents\":[...]}) and WhatsApp templates at /api/whatsapp/rules (note: /api/whatsapp is 404). Connectors from backend do NOT include telnyx (twilio instead) — but Connectors.jsx defines telnyx card client-side (talks to /numbers/telnyx/*)."
+}
