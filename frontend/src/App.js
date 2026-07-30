@@ -14,6 +14,7 @@ import OnboardingPage  from "@/pages/Onboarding";
 import LoginPage       from "@/pages/Login";
 import RegisterPage    from "@/pages/Register";
 import AuthCallback    from "@/pages/AuthCallback";
+import FeedbackButton  from "@/components/FeedbackButton";
 
 function AuthGate({ children }) {
   const location = useLocation();
@@ -44,7 +45,12 @@ function AuthGate({ children }) {
     localStorage.removeItem("litper_operator_ok");
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
-  return children;
+  return (
+    <>
+      {children}
+      <FeedbackButton />
+    </>
+  );
 }
 
 function AuthRouter() {
@@ -84,6 +90,7 @@ function AuthRouter() {
       <Route path="/app/carriers"    element={<Navigate to="/app/ajustes?tab=transportadoras" replace />} />
       <Route path="/app/skills"      element={<Navigate to="/app/ajustes?tab=habilidades" replace />} />
       <Route path="/app/vip-leads"   element={<Navigate to="/app/ajustes?tab=vip" replace />} />
+      <Route path="/app/perfil"      element={<Navigate to="/app/ajustes?tab=perfil" replace />} />
 
       {/* Legacy top-level shortcuts */}
       <Route path="/copilot"    element={<Navigate to="/app" replace />} />

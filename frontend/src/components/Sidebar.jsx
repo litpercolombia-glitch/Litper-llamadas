@@ -1,11 +1,11 @@
 import { NavLink } from "react-router-dom";
 import {
-  Robot, Package, PlugsConnected, ChartLineUp, Gear, House,
+  Package, PlugsConnected, ChartLineUp, Gear, House,
 } from "@phosphor-icons/react";
 
-// Only 5 top-level items. Everything else lives inside these hubs.
 const NAV = [
-  { to: "/app",            label: "Copilot",    icon: Robot,          testId: "nav-copilot",    exact: true,
+  { to: "/app",            label: "Lyan",       lyan: true,
+    testId: "nav-copilot",   exact: true,
     hint: "Chat con tus 5 agentes" },
   { to: "/app/pedidos",    label: "Pedidos",    icon: Package,        testId: "nav-pedidos",
     hint: "Cola · Importar · Novedades · Tickets" },
@@ -14,7 +14,7 @@ const NAV = [
   { to: "/app/metricas",   label: "Métricas",   icon: ChartLineUp,    testId: "nav-metricas",
     hint: "$ recuperado y entrega efectiva" },
   { to: "/app/ajustes",    label: "Ajustes",    icon: Gear,           testId: "nav-ajustes",
-    hint: "Configuración avanzada" },
+    hint: "Perfil · Productos · Prompts · más" },
 ];
 
 export default function Sidebar() {
@@ -28,11 +28,11 @@ export default function Sidebar() {
           <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-zinc-500">Zynex</span>
         </div>
         <h1 className="text-lg font-semibold text-white mt-1">Litper OS</h1>
-        <p className="text-[11px] font-mono text-zinc-500 mt-1">COD · LATAM · v2.3</p>
+        <p className="text-[11px] font-mono text-zinc-500 mt-1">COD · LATAM · v2.5</p>
       </div>
 
       <nav className="flex-1 py-3 overflow-y-auto">
-        {NAV.map(({ to, label, icon: Icon, testId, exact, hint }) => (
+        {NAV.map(({ to, label, icon: Icon, lyan, testId, exact, hint }) => (
           <NavLink
             key={to}
             to={to}
@@ -47,10 +47,16 @@ export default function Sidebar() {
             }
           >
             <div className="flex items-center gap-3">
-              <Icon size={20} weight="duotone" />
+              {lyan ? (
+                <img src="/lyan.webp" alt="Lyan"
+                     className="w-6 h-6 rounded-full object-cover ring-1 ring-cyan-400/40"
+                     data-testid="sidebar-lyan-avatar" />
+              ) : (
+                <Icon size={20} weight="duotone" />
+              )}
               <span className="text-sm font-medium">{label}</span>
             </div>
-            <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mt-0.5 ml-8">
+            <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mt-0.5 ml-9">
               {hint}
             </div>
           </NavLink>

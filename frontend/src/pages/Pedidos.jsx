@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import Layout from "../components/Layout";
+import HowItWorks from "../components/HowItWorks";
 import { HubContext } from "../components/HubContext";
 import { Package, FileXls, Warning, ListChecks } from "@phosphor-icons/react";
 import QueuePage    from "./Queue";
@@ -29,6 +30,16 @@ export default function PedidosPage() {
 
   return (
     <Layout title="Pedidos" subtitle={current.desc}>
+      <HowItWorks
+        testIdPrefix="pedidos-howitworks"
+        intro="Toda tu operación COD en un solo lugar: la cola (con semáforo), el importador Excel de Dropi, las novedades por transportadora y los tickets de rescate."
+        steps={[
+          "Conecta Dropi o sube tu Excel — Lyan crea automáticamente los pedidos.",
+          "Revisa la Cola: rojo = urgente (menos de 3 días para que el pedido se devuelva).",
+          "En Novedades ves quién está en oficina por transportadora.",
+          "Los Tickets son las conversaciones abiertas con clientes que aún no han retirado.",
+        ]}
+      />
       <div className="flex flex-wrap gap-1 border-b border-zinc-800 mb-6" data-testid="pedidos-tabs">
         {TABS.map(({ key, label, Icon }) => (
           <button key={key} onClick={() => switchTab(key)}

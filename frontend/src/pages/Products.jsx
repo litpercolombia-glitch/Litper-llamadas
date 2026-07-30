@@ -188,8 +188,17 @@ export default function ProductsPage() {
       {loading && <div className="text-zinc-400 text-sm">Cargando…</div>}
 
       {!loading && items.length === 0 && (
-        <div className="border border-dashed border-zinc-700 rounded-lg p-10 text-center text-zinc-400">
-          Aún no hay productos. Crea el primero.
+        <div className="border border-dashed border-zinc-700 rounded-lg p-10 text-center" data-testid="products-empty">
+          <Package size={32} className="mx-auto mb-3 text-zinc-600" weight="duotone" />
+          <div className="text-lg font-semibold text-white mb-1">Aún no tienes productos</div>
+          <p className="text-sm text-zinc-400 max-w-md mx-auto mb-4">
+            Agrega el tuyo para que Lyan lo mencione en cada llamada COD.
+          </p>
+          <Button onClick={() => setEditing({})}
+                  className="btn-cta-grad rounded-sm"
+                  data-testid="products-empty-create">
+            <Plus size={14} className="mr-1" /> Agrega el tuyo
+          </Button>
         </div>
       )}
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../components/Layout";
+import HowItWorks from "../components/HowItWorks";
 import { api } from "../lib/api";
 import { Button } from "../components/ui/button";
 import {
@@ -99,6 +100,15 @@ export default function MetricasPage() {
       title="Métricas"
       subtitle="Solo lo que mueve la aguja: $ recuperado, entrega efectiva, devoluciones evitadas."
     >
+      <HowItWorks
+        testIdPrefix="metricas-howitworks"
+        intro="Solo métricas de North Star: cuánto dinero recuperó Lyan, cuál es tu tasa de entrega efectiva y cuántas devoluciones evitaste."
+        steps={[
+          "Corre tu primer rescate — la cascada de 5 agentes activa las métricas.",
+          "Ves el $ recuperado por transportadora y por ciudad.",
+          "Compara semana a semana para probar el impacto real.",
+        ]}
+      />
       {loading && <div className="text-zinc-500 font-mono text-sm">Cargando…</div>}
 
       {isEmpty && (

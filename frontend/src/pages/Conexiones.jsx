@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import Layout from "../components/Layout";
+import HowItWorks from "../components/HowItWorks";
 import { HubContext } from "../components/HubContext";
 import { PlugsConnected, Key, Microphone, PhoneCall } from "@phosphor-icons/react";
 import ConnectorsPage from "./Connectors";
@@ -28,6 +29,21 @@ export default function ConexionesPage() {
 
   return (
     <Layout title="Conexiones" subtitle={current.desc}>
+      <HowItWorks
+        testIdPrefix="conexiones-howitworks"
+        intro="Zynex es BYOK (Bring Your Own Keys): tú pegas tus tokens, nosotros los ciframos y solo tú los ves. Pagas solo lo que uses en tu proveedor."
+        steps={[
+          "Elige un conector (Dropi, Chatea Pro, Telnyx, ElevenLabs, Shopify).",
+          "Sigue el paso a paso — cada tarjeta abre un instructivo corto.",
+          "Pega los tokens en los campos y dale Probar conexión.",
+          "Verde = listo. Rojo = revisa el token o los permisos.",
+        ]}
+        links={[
+          { href: "https://chateapro.app/settings#/api", label: "Chatea Pro · API", external: true },
+          { href: "https://portal.telnyx.com", label: "Telnyx · Portal", external: true },
+          { href: "https://elevenlabs.io/app/settings/api-keys", label: "ElevenLabs · Keys", external: true },
+        ]}
+      />
       <div className="flex flex-wrap gap-1 border-b border-zinc-800 mb-6" data-testid="conexiones-tabs">
         {TABS.map(({ key, label, Icon }) => (
           <button key={key} onClick={() => switchTab(key)}

@@ -199,3 +199,113 @@ async def google_session(response: Response,
     await _set_cookie(response, tok)
     return {"ok": True, "user": {"id": user_id, "email": email, "nombre": name,
                                   "picture": picture, "org_id": org_id, "role": "owner"}}
+
+
+# ---------- Profile & account settings (Vercel/Linear/Stripe pattern) ----------
+_AVATAR_MAX_BYTES = 2 * 1024 * 1024  # 2 MB
+
+
+class ProfileIn(BaseModel):
+    nombre: Optional[str] = None
+    email:  Optional[EmailStr] = None
+    org_name: Optional[str] = None
+
+
+class PasswordChangeIn(BaseModel):
+    current_password: str = Field(..., min_length=1)
+    new_password:     str = Field(..., min_length=6)
+
+
+class AvatarIn(BaseModel):
+    data_url: str  # e.g. "data:image/webp;base64,...."
+
+
+@router.put("/profile", summary="Update display name / email / org name.")
+async def update_profile(payload: ProfileIn, request: Request):
+    tok = await current_user(request)
+    db = get_db()
+    user = await db.users.find_one({"id": tok["sub"]}, {"_id": 0})
+    if not user:
+        raise HTTPException(401, "Usuario no encontrado.")
+
+    updates = {}
+    if payload.nombre is not None and payload.nombre.strip():
+        updates["nombre"] = payload.nombre.strip()
+    if payload.email is not None:
+        new_email = payload.email.lower().strip()
+        if new_email != user["email"]:
+            # Google-linked accounts cannot change their primary email here.
+            if user.get("provider") == "google":
+                raise HTTPException(400, "El email de una cuenta Google se gestiona en Google.")
+            clash = await db.users.find_one({"email": new_email, "id": {"$ne": user["id"]}}, {"_id": 0})
+            if clash:
+                raise HTTPException(409, "Ese email ya está en uso.")
+            updates["email"] = new_email
+    if updates:
+        updates["updated_at"] = _iso()
+        await db.users.update_one({"id": user["id"]}, {"$set": updates})
+
+    if payload.org_name is not None and payload.org_name.strip():
+        await db.orgs.update_one(
+            {"id": user["org_id"]},
+            {"$set": {"name": payload.org_name.strip(), "updated_at": _iso()}},
+            upsert=True,
+        )
+
+    fresh = await db.users.find_one({"id": user["id"]}, {"_id": 0, "password_hash": 0})
+    org   = await db.orgs.find_one({"id": user["org_id"]}, {"_id": 0}) or {}
+    return {"ok": True, "user": fresh, "org": org}
+
+
+@router.put("/password", summary="Change password (email accounts only).")
+async def change_password(payload: PasswordChangeIn, request: Request):
+    tok = await current_user(request)
+    db = get_db()
+    user = await db.users.find_one({"id": tok["sub"]}, {"_id": 0})
+    if not user:
+        raise HTTPException(401, "Usuario no encontrado.")
+    if user.get("provider") == "google":
+        raise HTTPException(400, "Tu contraseña la gestiona Google.")
+    if not user.get("password_hash") or not _verify(payload.current_password, user["password_hash"]):
+        raise HTTPException(401, "Contraseña actual incorrecta.")
+    await db.users.update_one(
+        {"id": user["id"]},
+        {"$set": {"password_hash": _hash(payload.new_password), "password_updated_at": _iso()}},
+    )
+    return {"ok": True}
+
+
+@router.post("/avatar", summary="Upload a profile picture (base64 data-URL, ≤2MB, jpg/png/webp).")
+async def upload_avatar(payload: AvatarIn, request: Request):
+    tok = await current_user(request)
+    db = get_db()
+    m = re.match(r"^data:(image/(?:png|jpeg|jpg|webp));base64,(.+)$", payload.data_url or "")
+    if not m:
+        raise HTTPException(400, "Formato inválido. Usa PNG, JPG o WebP.")
+    mime, b64 = m.group(1), m.group(2)
+    # Estimate decoded size = len(b64) * 3/4  (fast, no full decode)
+    est = int(len(b64) * 3 / 4)
+    if est > _AVATAR_MAX_BYTES:
+        raise HTTPException(413, "Imagen supera 2 MB. Recórtala antes de subirla.")
+    await db.users.update_one(
+        {"id": tok["sub"]},
+        {"$set": {"picture": payload.data_url, "picture_updated_at": _iso()}},
+    )
+    return {"ok": True, "size_estimate_bytes": est, "mime": mime}
+
+
+@router.delete("/avatar")
+async def delete_avatar(request: Request):
+    tok = await current_user(request)
+    await get_db().users.update_one({"id": tok["sub"]}, {"$unset": {"picture": ""}})
+    return {"ok": True}
+
+
+@router.get("/org", summary="Return the current user's organization info.")
+async def get_org(request: Request):
+    tok = await current_user(request)
+    org = await get_db().orgs.find_one({"id": tok["org"]}, {"_id": 0})
+    if not org:
+        # Legacy accounts: synthesize a minimal org doc
+        org = {"id": tok["org"], "name": tok["org"], "owner_user_id": tok["sub"]}
+    return {"org": org}

@@ -45,6 +45,7 @@ from routes.config import router as config_router  # noqa: E402
 from routes.auth import router as auth_router  # noqa: E402
 from routes.agents import router as agents_router  # noqa: E402
 from routes.llm import router as llm_router  # noqa: E402
+from routes.feedback import router as feedback_router  # noqa: E402
 
 logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
@@ -122,14 +123,8 @@ async def _ensure_seed():
             upsert=True,
         )
 
-    # Seed catalog products with promotions (idempotent by nombre)
-    from data import PRODUCTS_SEED
-    for p in PRODUCTS_SEED:
-        await db.catalog_products.update_one(
-            {"nombre": p["nombre"]},
-            {"$setOnInsert": p},
-            upsert=True,
-        )
+    # NOTE: catalog products are org-specific and are NOT seeded — every
+    # tenant starts with an empty catalog and creates their own from the UI.
 
     # Seed the default Sofía global prompt (LIT-LOG-RO flow — 6-block ElevenLabs).
     # Force-overwrite if the existing doc is from a legacy structure so upgrades
@@ -234,6 +229,7 @@ api.include_router(config_router)
 api.include_router(auth_router)
 api.include_router(agents_router)
 api.include_router(llm_router)
+api.include_router(feedback_router)
 
 
 @api.get("/", tags=["health"], summary="Root health.")

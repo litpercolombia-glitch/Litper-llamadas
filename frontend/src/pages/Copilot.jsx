@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import Sidebar from "../components/Sidebar";
+import HowItWorks from "../components/HowItWorks";
 import { api, formatCOP } from "../lib/api";
 import { Toaster, toast } from "sonner";
 import { Button } from "../components/ui/button";
@@ -59,13 +60,13 @@ function MessageBubble({ m }) {
   return (
     <div className={`flex gap-3 py-4 ${isUser ? "justify-end" : ""}`}>
       {!isUser && (
-        <div className="w-7 h-7 rounded-sm bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0 mt-1">
-          <Robot size={16} className="text-white" weight="duotone" />
+        <div className="w-7 h-7 rounded-full overflow-hidden bg-zinc-800 border border-zinc-700 shrink-0 mt-1">
+          <img src="/lyan.webp" alt="Lyan" className="w-full h-full object-cover" />
         </div>
       )}
       <div className={`max-w-[85%] ${isUser ? "order-2" : ""}`}>
         <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-1 flex items-center gap-2">
-          {isUser ? "Tú" : "Marcus"}
+          {isUser ? "Tú" : "Lyan"}
           {isAssistant && m.provider && (
             <span className="border border-zinc-700 bg-zinc-800/60 px-1.5 py-0.5 rounded text-[9px] tracking-widest">
               via {m.provider}
@@ -447,13 +448,13 @@ export default function CopilotPage() {
         <header className="border-b border-zinc-800 bg-zinc-950/80 backdrop-blur-xl sticky top-0 z-10">
           <div className="px-8 py-4 flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-sm bg-zinc-800 border border-zinc-700 flex items-center justify-center">
-                <Robot size={20} className="text-white" weight="duotone" />
+              <div className="w-9 h-9 rounded-full overflow-hidden border border-zinc-700 bg-zinc-800">
+                <img src="/lyan.webp" alt="Lyan" className="w-full h-full object-cover" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-white">Marcus · Litper Copilot</h2>
+                <h2 className="text-lg font-semibold text-white">Lyan · Copiloto Zynex</h2>
                 <p className="text-[11px] font-mono text-zinc-500">
-                  Agente autónomo con {skills.length} skills · claude-sonnet-4-6
+                  Orquestador de 5 agentes · claude-sonnet-4-6
                 </p>
               </div>
             </div>
@@ -508,20 +509,35 @@ export default function CopilotPage() {
           <div className="max-w-3xl mx-auto py-6">
             {messages.length === 0 && !running && (
               <div className="py-12 text-center">
-                {/* 3D glowing mascot ring */}
-                <div className="mx-auto mascot-ring mb-8" data-testid="copilot-mascot">
-                  <Robot size={72} className="text-white drop-shadow-[0_0_10px_rgba(90,200,250,0.6)]" weight="duotone" />
+                {/* Lyan mascot — big round avatar with glow */}
+                <div className="mx-auto mascot-ring mb-8 rounded-full overflow-hidden"
+                     data-testid="copilot-mascot" style={{ width: 128, height: 128 }}>
+                  <img src="/lyan.webp" alt="Lyan"
+                       className="w-full h-full object-cover" />
                 </div>
 
                 <h1 className="text-3xl md:text-4xl font-semibold text-white mb-3 tracking-tight"
                     data-testid="copilot-greeting">
                   Hola {me?.nombre ? <span className="text-white">{me.nombre}</span> : ""}, soy{" "}
-                  <span className="neon-text">Marcus</span>{" "}
-                  <span className="text-white">— tu Copilot de 5 agentes.</span>
+                  <span className="neon-text">Lyan</span>{" "}
+                  <span className="text-white">— tu copiloto de 5 agentes.</span>
                 </h1>
-                <p className="text-sm text-zinc-400 mb-10 max-w-lg mx-auto">
-                  Elige un agente operativo — yo pido tu confirmación cuando la acción tiene costo.
+                <p className="text-sm text-zinc-400 mb-6 max-w-lg mx-auto">
+                  Elige un agente operativo — te pido confirmación cuando la acción tiene costo.
                 </p>
+
+                <div className="max-w-3xl mx-auto mb-6 text-left" data-testid="copilot-howitworks-slot">
+                  <HowItWorks
+                    testIdPrefix="copilot-howitworks"
+                    intro="Lyan es la cara amable de una orquesta de 5 agentes especialistas. Le hablas en español normal, y él coordina Riesgo, Confirmación, Novedades, Rescate y Analítica."
+                    steps={[
+                      "Empieza pidiéndole: 'Corre la cascada sobre pedidos rojos'.",
+                      "Lyan te muestra un plan antes de ejecutar acciones con costo (llamadas, WhatsApp).",
+                      "Dile 'sí' o 'no' — nunca hace nada caro sin tu confirmación.",
+                      "Puedes cambiar el motor (Groq / Claude / Gemini) o dejarlo en Auto.",
+                    ]}
+                  />
+                </div>
 
                 {needsOnboarding && (
                   <div className="max-w-3xl mx-auto mb-8 border border-cyan-500/40 bg-cyan-500/5 rounded-sm p-4 text-left flex items-center gap-4"
@@ -602,9 +618,9 @@ export default function CopilotPage() {
             {running && (
               <div className="flex gap-3 py-4 items-center">
                 <div className="w-7 h-7 rounded-sm bg-zinc-800 border border-zinc-700 flex items-center justify-center">
-                  <Robot size={16} className="text-white" weight="duotone" />
+                  <img src="/lyan.webp" alt="Lyan" className="w-4 h-4 rounded-full object-cover" />
                 </div>
-                <div className="text-sm font-mono text-zinc-500">Marcus está pensando…</div>
+                <div className="text-sm font-mono text-zinc-500">Lyan está pensando…</div>
                 <div className="flex gap-1 ml-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-zinc-600 animate-pulse" />
                   <span className="w-1.5 h-1.5 rounded-full bg-zinc-600 animate-pulse" style={{ animationDelay: "150ms" }} />
@@ -629,7 +645,7 @@ export default function CopilotPage() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
                 }}
-                placeholder="Pregúntale a Marcus…  (Enter para enviar · Shift+Enter para salto de línea)"
+                placeholder="Pregúntale a Lyan…  (Enter para enviar · Shift+Enter para salto de línea)"
                 className="border-0 bg-transparent focus-visible:ring-0 min-h-[60px] resize-none text-sm rounded-none" />
               <div className="border-t border-zinc-800 px-3 py-2 flex items-center justify-between">
                 <div className="text-[10px] font-mono text-zinc-500">
