@@ -24,6 +24,40 @@ Same as v1.0 plus:
   → bulk import.
 
 
+### v2.5 (2026-07-30) — Lyan branding · zero-demo · Perfil · Feedback
+- **Marca**: favicon + apple-touch-icon = `/favicon.webp` + `/lyan.webp`;
+  title de la pestaña = **Zynex OS**.
+- **Rename Copilot → Lyan** con avatar del gato cyber en Sidebar, header del
+  chat, burbujas de Marcus (ahora "Lyan"), placeholder del input y mascota
+  gigante en el empty-state. Los 5 agentes internos no cambian; Lyan es la
+  cara/orquestador.
+- **HowItWorks** (`components/HowItWorks.jsx`) — acordeón reutilizable con
+  disparador de gradiente cyan→violeta animado, respeta
+  `prefers-reduced-motion`. Montado en las 5 pestañas (Copilot · Pedidos ·
+  Conexiones · Métricas · Ajustes).
+- **Login redesign (Hormozi 2 columnas)** — hero con hook "20-40% se
+  devuelven · USD 7-9 por devolución · Zynex los rescata antes", mascota
+  Lyan 3D flotante con glow cyan (respetando reduced-motion) + 3 beneficios
+  orientados a resultado + CTA "Rescatar mis pedidos". Google + email
+  siguen funcionando idénticos.
+- **Perfil de cuenta** (`/app/ajustes?tab=perfil`) — patrón Vercel/Linear:
+  foto (subida con recorte 512x512, ≤2 MB, PNG/JPG/WebP, POST /auth/avatar),
+  nombre + email editables (Google → email lock + badge), contraseña con
+  validación (o "Gestionado por Google" para cuentas OAuth), nombre de la
+  organización, `org_id` visible. Endpoints nuevos:
+  `PUT /api/auth/profile`, `PUT /api/auth/password`, `POST /api/auth/avatar`,
+  `DELETE /api/auth/avatar`, `GET /api/auth/org`.
+- **Feedback FAB** — botón "Sugerir función" flotante en cada ruta
+  autenticada abre un modal (título + descripción + email opcional) que
+  golpea `POST /api/feedback` — persiste a `db.feedback` y hace best-effort
+  SMTP a `FEEDBACK_EMAIL` (default `zynexproai@gmail.com`). Si no hay
+  `SMTP_HOST`, responde `emailed:false` pero garantiza persistencia.
+- **Cero demo data (extendido)**: se limpiaron `catalog_products`,
+  `vip_leads`, `novedades_ticks`, `ceo_reports`, `chat_threads`,
+  `chat_messages`. El seed de `PRODUCTS_SEED` fue eliminado del arranque.
+  Nueva empty-state en Productos: "Aún no tienes productos. Agrega el tuyo".
+- **Iteration 20 tests**: 16/16 backend + 100 % frontend, cero issues.
+
 ### v2.4 (2026-07-29) — Verbatim connector onboarding + empty-first UI
 - **Connectors rewritten** (`frontend/src/pages/Connectors.jsx`): 5 cards
   (Dropi · Chatea Pro · Telnyx · ElevenLabs · Shopify) with the EXACT
