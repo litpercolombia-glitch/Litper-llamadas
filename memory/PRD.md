@@ -24,6 +24,31 @@ Same as v1.0 plus:
   → bulk import.
 
 
+### v2.6 (2026-07-30) — Sidebar Claude-style · Login sin mascota · Agentes BETA
+- **Sidebar rediseñado estilo Claude**: 5 nav items arriba, divisor,
+  "＋ Nueva conversación", lista de chats abajo (solo en `/app`). Footer
+  con soporte visible en todas las páginas (zynexproai@gmail.com +
+  wa.me/573144754115). `notifyThreadsChanged()` sincroniza sidebar ↔ chat.
+- **Login rediseñado (sin mascota grande)**: hero solo con hook estadístico
+  + 3 beneficios Hormozi. Fondo con gradient Silver Matrix
+  (`.login-hero-bg`) — jamás negro. Layout 2 cols en desktop, apilado en
+  móvil. Footer con línea de soporte (mismo email + WhatsApp).
+- **Copilot empty-state limpio**: solo avatar chico (~36 px) de Lyan.
+  Se eliminó la ilustración grande.
+- **Feature nuevo — Custom Agents (BETA)**: `POST/GET/PATCH/DELETE
+  /api/custom-agents` + `POST /api/custom-agents/{id}/test-call`. Además
+  `/templates` (5 plantillas), `/tools` (6 acciones) y `/voices`
+  (4 ElevenLabs) alimentan el wizard. Colección `custom_agents` con index
+  compuesto `(org_id, created_at desc)`.
+- **UI Wizard de agentes** (`/app/ajustes?tab=agentes`) — 5 pasos
+  (Propósito · Personalidad · Voz · Acciones · Prueba). Empty-state
+  "Aún no tienes agentes · Crea el primero". Plantillas pre-llenan prompt
+  y variables. `test-call` en BETA valida config y responde `beta:true`
+  cuando faltan credenciales Telnyx/ElevenLabs (nunca falla ruido).
+- **POST /api/threads con body opcional** — hardening rápido pedido por
+  el testing agent.
+- **Iteration 21 tests**: 10/10 backend + 100 % frontend, cero issues.
+
 ### v2.5 (2026-07-30) — Lyan branding · zero-demo · Perfil · Feedback
 - **Marca**: favicon + apple-touch-icon = `/favicon.webp` + `/lyan.webp`;
   title de la pestaña = **Zynex OS**.

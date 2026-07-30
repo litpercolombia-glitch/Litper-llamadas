@@ -35,9 +35,10 @@ async def list_threads(limit: int = 100):
 
 @router.post("/threads", response_model=ChatThread, status_code=201,
              summary="Create a new chat thread.")
-async def create_thread(payload: ThreadCreate):
-    t = ChatThread(title=payload.title or "Nueva conversación",
-                   skill_id=payload.skill_id)
+async def create_thread(payload: Optional[ThreadCreate] = None):
+    p = payload or ThreadCreate()
+    t = ChatThread(title=p.title or "Nueva conversación",
+                   skill_id=p.skill_id)
     await get_db().chat_threads.insert_one(t.model_dump())
     return t
 
