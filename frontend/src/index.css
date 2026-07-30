@@ -677,3 +677,21 @@ html.matrix-day .constellation-canvas { opacity: 0.42; }
 @media (prefers-reduced-motion: reduce) {
   .feedback-fab { transition: none; }
 }
+
+/* ─── Login left panel — Silver Matrix gradient (never black) ─── */
+.login-hero-bg {
+  background:
+    radial-gradient(1000px 600px at 15% 30%, rgba(6,182,212,.16), transparent 60%),
+    radial-gradient(900px 700px at 85% 80%, rgba(168,85,247,.14), transparent 60%),
+    linear-gradient(180deg, #0a0a0b 0%, #08080b 100%);
+  position: relative;
+}
+.login-hero-bg::before {
+  content: "";
+  position: absolute; inset: 0;
+  background:
+    repeating-linear-gradient(0deg, rgba(255,255,255,.04) 0 1px, transparent 1px 40px),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.04) 0 1px, transparent 1px 40px);
+  mask-image: radial-gradient(ellipse at 50% 50%, black 30%, transparent 75%);
+  pointer-events: none;
+}

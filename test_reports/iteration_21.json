@@ -1,0 +1,29 @@
+{
+  "summary": "Iteration 21 (UX rework + Custom-Agents BETA) tested end-to-end. Backend 10/10 pytest pass (templates=5, tools=6, voices=4, CRUD, invalid-tool→400, missing-prompt→422, test-call BETA, regression /api/agents=5, /api/whatsapp/rules=3, providers dropi+shopify, auth/me). Frontend: login redesign OK (no big Lyan, gradient .login-hero-bg, 3 benefits, hook contains 20-40% and USD 7-9, right col 440px, support footer with correct mailto and wa.me/573144754115). Sidebar Claude-style OK: sidebar-chats appears ONLY on /app; sidebar-support present on every /app/* route. Copilot mascot is 36x36 rounded-full <img src=/lyan.webp>. Agentes wizard: 5 steps flow, all 5 templates render, prompt pre-filled after template pick, save-draft creates POST /custom-agents, testcall returns BETA message with 'Beta — conecta Telnyx y ElevenLabs...', publish sets estado=en_vivo, delete cleans up (final agents list empty). Feedback dialog shows feedback-support with correct email+WhatsApp. Found + fixed one real bug: Sidebar.newThread called api.post('/threads') with no body → 422 on backend; changed to api.post('/threads', {}).",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Sidebar", "issue": "sidebar-new-chat POST /threads was sent with no body causing 422 (FastAPI requires ThreadCreate body). Fixed by sending {}.", "selector": "[data-testid=sidebar-new-chat]", "priority": "HIGH-FIXED"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_iteration_21.py", "/app/test_reports/pytest/iter21.xml"],
+  "action_items": [
+    "Optional backend hardening: make POST /api/threads body Optional (accept empty POST) so future no-body clients don't 422. Currently mitigated on frontend.",
+    "Consider making the wizard Nav bar sticky inside the panel — at 1920x800 viewport the 'Siguiente' button sits at y=743 (below fold when panel is tall). Force clicks worked but real users on small laptops must scroll."
+  ],
+  "critical_code_review_comments": [
+    "custom_agents.py test-call correctly returns beta=true when TELNYX_API_KEY/ELEVEN_API_KEY unset. Good.",
+    "Agentes.jsx: activeDraft is a useMemo of editing only — fine. But `setEditing(saved)` after onSaved keeps the wizard bound to the created agent so subsequent 'Publicar' correctly PATCHes instead of re-POST. Verified.",
+    "Sidebar newThread bug (fixed) shows a pattern to watch: any FastAPI POST with pydantic body needs a JSON body from the client, even if all fields are optional."
+  ],
+  "updated_files": ["/app/frontend/src/components/Sidebar.jsx", "/app/backend/tests/test_iteration_21.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "qa2@litper.co / Litper!2026 (unchanged).",
+  "seed_data_creation": "None persisted. Test agents/threads created during runs were deleted; agentes list returns to empty for the empty-state assertions.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter 21 backend + frontend green. Only change made outside tests: Sidebar.jsx L50 now sends `api.post('/threads', {})` instead of `api.post('/threads')`. All iter-21 data-testids from the review request verified. Wizard 'Siguiente' button lives near the bottom of the panel — use viewport 1920x1080 (or scrollIntoView) for reliable clicks.",
+  "rca of the issue": "Sidebar `newThread` bug: FastAPI endpoint POST /api/threads declares `payload: ThreadCreate` as a required body arg. Even though every field of ThreadCreate is Optional, pydantic still requires the body to exist. axios.post(url) with no data sends no body → 422 'Field required loc=body'. Repro: click 'Nueva conversación' in sidebar without fix → no thread added, console 422. Mitigation applied: send `{}` as the body from the frontend."
+}

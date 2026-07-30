@@ -125,6 +125,16 @@ export default function FeedbackButton() {
               </Button>
             </DialogFooter>
           </form>
+
+          <div className="mt-4 pt-3 border-t border-zinc-800 text-[11px] text-zinc-500 text-center"
+               data-testid="feedback-support">
+            ¿Necesitas soporte? Escríbenos a{" "}
+            <a href="mailto:zynexproai@gmail.com"
+               className="text-cyan-300 hover:text-cyan-200">zynexproai@gmail.com</a>
+            {" "}o WhatsApp{" "}
+            <a href="https://wa.me/573144754115" target="_blank" rel="noreferrer"
+               className="text-emerald-300 hover:text-emerald-200">3144754115</a>.
+          </div>
         </DialogContent>
       </Dialog>
     </>

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import Sidebar from "../components/Sidebar";
+import Sidebar, { notifyThreadsChanged } from "../components/Sidebar";
 import HowItWorks from "../components/HowItWorks";
 import { api, formatCOP } from "../lib/api";
 import { Toaster, toast } from "sonner";
@@ -21,7 +21,7 @@ import {
   CurrencyCircleDollar, Plug, SignOut, PlayCircle,
   Stack, CheckSquare, WhatsappLogo,
 } from "@phosphor-icons/react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import MatrixRain from "../components/MatrixRain";
 import Constellation from "../components/Constellation";
 import ThemeToggle from "../components/ThemeToggle";
@@ -214,6 +214,9 @@ export default function CopilotPage() {
     setMessages(r.data || []);
   };
 
+  const location = useLocation();
+  const urlThreadId = new URLSearchParams(location.search).get("thread");
+
   useEffect(() => {
     loadThreads();
     loadSkills();
@@ -222,17 +225,29 @@ export default function CopilotPage() {
     loadKpi();
   }, []);
 
+  // Sync active thread with the URL (?thread=<id>) — Sidebar drives it now.
+  useEffect(() => {
+    if (urlThreadId && urlThreadId !== activeId) setActiveId(urlThreadId);
+    if (!urlThreadId && activeId) setActiveId(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlThreadId]);
+
   useEffect(() => { loadMessages(activeId); }, [activeId]);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages, running]);
 
-  const newThread = () => { setActiveId(null); setMessages([]); setInput(""); };
+  const newThread = () => {
+    setActiveId(null); setMessages([]); setInput("");
+    navigate("/app"); // clear ?thread=
+    notifyThreadsChanged();
+  };
   const removeThread = async (id) => {
     await api.delete(`/threads/${id}`);
     if (activeId === id) newThread();
     loadThreads();
+    notifyThreadsChanged();
   };
 
   const send = async () => {
@@ -253,6 +268,7 @@ export default function CopilotPage() {
       if (!activeId) setActiveId(r.data.thread_id);
       await loadMessages(r.data.thread_id);
       loadThreads();
+      notifyThreadsChanged();
     } catch (e) {
       toast.error(e?.response?.data?.detail || e.message);
       loadMessages(activeId);
@@ -344,6 +360,7 @@ export default function CopilotPage() {
       if (!activeId) setActiveId(r.data.thread_id);
       await loadMessages(r.data.thread_id);
       loadThreads();
+      notifyThreadsChanged();
     } catch (e) {
       toast.error(e?.response?.data?.detail || e.message);
       loadMessages(activeId);
@@ -442,8 +459,6 @@ export default function CopilotPage() {
       <Constellation density={55} />
       <MatrixRain />
       <Sidebar />
-      <ThreadsPanel threads={threads} activeId={activeId}
-        onSelect={setActiveId} onNew={newThread} onDelete={removeThread} />
       <div className="flex-1 flex flex-col min-w-0 h-screen">
         <header className="border-b border-zinc-800 bg-zinc-950/80 backdrop-blur-xl sticky top-0 z-10">
           <div className="px-8 py-4 flex items-center justify-between gap-4">
@@ -509,11 +524,14 @@ export default function CopilotPage() {
           <div className="max-w-3xl mx-auto py-6">
             {messages.length === 0 && !running && (
               <div className="py-12 text-center">
-                {/* Lyan mascot — big round avatar with glow */}
-                <div className="mx-auto mascot-ring mb-8 rounded-full overflow-hidden"
-                     data-testid="copilot-mascot" style={{ width: 128, height: 128 }}>
+                {/* Small round Lyan avatar (no more big hero mascot) */}
+                <div className="mx-auto mb-5 flex items-center justify-center gap-2">
                   <img src="/lyan.webp" alt="Lyan"
-                       className="w-full h-full object-cover" />
+                       data-testid="copilot-mascot"
+                       className="w-9 h-9 rounded-full object-cover ring-1 ring-cyan-400/40" />
+                  <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">
+                    Lyan · Copiloto Zynex
+                  </span>
                 </div>
 
                 <h1 className="text-3xl md:text-4xl font-semibold text-white mb-3 tracking-tight"

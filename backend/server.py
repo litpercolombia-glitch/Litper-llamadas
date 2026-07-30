@@ -46,6 +46,7 @@ from routes.auth import router as auth_router  # noqa: E402
 from routes.agents import router as agents_router  # noqa: E402
 from routes.llm import router as llm_router  # noqa: E402
 from routes.feedback import router as feedback_router  # noqa: E402
+from routes.custom_agents import router as custom_agents_router  # noqa: E402
 
 logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
@@ -98,6 +99,8 @@ async def _ensure_seed():
     await db.ceo_reports.create_index("id", unique=True)
     await db.novedades_ticks.create_index("ts")
     await db.settings.create_index("key", unique=True)
+    await db.custom_agents.create_index([("org_id", 1), ("created_at", -1)])
+    await db.custom_agents.create_index("id", unique=True)
 
     # Seed novedades (idempotent by carrier+estatus_carrier)
     for n in NOVEDADES_SEED:
@@ -230,6 +233,7 @@ api.include_router(auth_router)
 api.include_router(agents_router)
 api.include_router(llm_router)
 api.include_router(feedback_router)
+api.include_router(custom_agents_router)
 
 
 @api.get("/", tags=["health"], summary="Root health.")
