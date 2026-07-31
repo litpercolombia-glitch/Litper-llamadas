@@ -2,9 +2,10 @@ import { useMemo, useState } from "react";
 import Layout from "../components/Layout";
 import HowItWorks from "../components/HowItWorks";
 import { HubContext } from "../components/HubContext";
-import { UserCircle, Robot, Package, ChatText, ClockCountdown, Truck, Sparkle, UsersThree } from "@phosphor-icons/react";
+import { UserCircle, Robot, PhoneCall, Package, ChatText, ClockCountdown, Truck, Sparkle, UsersThree } from "@phosphor-icons/react";
 import PerfilPage    from "./Perfil";
 import AgentesPage   from "./Agentes";
+import LlamadasPage  from "./Llamadas";
 import ProductsPage  from "./Products";
 import PromptsPage   from "./Prompts";
 import CadencePage   from "./Cadence";
@@ -15,6 +16,7 @@ import VipLeadsPage  from "./VipLeads";
 const TABS = [
   { key: "perfil",         label: "Perfil",          Icon: UserCircle,     desc: "Tu cuenta y tu organización." },
   { key: "agentes",        label: "Agentes",         Icon: Robot,          desc: "Crea agentes de voz para casos particulares (BETA)." },
+  { key: "llamadas",       label: "Llamadas",        Icon: PhoneCall,      desc: "Historial de llamadas con audio y transcript." },
   { key: "productos",      label: "Productos",       Icon: Package,        desc: "Catálogo con precios y promociones." },
   { key: "prompts",        label: "Prompts",         Icon: ChatText,       desc: "El guion de tu IA por país (antifluido · nunca 'impermeable')." },
   { key: "cadencia",       label: "Cadencia",        Icon: ClockCountdown, desc: "Cuántos intentos y en qué ventanas." },
@@ -63,6 +65,7 @@ export default function AjustesPage() {
       <HubContext.Provider value={true}>
         {tab === "perfil"          && <PerfilPage />}
         {tab === "agentes"         && <AgentesPage />}
+        {tab === "llamadas"        && <LlamadasPage />}
         {tab === "productos"       && <ProductsPage />}
         {tab === "prompts"         && <PromptsPage />}
         {tab === "cadencia"        && <CadencePage />}

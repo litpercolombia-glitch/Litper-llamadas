@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 
 from db import get_db
 from deps import require_api_key
+from retell_service import upsert_agent as _retell_upsert, configured as _retell_ok, place_call as _retell_call
 
 
 router = APIRouter(prefix="/custom-agents", tags=["custom-agents"])
@@ -41,8 +42,13 @@ async def _org_id(request: Request) -> str:
 
 # ---------- Models ----------
 ALLOWED_TOOLS = {
-    "confirmar_pedido", "reagendar", "enviar_whatsapp",
-    "transferir_a_humano", "terminar_llamada", "registrar_pago",
+    # Non-money (safe to auto-execute)
+    "reagendar_entrega", "confirmar_pedido",
+    "consultar_disponibilidad", "enviar_whatsapp", "transferir_a_humano",
+    # Money (require HITL confirmation — see routes/agent_tools.py)
+    "registrar_promesa_pago", "enviar_link_pago",
+    # Legacy aliases kept for back-compat with earlier drafts.
+    "reagendar", "terminar_llamada", "registrar_pago",
 }
 ALLOWED_ESTADOS = {"borrador", "prueba", "en_vivo"}
 
@@ -60,6 +66,7 @@ class AgentIn(BaseModel):
     variables: list[str] = Field(default_factory=list)
     numero:    Optional[str] = None
     estado:    str = "borrador"
+    retell_agent_id: Optional[str] = None
 
 
 class AgentPatch(BaseModel):
@@ -83,56 +90,84 @@ def _validate(a: dict):
         raise HTTPException(400, f"Estado inválido: {a['estado']}")
 
 
-# ---------- Templates (pre-generated prompts) ----------
+# ---------- Templates (specialist prompts — Claude Haiku 0.3 · es-CO · antifluido · max 2 frases/turno) ----------
 TEMPLATES = {
     "rescate_oficina": {
-        "label": "Rescate de pedidos en oficina",
+        "label": "Sofía Rescate — Rescate de pedidos en oficina",
         "prompt": (
-            "Eres una operadora COD amable, natural y directa. Tu misión es "
-            "convencer a {{nombre}} de que retire su pedido de {{producto}} "
-            "en la oficina antes de que se devuelva. Confirma la dirección "
-            "({{direccion}}) y el valor a pagar ({{valor}}). Nunca digas la "
-            "palabra 'impermeable'. Ofrece alternativas: cambio de dirección, "
-            "reagendar entrega, o WhatsApp con la ubicación del punto de "
-            "retiro. Si el cliente confirma, agenda; si no, negocia una vez."
+            "Eres Sofía, asesora de {{empresa}}. Llamas a {{nombre}} porque su pedido de "
+            "{{producto}} (pedido {{pedido_id}}) está represado en la oficina de "
+            "{{transportadora}} en {{ciudad}} hace {{dias_oficina}} días y está a punto "
+            "de devolverse. OBJETIVO: que el cliente recoja el pedido o reprograme la "
+            "entrega HOY. Saludo cálido y directo. Explica en 1 frase la urgencia. Ofrece "
+            "2 opciones: (a) recoger en la oficina, (b) reprogramar a su dirección. "
+            "Objeciones: 'no tengo tiempo' → reprogramar; 'ya no lo quiero' → indaga la "
+            "razón real antes de aceptar. El protector es ANTIFLUIDO, nunca impermeable. "
+            "ACCIONES: reagendar_entrega si acepta nueva fecha; confirmar_recogida si va "
+            "a la oficina; registrar_desistido SOLO si insiste (confirma antes: "
+            "'¿cancelo el pedido {{pedido_id}}?'). Si no contesta o pide info escrita → "
+            "enviar_whatsapp. Cierre: confirma la acción acordada. Máx 2 frases por turno."
         ),
-        "tools":     ["confirmar_pedido", "reagendar", "enviar_whatsapp", "terminar_llamada"],
-        "variables": ["nombre", "producto", "direccion", "valor"],
+        "tools":     ["reagendar_entrega", "confirmar_pedido", "enviar_whatsapp"],
+        "variables": ["nombre", "empresa", "producto", "pedido_id", "transportadora", "ciudad", "dias_oficina"],
     },
     "confirmacion_cod": {
-        "label": "Confirmación de pedido COD",
+        "label": "Sofía Confirma — Confirmación de pedido COD",
         "prompt": (
-            "Eres una operadora que confirma pedidos COD. Saluda a {{nombre}}, "
-            "confirma el producto {{producto}}, la dirección {{direccion}} y "
-            "el valor {{valor}}. Si algo cambió, actualízalo. Cierra con "
-            "próxima ventana de entrega. Nunca digas 'impermeable'."
+            "Eres Sofía, asesora de {{empresa}}. Llamas a {{nombre}} para confirmar su "
+            "pedido nuevo de {{producto}} (pedido {{pedido_id}}, valor {{valor}}) antes "
+            "de despacharlo. OBJETIVO: validar que el pedido es real, que la dirección "
+            "{{direccion}} es correcta y que estará para recibir y pagar contra entrega. "
+            "Verifica 3 cosas: (1) sí lo pidió y lo quiere, (2) dirección exacta con "
+            "punto de referencia, (3) que habrá quién reciba y pague {{valor}}. Resuelve "
+            "dudas de precio/producto con seguridad (antifluido, garantía). No presiones "
+            "si claramente no lo quiere. ACCIONES: confirmar_pedido(direccion, franja); "
+            "corregir_datos si cambió; registrar_desistido si no lo quiere (confirma "
+            "antes); enviar_whatsapp con resumen. Cierre: repite dirección y franja. "
+            "Máx 2 frases por turno."
         ),
-        "tools":     ["confirmar_pedido", "reagendar", "terminar_llamada"],
-        "variables": ["nombre", "producto", "direccion", "valor"],
+        "tools":     ["confirmar_pedido", "enviar_whatsapp"],
+        "variables": ["nombre", "empresa", "producto", "pedido_id", "valor", "direccion"],
     },
     "citas": {
-        "label": "Recordatorio de citas",
+        "label": "Asistente Citas — Recordatorio con horarios reales",
         "prompt": (
-            "Eres una asistente que recuerda citas. Saluda a {{nombre}}, "
-            "recuérdale su cita el {{fecha_cita}} y ofrécele confirmar, "
-            "reagendar o cancelar. Sé breve y cálida."
+            "Eres el asistente de voz de {{empresa}}. Llamas a {{nombre}} para recordar "
+            "su cita con {{doctor}} el {{fecha_cita}} y confirmar asistencia. OBJETIVO: "
+            "confirmar, reagendar o cancelar. REGLA CRÍTICA: NUNCA calcules fechas ni "
+            "horarios; el horario disponible te lo entrega la herramienta "
+            "consultar_disponibilidad ya calculado; solo léelo. Pregunta si asistirá: sí "
+            "→ confirmar; no puede → ofrece el próximo horario de "
+            "consultar_disponibilidad. Tono amable y breve. ACCIONES: confirmar_cita; "
+            "reagendar_cita(nuevo_horario) usando SOLO horarios de "
+            "consultar_disponibilidad; cancelar_cita (confirma antes); enviar_whatsapp "
+            "con el detalle. Cierre: repite día y hora. Máx 2 frases por turno."
         ),
-        "tools":     ["reagendar", "terminar_llamada"],
-        "variables": ["nombre", "fecha_cita"],
+        "tools":     ["consultar_disponibilidad", "reagendar_entrega", "enviar_whatsapp"],
+        "variables": ["nombre", "empresa", "doctor", "fecha_cita"],
     },
     "cobranza": {
-        "label": "Cobranza / Recordatorio de pago",
+        "label": "Asistente Cobranza — Promesa de pago con guardrail",
         "prompt": (
-            "Eres una asistente cordial de cobranza. Recuérdale a {{nombre}} "
-            "que tiene un saldo pendiente por {{valor}}. Ofrécele opciones "
-            "de pago y confirma el compromiso. Sé firme pero respetuosa."
+            "Eres el asistente de {{empresa}}. Llamas a {{nombre}} por un pago pendiente "
+            "de {{valor}} del pedido {{pedido_id}}. DISCLOSURE OBLIGATORIO (primera "
+            "frase, siempre): 'Hola {{nombre}}, esta es una llamada de {{empresa}} con "
+            "asistencia automatizada sobre un tema de pago.' OBJETIVO: acordar el pago o "
+            "una promesa de pago con fecha. Tono firme pero respetuoso, sin amenazas ni "
+            "intimidación, cumpliendo normas de cobranza. Si puede pagar hoy → "
+            "enviar_link_pago ({{link_pago}}). Si no → pide fecha concreta y "
+            "registrar_promesa_pago(fecha) (confirma la fecha antes). Nunca inventes "
+            "recargos ni consecuencias legales; si preguntan, di que un asesor humano "
+            "los contactará. ACCIONES: enviar_link_pago; registrar_promesa_pago(fecha); "
+            "transferir_a_humano si se complica o lo pide. Cierre: confirma lo acordado. "
+            "Máx 2 frases por turno."
         ),
-        "tools":     ["registrar_pago", "transferir_a_humano", "enviar_whatsapp"],
-        "variables": ["nombre", "valor"],
+        "tools":     ["enviar_link_pago", "registrar_promesa_pago", "transferir_a_humano"],
+        "variables": ["nombre", "empresa", "valor", "pedido_id", "link_pago"],
     },
     "personalizado": {
         "label": "Personalizado (en blanco)",
-        "prompt": "Eres una operadora especializada en… (personaliza aquí).",
+        "prompt": "Eres una operadora especializada en… (personaliza aquí). Máx 2 frases por turno. Nunca digas 'impermeable' (usa 'antifluido').",
         "tools":     [],
         "variables": [],
     },
@@ -151,14 +186,20 @@ async def list_templates():
 @router.get("/tools", summary="Herramientas disponibles para casillas (paso 4).")
 async def list_tools():
     labels = {
-        "confirmar_pedido":     "Confirmar pedido",
-        "reagendar":            "Reagendar",
-        "enviar_whatsapp":      "Enviar WhatsApp",
-        "transferir_a_humano":  "Transferir a humano",
-        "terminar_llamada":     "Terminar llamada",
-        "registrar_pago":       "Registrar pago",
+        "reagendar_entrega":       "Reagendar entrega",
+        "confirmar_pedido":        "Confirmar pedido",
+        "consultar_disponibilidad":"Consultar disponibilidad (fechas)",
+        "enviar_whatsapp":         "Enviar WhatsApp",
+        "transferir_a_humano":     "Transferir a humano",
+        "registrar_promesa_pago":  "Registrar promesa de pago 💰",
+        "enviar_link_pago":        "Enviar link de pago 💰",
     }
-    return {"tools": [{"key": k, "label": labels[k]} for k in ALLOWED_TOOLS]}
+    keys = ["reagendar_entrega","confirmar_pedido","consultar_disponibilidad",
+            "enviar_whatsapp","transferir_a_humano",
+            "registrar_promesa_pago","enviar_link_pago"]
+    return {"tools": [{"key": k, "label": labels[k],
+                       "money": k in {"registrar_promesa_pago","enviar_link_pago"}}
+                      for k in keys]}
 
 
 @router.get("/voices", summary="Voces disponibles (por ahora estáticas, ElevenLabs).")
@@ -192,9 +233,16 @@ async def create_agent(payload: AgentIn, request: Request):
     a["org_id"]     = org_id
     a["created_at"] = _iso()
     a["updated_at"] = _iso()
+    # If publishing straight to a live/test state, sync to Retell.
+    if a.get("estado") in {"prueba", "en_vivo"} and _retell_ok():
+        r = await _retell_upsert(a)
+        if r.get("ok") and r.get("retell_agent_id"):
+            a["retell_agent_id"] = r["retell_agent_id"]
+        else:
+            a["retell_error"] = str(r.get("response") or r.get("detail"))[:400]
     await get_db().custom_agents.insert_one(a)
     a.pop("_id", None)
-    return {"ok": True, "agent": a}
+    return {"ok": True, "agent": a, "retell_configured": _retell_ok()}
 
 
 @router.patch("/{agent_id}", summary="Actualiza campos del agente.",
@@ -209,6 +257,12 @@ async def patch_agent(agent_id: str, patch: AgentPatch, request: Request):
     merged = {**a, **changes}
     _validate(merged)
     changes["updated_at"] = _iso()
+    # Re-sync to Retell whenever a "live" field changed or estado hit prueba/en_vivo.
+    live_field_touched = bool({"prompt","voz_id","nombre","idioma","estado","tools"} & set(changes.keys()))
+    if live_field_touched and merged.get("estado") in {"prueba","en_vivo"} and _retell_ok():
+        r = await _retell_upsert(merged)
+        if r.get("ok") and r.get("retell_agent_id"):
+            changes["retell_agent_id"] = r["retell_agent_id"]
     await db.custom_agents.update_one({"id": agent_id}, {"$set": changes})
     fresh = await db.custom_agents.find_one({"id": agent_id}, {"_id": 0})
     return {"ok": True, "agent": fresh, "changed": len(changes)}
@@ -230,7 +284,7 @@ class TestCallIn(BaseModel):
 
 
 @router.post("/{agent_id}/test-call",
-             summary="Simula una llamada de prueba (BETA — sin marcar aún).",
+             summary="Simula/dispara una llamada de prueba (BETA si falta Retell/número).",
              dependencies=[Depends(require_api_key)])
 async def test_call(agent_id: str, payload: TestCallIn, request: Request):
     import os
@@ -242,18 +296,32 @@ async def test_call(agent_id: str, payload: TestCallIn, request: Request):
     if not a.get("voz_id"):
         raise HTTPException(400, "Elige una voz antes de probar.")
 
-    # Are voice/telephony creds even configured?
     telnyx_ok = bool(os.environ.get("TELNYX_API_KEY", "").strip())
     eleven_ok = bool(os.environ.get("ELEVEN_API_KEY", "").strip())
-    if not telnyx_ok or not eleven_ok:
-        return {
-            "ok": True, "beta": True, "dialed": False,
-            "detail": ("Beta — conecta Telnyx y ElevenLabs para llamadas reales. "
-                       "Config del agente validada correctamente."),
-            "would_call": payload.numero,
-            "checks": {"telnyx": telnyx_ok, "elevenlabs": eleven_ok},
-        }
-    # Placeholder — hook up real Telnyx Voice + ElevenLabs SDK here.
-    return {"ok": True, "beta": True, "dialed": False,
-            "detail": "Telnyx/ElevenLabs configurados. Marcado real en la próxima iteración.",
-            "would_call": payload.numero}
+    retell_ok = _retell_ok()
+
+    # If Retell is set up AND the agent already has a retell_agent_id
+    # (or we can create one now) AND a Telnyx-provisioned outbound
+    # number exists → place a real call. Otherwise stay in BETA.
+    if retell_ok and telnyx_ok and eleven_ok:
+        rid = a.get("retell_agent_id")
+        if not rid:
+            up = await _retell_upsert(a)
+            rid = up.get("retell_agent_id")
+            if rid:
+                await get_db().custom_agents.update_one(
+                    {"id": agent_id}, {"$set": {"retell_agent_id": rid}}
+                )
+        if rid:
+            r = await _retell_call(rid, payload.numero, a.get("numero"))
+            return {"ok": r.get("ok", False), "beta": False,
+                    "dialed": bool(r.get("ok")),
+                    "detail": "Llamada iniciada via Retell.",
+                    "response": r.get("response")}
+    return {
+        "ok": True, "beta": True, "dialed": False,
+        "detail": ("Beta — falta configurar credenciales para llamada real. "
+                   "Config del agente validada correctamente."),
+        "would_call": payload.numero,
+        "checks": {"retell": retell_ok, "telnyx": telnyx_ok, "elevenlabs": eleven_ok},
+    }
