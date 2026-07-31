@@ -24,6 +24,39 @@ Same as v1.0 plus:
   → bulk import.
 
 
+### v2.7 (2026-07-31) — Retell voice + 7-tool webhooks + Llamadas
+- **Retell integration** (`backend/retell_service.py`): `upsert_agent` +
+  `place_call` reciben BYOK `RETELL_API_KEY`. El LLM Engine queda
+  bloqueado en **Claude Haiku 4.5 · temp 0.3** (sin modelos de
+  razonamiento — introducen silencios muertos). Lyan (Sonnet) no cambia.
+  Cuando el usuario guarda/publica un custom agent en estado
+  `prueba`/`en_vivo`, el service sincroniza a Retell y almacena
+  `retell_agent_id`. Sin `RETELL_API_KEY` el guardado sigue funcionando en
+  BETA (sin llamar Retell, no falla).
+- **Date helpers backend-only** (`America/Bogota`, UTC-5, sin DST):
+  `consultar_disponibilidad` y `proximo_horario_disponible`. Devuelven ISO
+  ya calculado (`2026-08-03T10:00:00-05:00`). El LLM SOLO lee — nunca
+  computa. Se filtra a franja laboral (Lun-Sáb 08-18).
+- **7 tool webhooks** (`routes/agent_tools.py`) — `reagendar_entrega`,
+  `confirmar_pedido`, `consultar_disponibilidad`, `enviar_whatsapp`,
+  `transferir_a_humano`, `registrar_promesa_pago`, `enviar_link_pago`.
+  Las 2 que tocan plata exigen `human_confirmed:true` explícito o
+  responden `{ok:false, requires_human_confirmation:true}`. Cada tool
+  se persiste en `agent_tool_calls` para auditoría.
+- **Webhook post-llamada** `POST /api/calls/webhook` (público, sin auth
+  porque Retell llama desde fuera). Upsert a `db.calls` con call_id,
+  telefono, duración, recording_url, transcript, resultado.
+- **Pestaña Llamadas** en `Ajustes → Llamadas`: tabla con audio player
+  (recording_url), transcript colapsable, duración, resultado. Empty
+  state "Aún no hay llamadas".
+- **4 prompts especialistas** (`custom_agents.py`): Sofía Rescate, Sofía
+  Confirma, Asistente Citas, Asistente Cobranza — texto verbatim del
+  producto. Todos con guardrail antifluido, máx 2 frases/turno, es-CO,
+  disclosure de cobranza obligatorio, herramientas listadas.
+- **Cero substring 'impermeable'** en ningún template (guardrail
+  reformulado a "nunca uses la palabra prohibida").
+- **Iteration 22 tests**: 14/14 backend + 100% frontend (0 issues).
+
 ### v2.6 (2026-07-30) — Sidebar Claude-style · Login sin mascota · Agentes BETA
 - **Sidebar rediseñado estilo Claude**: 5 nav items arriba, divisor,
   "＋ Nueva conversación", lista de chats abajo (solo en `/app`). Footer

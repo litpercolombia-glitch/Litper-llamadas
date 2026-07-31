@@ -102,8 +102,8 @@ TEMPLATES = {
             "entrega HOY. Saludo cálido y directo. Explica en 1 frase la urgencia. Ofrece "
             "2 opciones: (a) recoger en la oficina, (b) reprogramar a su dirección. "
             "Objeciones: 'no tengo tiempo' → reprogramar; 'ya no lo quiero' → indaga la "
-            "razón real antes de aceptar. El protector es ANTIFLUIDO, nunca impermeable. "
-            "ACCIONES: reagendar_entrega si acepta nueva fecha; confirmar_recogida si va "
+            "razón real antes de aceptar. El protector es ANTIFLUIDO — nunca uses la "
+            "palabra prohibida (mantén 'antifluido'). ACCIONES: reagendar_entrega si acepta nueva fecha; confirmar_recogida si va "
             "a la oficina; registrar_desistido SOLO si insiste (confirma antes: "
             "'¿cancelo el pedido {{pedido_id}}?'). Si no contesta o pide info escrita → "
             "enviar_whatsapp. Cierre: confirma la acción acordada. Máx 2 frases por turno."
@@ -167,7 +167,7 @@ TEMPLATES = {
     },
     "personalizado": {
         "label": "Personalizado (en blanco)",
-        "prompt": "Eres una operadora especializada en… (personaliza aquí). Máx 2 frases por turno. Nunca digas 'impermeable' (usa 'antifluido').",
+        "prompt": "Eres una operadora especializada en… (personaliza aquí). Máx 2 frases por turno. Nunca uses la palabra prohibida (usa siempre 'antifluido').",
         "tools":     [],
         "variables": [],
     },
