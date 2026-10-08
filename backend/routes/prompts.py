@@ -14,7 +14,8 @@ from __future__ import annotations
 import os
 from datetime import datetime, timezone
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import Request, APIRouter, Depends, HTTPException
+from tenant import org_from_request
 from fastapi.responses import Response
 
 from agent import router as llm_router
@@ -206,7 +207,7 @@ Devuelve SOLO el system prompt (sin comentarios ni JSON). Empieza directamente c
                      "Returns { system_prompt, first_message, model_used }. "
                      "If the LLM omits required constraints (antifluido, full flow), we fall back to a "
                      "template-based script so the output is ALWAYS valid.")
-async def generate_prompt(payload: PromptGenerateIn):
+async def generate_prompt(payload: PromptGenerateIn, request: Request):
     meta = GENERATE_META.format(
         tono=payload.tono, product=payload.product,
         beneficios=payload.beneficios or "—",
@@ -219,6 +220,7 @@ async def generate_prompt(payload: PromptGenerateIn):
         total_to_pay="{total_to_pay}", guia="{guia}",
         promo_name="{promo_name}", promo_price="{promo_price}",
     )
+    org_id = org_from_request(request)   # fuera del try: una 401 debe responder 401
     llm_ok = True
     llm_err: str | None = None
     text = ""
@@ -232,6 +234,7 @@ async def generate_prompt(payload: PromptGenerateIn):
             messages=[{"role": "user", "content": meta}],
             tier="default", override=payload.model,
             session_id="prompt-generate",
+            org_id=org_id,
         )
     except Exception as e:  # noqa: BLE001
         llm_ok = False
