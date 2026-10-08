@@ -28,16 +28,9 @@ def _iso() -> str: return datetime.now(timezone.utc).isoformat()
 
 
 async def _org_id(request: Request) -> str:
-    """Best-effort org resolution: prefer the JWT cookie, fall back to header."""
-    try:
-        from routes.auth import _decode, COOKIE_NAME
-        tok = request.cookies.get(COOKIE_NAME)
-        claims = _decode(tok) if tok else None
-        if claims and claims.get("org"): return claims["org"]
-    except Exception:
-        pass
-    header_org = request.headers.get("X-Org-Id", "").strip()
-    return header_org or "default"
+    """Cliente de la petición (JWT > X-API-Key+X-Org-Id > default). Ver tenant.py."""
+    from tenant import org_from_request
+    return org_from_request(request)
 
 
 # ---------- Models ----------
