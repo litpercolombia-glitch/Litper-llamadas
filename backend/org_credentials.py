@@ -49,6 +49,10 @@ PROVIDER_SCHEMAS: dict[str, dict[str, dict[str, str]]] = {
         "agent_id":         {"env": "ELEVENLABS_AGENT_ID",        "label": "Agent ID"},
         "default_voice_id": {"env": "ELEVENLABS_DEFAULT_VOICE_ID","label": "Voice ID por defecto"},
     },
+    "openrouter": {
+        "api_key": {"env": "OPENROUTER_API_KEY", "label": "API Key (openrouter.ai/keys)"},
+        "model":   {"env": "OPENROUTER_MODEL_DEFAULT", "label": "Modelo por defecto (opcional, ej. google/gemini-2.5-flash)"},
+    },
     "groq":     {"api_key": {"env": "GROQ_API_KEY",     "label": "API Key"}},
     "gemini":   {"api_key": {"env": "GEMINI_API_KEY",   "label": "API Key"}},
     "mistral":  {"api_key": {"env": "MISTRAL_API_KEY",  "label": "API Key"}},
@@ -69,8 +73,33 @@ PROVIDER_SCHEMAS: dict[str, dict[str, dict[str, str]]] = {
     },
 }
 
+_LLM_PROVIDERS = {"openrouter", "groq", "gemini", "mistral", "cerebras", "claude"}
+
 _SECRET_FIELDS = {"api_key", "auth_token", "sip_password", "connection_id",
                   "api_token", "access_token"}
+
+
+import logging as _logging
+if os.environ.get("PLATFORM_KEYS_ORGS") is None:
+    _logging.getLogger("org_credentials").critical(
+        "PLATFORM_KEYS_ORGS no definida: TODOS los clientes pueden usar las llaves de "
+        "plataforma (.env). Definirla (org de Litper + trials) ANTES de vender.")
+
+
+def platform_keys_allowed(org_id: str) -> bool:
+    """¿Puede este cliente usar las llaves de PLATAFORMA del servidor (.env)?
+
+    PLATFORM_KEYS_ORGS:
+      - sin definir  -> "*" (modo un-solo-cliente, compatibilidad: Litper hoy).
+      - "*"          -> todos (solo para uso interno).
+      - "org1,org2"  -> solo esos clientes (Litper + clientes en trial).
+      - ""           -> nadie: cada cliente trae su propia llave (BYOK puro).
+    Para vender: definirla SIEMPRE con la org de Litper + trials."""
+    raw = os.environ.get("PLATFORM_KEYS_ORGS")
+    if raw is None:
+        return True
+    allowed = {o.strip() for o in raw.split(",") if o.strip()}
+    return "*" in allowed or org_id in allowed
 
 
 def _fernet() -> Fernet:
@@ -96,11 +125,15 @@ def _mask(value: str) -> str:
 # ---------------------------------------------------------------------------
 # Public API — used by both /config routes AND by every provider client.
 # ---------------------------------------------------------------------------
-async def get_credentials(provider: str, org_id: str = DEFAULT_ORG) -> dict[str, str]:
+async def get_credentials(provider: str, org_id: str = DEFAULT_ORG,
+                          allow_env: bool | None = None) -> dict[str, str]:
     """Return the effective plaintext credentials for a provider.
 
-    Precedence: org-stored value → backend/.env fallback → empty string.
+    Precedence: org-stored value → backend/.env fallback (solo si el cliente
+    tiene permiso de llaves de plataforma) → empty string.
     NEVER expose the returned dict outside the backend."""
+    if allow_env is None:
+        allow_env = platform_keys_allowed(org_id)
     if provider not in PROVIDER_SCHEMAS:
         raise ValueError(f"unknown provider: {provider}")
     schema = PROVIDER_SCHEMAS[provider]
@@ -120,7 +153,9 @@ async def get_credentials(provider: str, org_id: str = DEFAULT_ORG) -> dict[str,
             # bad ciphertext — treat as empty; fall back to env
             pass
 
-    # Fill remaining fields from env
+    # Fill remaining fields from env (solo clientes con permiso de plataforma)
+    if not allow_env:
+        return out
     for field, spec in schema.items():
         if out[field]:
             continue
@@ -185,8 +220,12 @@ async def status(org_id: str = DEFAULT_ORG) -> list[dict[str, Any]]:
     for provider, schema in PROVIDER_SCHEMAS.items():
         doc = stored.get(provider)
         creds = await get_credentials(provider, org_id)
-        # Configured = at least one field has a value (from org OR env)
-        configured = any(creds.values())
+        # Configured = al menos un campo con valor (org o env). Para motores de
+        # IA exige api_key (guardar solo el "model" NO cuenta como conectado).
+        if "api_key" in schema and provider in _LLM_PROVIDERS:
+            configured = bool(creds.get("api_key"))
+        else:
+            configured = any(creds.values())
         # Origin: org > env > none
         if doc and doc.get("is_configured"):
             origin = "org"
@@ -194,11 +233,9 @@ async def status(org_id: str = DEFAULT_ORG) -> list[dict[str, Any]]:
             origin = "env"
         else:
             origin = "none"
-        hint = (doc or {}).get("hint") or ""
-        if not hint and configured:
-            for f in ("api_key", "auth_token", "sip_password"):
-                if creds.get(f):
-                    hint = _mask(creds[f]); break
+        # Pista enmascarada SOLO de llaves propias del cliente; nunca de las
+        # llaves de plataforma (.env).
+        hint = ((doc or {}).get("hint") or "") if origin == "org" else ""
         out.append({
             "provider": provider,
             "fields": [
