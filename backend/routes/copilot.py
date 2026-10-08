@@ -1,6 +1,6 @@
 """Routes: /threads, /threads/{id}/messages, /agent/run — Copilot chat."""
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from typing import List, Optional
 from pydantic import BaseModel
 
@@ -75,8 +75,11 @@ async def list_messages(thread_id: str):
 
 @router.post("/agent/run",
              summary="Send a user message to the Copilot; runs the agent loop and returns steps + final answer.")
-async def run(payload: SendMessageIn):
+async def run(payload: SendMessageIn, request: Request):
     db = get_db()
+    # Cliente (tenant) dueño de la llave de IA — BYOK por org.
+    from tenant import org_from_request
+    org_id = org_from_request(request)
 
     # Ensure thread
     tid = payload.thread_id
@@ -107,7 +110,8 @@ async def run(payload: SendMessageIn):
     result = await run_agent(session_id=tid, history=history, user_text=payload.text,
                              skill_instructions=skill_instructions,
                              auto_mode=payload.auto_mode,
-                             model_override=payload.model_override)
+                             model_override=payload.model_override,
+                             org_id=org_id)
 
     # Persist assistant message with tool_calls trace
     tool_calls = []

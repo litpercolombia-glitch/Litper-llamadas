@@ -1,6 +1,6 @@
 """Agent loop — LLM plans, tools execute, results feed back until final answer.
 
-Uses emergentintegrations LlmChat with Claude Sonnet 4.6 (recommended).
+Usa agent.router (OpenRouter + BYOK por cliente; sin emergentintegrations).
 
 Tool-call protocol: we ask the model to emit tool calls as JSON objects wrapped
 in a ```tool``` fenced block, one call per block. Example:
@@ -96,7 +96,8 @@ async def run_agent(session_id: str, history: list[dict[str, str]],
                     user_text: str, *, skill_instructions: str = "",
                     max_iterations: int = MAX_ITERATIONS,
                     auto_mode: bool = False,
-                    model_override: str | None = None) -> dict[str, Any]:
+                    model_override: str | None = None,
+                    org_id: str = "default") -> dict[str, Any]:
     """Run the agent loop for one user turn."""
     system = _system_prompt(skill_instructions)
     conv: list[dict[str, str]] = []
@@ -118,7 +119,7 @@ async def run_agent(session_id: str, history: list[dict[str, str]],
                                    or "razona" in (skill_instructions or "").lower()) else "default"
             assistant_text, provider_used = await llm_call(
                 system, conv, tier=tier, override=model_override,
-                session_id=session_id)
+                session_id=session_id, org_id=org_id)
         except Exception as e:  # noqa: BLE001
             return {"final_text": f"⚠️ Todos los proveedores LLM fallaron: {e}",
                     "steps": steps, "provider": None}

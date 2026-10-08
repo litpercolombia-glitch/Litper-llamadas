@@ -19,13 +19,8 @@ def _iso() -> str: return datetime.now(timezone.utc).isoformat()
 
 
 async def _org_id(request: Request) -> str:
-    try:
-        from routes.auth import _decode, COOKIE_NAME
-        tok = request.cookies.get(COOKIE_NAME)
-        claims = _decode(tok) if tok else None
-        if claims and claims.get("org"): return claims["org"]
-    except Exception: pass
-    return request.headers.get("X-Org-Id", "").strip() or "default"
+    from tenant import org_from_request
+    return org_from_request(request)
 
 
 @router.post("/webhook",
