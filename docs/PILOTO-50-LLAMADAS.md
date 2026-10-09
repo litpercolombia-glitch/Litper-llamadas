@@ -2,6 +2,7 @@
 
 > Versión 1 · 9-oct-2026 · Autor: especialista Zynex · Estado: **borrador para aprobación del CEO**
 > Hito de misión: **50 contactos reales de Litper medidos contra Dropi al 31-oct-2026.**
+> **Actualización 9-oct-2026:** el diseño 50 + 50 aleatorio no es factible antes del 21-oct con el dato actual. Ver **§v2 — Diseño con control histórico** al final del documento; las secciones 0–6 quedan como versión 1 de referencia.
 > Nada en este documento se ha ejecutado: no se ha contactado a ningún cliente, no se han creado cuentas ni tablas y no se ha gastado dinero.
 
 ---
@@ -359,3 +360,98 @@ group by grupo;
 3. Diferencia (tratado − control) en pp con IC 95 % (Wald / Newcombe) y prueba exacta de Fisher.
 4. Chequeo de balance: transportadora, ciudad, tipo de novedad y valor COD por grupo.
 5. Reporte de 1 página: tasa por grupo, diferencia con IC, pedidos y COP rescatados, novedades falsas detectadas (con evidencia para disputa) y aprendizajes del guion.
+
+---
+
+## v2 — Diseño con control histórico (9-oct-2026)
+
+> Esta sección **reemplaza el diseño de §1.4–§1.6** (50 tratados + 50 control aleatorio). Todo lo demás de la versión 1 (elegibilidad §2, guiones §3, registro §4, cumplimiento §5) sigue vigente salvo donde se indica aquí. Nada de esto se ha ejecutado.
+
+### v2.0 Por qué cambia el diseño (hallazgo de factibilidad)
+
+Corte de datos: Supabase al 8-oct, Dropi al 9-oct.
+
+- **La tabla `desk_novedades` cuenta eventos, no pedidos.** No tiene `pedido_ref`, así que un mismo pedido con varias novedades cuenta varias veces. Mediana de **28 eventos/día**; última semana **13,3 eventos/día**.
+- **En Dropi solo se ven ~1,7 novedades únicas por día.** A ese ritmo, del 10 al 21-oct entran del orden de **20 pedidos únicos**, no los ~100 que pedía el diseño 50 + 50.
+- **`dropi_estado_snapshot` no tiene historial desde el 22-sep**, así que hoy no se puede reconstruir el desenlace de las novedades recientes desde Supabase; hay que tomarlo de Dropi.
+- **Pareto de causas de novedad:** cliente **43 %**, transportadora **29 %**, error_dropi **19 %** (resto, otras).
+- Con 50 + 50 el efecto mínimo detectable ya era **≈ 27 puntos**. Con el flujo real, un 50 + 50 aleatorio **no alcanza a inscribirse antes del 21-oct** con dato confiable.
+
+### v2.1 Diseño nuevo: todas las novedades tratadas + control histórico
+
+1. **Tratados = TODAS las novedades únicas por pedido** que se abran desde el arranque (tras el SÍ del CEO) **hasta el 21-oct** y cumplan §2. Se deja de asignar por dígito: no se reserva ningún pedido nuevo como control.
+2. **Control histórico = las novedades únicas por pedido de las 4 semanas previas al arranque** (aprox. 12-sep a 9-oct), con su desenlace real en Dropi a 10 días de la novedad. Mismos criterios de inclusión y exclusión (§2) aplicados retroactivamente, sin mirar el desenlace al decidir quién entra.
+3. **Misma mezcla de causas:** el control debe tener una mezcla de causas parecida al grupo tratado. Se compara el Pareto (cliente / transportadora / error_dropi) de ambos grupos antes de analizar.
+4. **Ajuste por causa y por transportadora:**
+   - Se **estratifica** por causa (cliente, transportadora, error_dropi; "otras" se agrupa o se excluye si es muy pequeña) y se calcula la diferencia tratado − control **dentro de cada estrato**.
+   - Se combina con pesos de estrato (Mantel-Haenszel, o estandarización directa a la mezcla de causas del grupo tratado).
+   - Como sensibilidad, regresión logística `entregado_d10 ~ tratado + causa + transportadora`. Si alguna transportadora tiene muy pocos casos se agrupa en "otras".
+   - Se reporta siempre la diferencia **cruda** y la **ajustada**, ambas con IC 95 %.
+5. **Hito del 31-oct:** se cumple con el número de tratados **con desenlace a 10 días** que se logre, dicho explícitamente (por ejemplo, "23 tratados medidos"). No se rellena con llamadas en frío ni con pedidos sin novedad.
+
+### v2.2 Plan B: 25 + 25 aleatorio
+
+- **Condición:** si al 21-oct se han acumulado **≥ 50 novedades únicas por pedido** elegibles (cuenta con `pedido_ref`, no con eventos), se analiza como experimento aleatorio **25 tratados + 25 control**.
+- Para que esto sea posible, la asignación por último dígito (§1.4) **se registra** para cada pedido desde el arranque. Si el conteo del requisito previo (v2.3, antes del 12-oct) proyecta ≥ 50 únicas al 21-oct, se activa la asignación por dígito y los impares pasan a control (gestión habitual) hasta completar 25 + 25.
+- Si el conteo proyecta < 50, el plan B no se activa y se queda el diseño principal (v2.1). Si se activó y al 21-oct no se llegó a 50, los tratados se analizan contra el control histórico (v2.1) y los controles aleatorios se suman como control concurrente descriptivo.
+- Con 25 + 25 el efecto mínimo detectable es ~36–38 puntos (tabla v2.4): solo sirve para confirmar un efecto muy grande, pero da una comparación sin sesgo de época.
+
+### v2.3 Requisito previo (antes del 12-oct; fecha límite sáb 11-oct)
+
+1. **Contar pedidos únicos en novedad, no eventos**, por día, para sep–oct, cruzando Dropi y `desk_novedades`. Resultado esperado: novedades únicas/día y desenlace a 10 días de las 4 semanas previas (esto es p0, la tasa del control histórico).
+2. **Agregar el campo `pedido_ref` al registro** de novedades (`desk_novedades`) y al registro del piloto (§4.1): referencia única del pedido en Dropi, que permite deduplicar eventos y unir con el desenlace. En el registro del piloto `pedido_ref` equivale a `pedido_id`; si se mantienen ambos nombres deben tener el mismo valor.
+   - Propuesta (**NO ejecutada**): `alter table desk_novedades add column pedido_ref text;` más un índice por `pedido_ref`, y llenarlo hacia atrás para las 4 semanas del control histórico.
+3. **Decisión escrita el 11-oct:** con el conteo de únicas se decide diseño principal (v2.1) o activación del plan B (v2.2).
+
+### v2.4 Métricas y efecto mínimo detectable
+
+**Métrica primaria:** **tasa de entrega final a 10 días de la novedad** = pedidos con estado de entrega en Dropi 10 días calendario después de la fecha de la novedad ÷ pedidos con novedad del grupo. El día 0 es la fecha de la novedad (no la de inscripción), para que tratados y control histórico se midan igual. Mismas reglas de "entregado / no entregado" que §1.2 (lo que siga en tránsito o en novedad el día 10 cuenta como no entregado). Análisis por intención de tratar.
+
+**Métricas secundarias:**
+- **Tiempo a resolución:** días desde la novedad hasta el estado final (entregado o devolución), con curva de supervivencia por grupo; censurado a 20 días.
+- **Costo por pedido recuperado:** costo total del piloto (efectivo + horas internas valoradas) ÷ pedidos recuperados atribuibles (diferencia de tasas × n tratados).
+- Se mantienen como descriptivas las de §1.2 (contacto efectivo, compromiso, novedades falsas detectadas).
+
+**Efecto mínimo detectable (MDE)**: diferencia de dos proporciones, α = 0,05 a dos colas, potencia 80 %, misma fórmula de §1.5 generalizada a grupos de distinto tamaño (p̄ ponderado por n). Calculado con Python (`scipy`), resolviendo la diferencia que da potencia exacta de 80 %:
+
+| n tratados | n control | MDE con p0 = 0,50 | Tasa tratada necesaria | MDE con p0 = 0,40 (referencia) |
+|---|---|---|---|---|
+| 20 | 100 (histórico) | **+32,2 pp** | 82,2 % | +33,2 pp |
+| 30 | 100 (histórico) | **+27,9 pp** | 77,9 % | +28,6 pp |
+| 50 | 100 (histórico) | **+23,5 pp** | 73,5 % | +24,0 pp |
+| 25 | 25 (plan B aleatorio) | +36,1 pp | 86,1 % | +38,1 pp |
+| 50 | 50 (diseño v1) | +26,7 pp | 76,7 % | +27,6 pp |
+
+Lectura honesta:
+- Aumentar el control a ~100 históricos **ayuda poco** cuando los tratados son pocos: el cuello de botella es el número de tratados. Con ~20 tratados solo se detecta un efecto de ~32 pp.
+- Este MDE **solo mide el error aleatorio**. El control histórico añade un posible **sesgo** (v2.5) que la tabla no refleja; por eso el resultado se lee como estimación con IC y no como prueba definitiva.
+- **Supuesto (no verificado):** p0 ≈ 0,5. Se reemplaza por la tasa real del control histórico apenas exista el conteo de v2.3.
+
+### v2.5 Amenazas a la validez del control histórico y mitigación
+
+| Amenaza | Por qué sesga | Mitigación |
+|---|---|---|
+| **Estacionalidad de octubre** (quincenas, festivo del 12-oct, inicio de temporada de fin de año, lluvias) | La entrega puede subir o bajar sola en octubre frente a septiembre, y se confundiría con el efecto de Zynex | Comparar la tasa de entrega de **pedidos sin novedad** en ambas ventanas (si cambia, la diferencia se descuenta: diferencia-en-diferencias). Excluir o marcar los días festivos. Reportar la tendencia semanal de las 4 semanas previas para ver si ya había deriva. |
+| **Cambios de transportadora** (otra mezcla de transportadoras, cambios de cobertura, una transportadora con problemas puntuales) | La tasa de entrega depende mucho de la transportadora | Ajuste por transportadora (v2.1, punto 4). Si una transportadora aparece solo en un grupo, se analiza aparte o se excluye. Registrar cualquier cambio de transportadora o de tarifa que haga Litper durante el piloto. |
+| **Cambio en la mezcla de causas** (más novedades de cliente o de transportadora en octubre) | Las novedades de cliente son las más rescatables por contacto | Estratificación por causa (cliente / transportadora / error_dropi) y estandarización a la mezcla de los tratados. |
+| **Cambios en la gestión habitual** (Litper empieza a gestionar distinto las novedades en el panel de Dropi) | El "control" ya no representaría la gestión actual | Congelar la gestión habitual durante el piloto y documentar cualquier cambio con fecha. |
+| **Calidad de dato desigual** (el histórico se arma con eventos sin `pedido_ref` y con `dropi_estado_snapshot` sin historial desde 22-sep) | Desenlaces mal unidos o pedidos duplicados en el control | Desenlace del control tomado directamente de Dropi por pedido; deduplicar por `pedido_ref`; auditar a mano una muestra de 10 pedidos del control. |
+| **Selección en la inclusión** (criterios aplicados de forma distinta hacia atrás) | El control podría incluir novedades ya "perdidas" o excluir las fáciles | Aplicar §2 con reglas escritas y sin mirar el desenlace; dejar registro de exclusiones con motivo. |
+| **Efecto de época del propio piloto** (más atención del equipo a todas las novedades) | Mejora todo, no solo por el contacto | Se declara como limitación; el plan B (aleatorio) es la única forma de aislarlo. |
+
+### v2.6 Calendario actualizado
+
+| Fecha | Hito |
+|---|---|
+| 9–10 oct | CEO revisa v2. Conteo de novedades únicas por pedido y propuesta de `pedido_ref` (sin ejecutar hasta aprobación). |
+| **sáb 11 oct** | **Fecha límite del requisito previo** (v2.3) y decisión escrita: diseño principal o plan B. |
+| dom 11 y **lun 12 oct** (festivo) | No se contacta a nadie. |
+| mar 13 → **mié 21 oct** | Inscripción de todas las novedades únicas (tratadas) y contacto, **solo si el CEO dio el SÍ**. |
+| 22–25 oct | Armado del control histórico con desenlace en Dropi y chequeo de mezcla de causas y transportadoras. |
+| **31 oct** | Corte a 10 días de todos los tratados. Reporte con diferencia cruda y ajustada, IC 95 %, tiempo a resolución y costo por pedido recuperado. |
+
+### v2.7 Recordatorios obligatorios
+
+- **No se llama ni se escribe a ningún cliente real sin el SÍ explícito del CEO.** Hasta entonces todo es preparación de datos y documentos.
+- **El repositorio es público:** aquí no van cifras de clientes ni datos personales (nombres, teléfonos, direcciones, guías, IDs de pedido concretos, valores por pedido). Solo agregados, supuestos y diseño. Los datos del piloto viven en Supabase con acceso restringido.
+- Siguen vigentes los controles de cumplimiento de §5 (Ley 2300 de 2023, Ley 1581 de 2012, CRC).
