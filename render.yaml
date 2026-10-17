@@ -1,0 +1,79 @@
+# Zynex Connect — STAGING fuera de Emergent (Render Blueprint, plan free)
+# Ver DEPLOY_STAGING.md. Los secretos van con sync:false: Render los pide al
+# crear el Blueprint y NUNCA se guardan en este archivo.
+services:
+  # ---------- Backend FastAPI ----------
+  - type: web
+    name: zynex-staging-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    # 1 solo proceso: APScheduler corre dentro de la app (no usar varios workers)
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.13.5"
+      # --- obligatorias ---
+      - key: MONGO_URL            # cadena mongodb+srv de Atlas
+        sync: false
+      - key: DB_NAME
+        value: zynex_staging
+      - key: JWT_SECRET           # firma de la cookie de sesión
+        sync: false
+      - key: ENCRYPTION_KEY       # llave Fernet (credenciales por cliente)
+        sync: false
+      - key: CORS_ORIGINS         # URL del static site, p.ej. https://zynex-staging-web.onrender.com
+        sync: false
+      - key: APP_PUBLIC_URL
+        sync: false
+      # --- opcionales (dejar vacías en staging si no se prueban) ---
+      - key: PUBLIC_API_KEY       # X-API-Key para agentes externos
+        sync: false
+      - key: PLATFORM_KEYS_ORGS
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: ELEVENLABS_API_KEY
+        sync: false
+      - key: ELEVENLABS_AGENT_ID
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: CHATEA_PRO_API_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+
+  # ---------- Frontend React (CRA + craco) ----------
+  - type: web
+    name: zynex-staging-web
+    runtime: static
+    rootDir: frontend
+    buildCommand: yarn install --frozen-lockfile && CI=false yarn build
+    staticPublishPath: build
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      # Vacío a propósito: el frontend llama a /api en su mismo dominio y la
+      # regla de abajo lo reenvía al backend (así la cookie de sesión funciona).
+    routes:
+      # Si Render le asigna otra URL al backend, cambia este destino.
+      - type: rewrite
+        source: /api/*
+        destination: https://zynex-staging-api.onrender.com/api/*
+      - type: rewrite
+        source: /*
+        destination: /index.html
