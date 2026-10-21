@@ -32,4 +32,4 @@ Detalle y limitaciones: `DEPLOY_STAGING.md`. Variables: `backend/.env.example`.
 ## 5. Para las 50 llamadas (M2)
 - Agregar luego `ELEVENLABS_API_KEY`, `ELEVENLABS_AGENT_ID`, `TWILIO_*` / `OPENROUTER_API_KEY` en Render -> Environment.
 - Plan free se duerme a los 15 min y pausa el scheduler: para cadencias reales usar Starter.
-- Medicion: `python backend/scripts/medir_llamadas_vs_dropi.py` con el CSV de Dropi.
+- Medicion (con MONGO_URL/DB_NAME de Atlas): `python backend/scripts/medir_llamadas_vs_dropi.py --dropi export_dropi.csv`
