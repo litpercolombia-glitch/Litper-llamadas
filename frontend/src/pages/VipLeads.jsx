@@ -49,7 +49,7 @@ export default function VipLeadsPage() {
       const url = URL.createObjectURL(res.data);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "litper_vip_leads.xlsx";
+      a.download = "zynex_vip_leads.xlsx";
       a.click();
       URL.revokeObjectURL(url);
       toast.success("Exportado.");
@@ -87,7 +87,7 @@ export default function VipLeadsPage() {
               <TableHead>WhatsApp</TableHead>
               <TableHead>País</TableHead>
               <TableHead>Volumen</TableHead>
-              <TableHead>WA welcome</TableHead>
+              <TableHead>Bienvenida</TableHead>
               <TableHead>Status</TableHead>
               <TableHead></TableHead>
             </TableRow>
@@ -113,7 +113,7 @@ export default function VipLeadsPage() {
                 <TableCell className="text-xs">{l.pedidos_semana || "—"}</TableCell>
                 <TableCell className="text-xs">
                   {l.welcome_sent ? <Badge className="bg-green-500/10 text-green-300 border-green-500/40 border">enviado</Badge>
-                                  : <Badge variant="outline" className="text-zinc-400">—</Badge>}
+                                  : <Badge variant="outline" className="text-zinc-400" title="No se envían mensajes automáticos: escríbele tú desde el enlace de WhatsApp.">sin enviar</Badge>}
                 </TableCell>
                 <TableCell>
                   <Select value={l.status} onValueChange={(v) => patch(l.id, { status: v })}>

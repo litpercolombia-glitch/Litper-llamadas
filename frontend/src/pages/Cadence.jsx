@@ -46,7 +46,7 @@ export default function CadencePage() {
     (async () => {
       const r = await api.get("/queue", { params: { limit: 500 } });
       setQueue(r.data || []);
-      if (!queueId && r.data?.[0]) setQueueId(r.data[0].id);
+      setQueueId((cur) => cur || r.data?.[0]?.id || "");
     })();
   }, []);
 
