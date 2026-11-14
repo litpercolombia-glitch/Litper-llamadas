@@ -1,18 +1,20 @@
 import { useMemo, useState } from "react";
 import Layout from "../components/Layout";
-import HowItWorks from "../components/HowItWorks";
+import { helpForTab } from "../constants/help";
 import { HubContext } from "../components/HubContext";
-import { PlugsConnected, Key, Microphone, PhoneCall } from "@phosphor-icons/react";
+import { PlugsConnected, Key, Microphone, PhoneCall, Plugs } from "@phosphor-icons/react";
 import ConnectorsPage from "./Connectors";
 import ConfigPage     from "./Config";
 import VoicesPage     from "./Voices";
 import NumbersPage    from "./Numbers";
+import McpConnectors  from "../components/McpConnectors";
 
 const TABS = [
-  { key: "conectores",   label: "Conectores",   Icon: PlugsConnected, desc: "Dropi · Chatea Pro · ElevenLabs · Telnyx — con guía paso a paso." },
-  { key: "credenciales", label: "Credenciales", Icon: Key,            desc: "BYOK · tus llaves cifradas y solo tú las ves." },
-  { key: "voces",        label: "Voces",        Icon: Microphone,     desc: "Voz de tu operadora IA por país." },
-  { key: "numeros",      label: "Números",      Icon: PhoneCall,      desc: "Caller IDs verificados." },
+  { key: "conectores",   label: "Conectores",   Icon: PlugsConnected, desc: "Mensajería, telefonía, voz y tu sistema de pedidos o citas, con guía paso a paso." },
+  { key: "mcp",          label: "Conectores MCP", Icon: Plugs,        desc: "Dale herramientas nuevas al asistente conectando servidores MCP de confianza." },
+  { key: "credenciales", label: "Credenciales", Icon: Key,            desc: "Tus llaves, cifradas. Solo tu empresa las usa." },
+  { key: "voces",        label: "Voces",        Icon: Microphone,     desc: "La voz con la que hablan tus agentes." },
+  { key: "numeros",      label: "Números",      Icon: PhoneCall,      desc: "Los números desde los que llaman tus agentes." },
 ];
 
 export default function ConexionesPage() {
@@ -29,21 +31,6 @@ export default function ConexionesPage() {
 
   return (
     <Layout title="Conexiones" subtitle={current.desc}>
-      <HowItWorks
-        testIdPrefix="conexiones-howitworks"
-        intro="Zynex es BYOK (Bring Your Own Keys): tú pegas tus tokens, nosotros los ciframos y solo tú los ves. Pagas solo lo que uses en tu proveedor."
-        steps={[
-          "Elige un conector (Dropi, Chatea Pro, Telnyx, ElevenLabs, Shopify).",
-          "Sigue el paso a paso — cada tarjeta abre un instructivo corto.",
-          "Pega los tokens en los campos y dale Probar conexión.",
-          "Verde = listo. Rojo = revisa el token o los permisos.",
-        ]}
-        links={[
-          { href: "https://chateapro.app/settings#/api", label: "Chatea Pro · API", external: true },
-          { href: "https://portal.telnyx.com", label: "Telnyx · Portal", external: true },
-          { href: "https://elevenlabs.io/app/settings/api-keys", label: "ElevenLabs · Keys", external: true },
-        ]}
-      />
       <div className="flex flex-wrap gap-1 border-b border-zinc-800 mb-6" data-testid="conexiones-tabs">
         {TABS.map(({ key, label, Icon }) => (
           <button key={key} onClick={() => switchTab(key)}
@@ -58,8 +45,9 @@ export default function ConexionesPage() {
         ))}
       </div>
 
-      <HubContext.Provider value={true}>
+      <HubContext.Provider value={helpForTab("conexiones", tab) || true}>
         {tab === "conectores"   && <ConnectorsPage />}
+        {tab === "mcp"          && <McpConnectors />}
         {tab === "credenciales" && <ConfigPage />}
         {tab === "voces"        && <VoicesPage />}
         {tab === "numeros"      && <NumbersPage />}

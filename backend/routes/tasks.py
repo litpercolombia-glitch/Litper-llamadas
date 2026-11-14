@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from typing import List, Optional
 
 from db import get_db
-from deps import require_api_key
+from deps import get_org, require_api_key
 from models import Task, TaskIn, TaskUpdate
 
 router = APIRouter(prefix="/tasks", tags=["tasks"],
@@ -17,9 +17,9 @@ def _now():
 
 @router.post("", response_model=Task, status_code=201,
              summary="Create a customer task/ticket.")
-async def create_task(payload: TaskIn):
+async def create_task(payload: TaskIn, org: str = Depends(get_org)):
     task = Task(**payload.model_dump())
-    await get_db().customer_tasks.insert_one(task.model_dump())
+    await get_db().customer_tasks.insert_one({**task.model_dump(), "org_id": org})
     return task
 
 
@@ -27,8 +27,9 @@ async def create_task(payload: TaskIn):
             summary="List tasks.")
 async def list_tasks(status: Optional[str] = None,
                      type: Optional[str] = None,
-                     limit: int = 100):
-    q = {}
+                     limit: int = 100,
+                     org: str = Depends(get_org)):
+    q = {"org_id": org}
     if status:
         q["status"] = status
     if type:
@@ -40,8 +41,8 @@ async def list_tasks(status: Optional[str] = None,
 
 @router.get("/{task_id}", response_model=Task,
             summary="Get a task.")
-async def get_task(task_id: str):
-    doc = await get_db().customer_tasks.find_one({"id": task_id}, {"_id": 0})
+async def get_task(task_id: str, org: str = Depends(get_org)):
+    doc = await get_db().customer_tasks.find_one({"id": task_id, "org_id": org}, {"_id": 0})
     if not doc:
         raise HTTPException(404, "Task not found")
     return doc
@@ -49,11 +50,11 @@ async def get_task(task_id: str):
 
 @router.patch("/{task_id}", response_model=Task,
               summary="Update a task (status, description, assignee, due date, type).")
-async def update_task(task_id: str, payload: TaskUpdate):
+async def update_task(task_id: str, payload: TaskUpdate, org: str = Depends(get_org)):
     upd = {k: v for k, v in payload.model_dump().items() if v is not None}
     upd["updated_at"] = _now()
     r = await get_db().customer_tasks.find_one_and_update(
-        {"id": task_id}, {"$set": upd},
+        {"id": task_id, "org_id": org}, {"$set": upd},
         return_document=True, projection={"_id": 0})
     if not r:
         raise HTTPException(404, "Task not found")
@@ -61,8 +62,8 @@ async def update_task(task_id: str, payload: TaskUpdate):
 
 
 @router.delete("/{task_id}", summary="Delete a task.")
-async def delete_task(task_id: str):
-    r = await get_db().customer_tasks.delete_one({"id": task_id})
+async def delete_task(task_id: str, org: str = Depends(get_org)):
+    r = await get_db().customer_tasks.delete_one({"id": task_id, "org_id": org})
     if r.deleted_count == 0:
         raise HTTPException(404, "Task not found")
     return {"ok": True, "id": task_id}

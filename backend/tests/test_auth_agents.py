@@ -1,4 +1,6 @@
 """Backend tests: auth (email/pass + google bogus) + 5-agent orchestrator + blacklist."""
+from _live import require_live  # pruebas contra servidor vivo: se saltan sin entorno
+require_live()
 import os
 import time
 import pytest
@@ -12,9 +14,9 @@ if not BASE:
             if line.startswith("REACT_APP_BACKEND_URL="):
                 BASE = line.strip().split("=", 1)[1].rstrip("/")
 API = f"{BASE}/api"
-API_KEY = "litper_hub_pk_2026_prod_ChangeMe_9x2Kf7bQvE4mLnT8sZ3H"
-QA_EMAIL = "qa2@litper.co"
-QA_PASS = "Litper!2026"
+API_KEY = os.environ.get("PUBLIC_API_KEY", "")
+QA_EMAIL = os.environ.get("QA_EMAIL", "")
+QA_PASS = os.environ.get("QA_PASSWORD", "")
 
 
 @pytest.fixture
@@ -35,7 +37,7 @@ class TestAuth:
     def test_register_new_user(self, sess):
         uniq = f"qa+{int(time.time())}@litper.co"
         r = sess.post(f"{API}/auth/register", json={
-            "email": uniq, "password": "Litper!2026",
+            "email": uniq, "password": os.environ.get("QA_PASSWORD", ""),
             "nombre": "QA Tmp", "org_name": "Litper QA Tmp"})
         assert r.status_code == 200, r.text
         data = r.json()
