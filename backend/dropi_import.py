@@ -1,5 +1,5 @@
 """
-Dropi Excel importer for Litper Connect Hub.
+Dropi Excel importer for Zynex OS.
 
 Real Dropi "Reclamos en Oficina" exports use a wide format (~53 columns) where
 ONE ORDER = MULTIPLE ROWS: each promo/combo/variation is emitted as its own
