@@ -1,4 +1,6 @@
 """Iteration 10: multi-tenant credentials, WA 24h window, 6-block prompt, funnel regressions."""
+from _live import require_live  # pruebas contra servidor vivo: se saltan sin entorno
+require_live()
 import os
 import requests
 import pytest
@@ -11,7 +13,7 @@ if not BASE:
             if line.startswith("REACT_APP_BACKEND_URL"):
                 BASE = line.split("=", 1)[1].strip().strip('"').rstrip("/")
 
-API_KEY = "litper_hub_pk_2026_prod_ChangeMe_9x2Kf7bQvE4mLnT8sZ3H"
+API_KEY = os.environ.get("PUBLIC_API_KEY", "")
 HDR = {"Content-Type": "application/json", "X-API-Key": API_KEY}
 
 

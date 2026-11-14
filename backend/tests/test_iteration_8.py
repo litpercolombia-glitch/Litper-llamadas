@@ -1,12 +1,14 @@
 """Backend tests for iteration_8 completion round:
 Prompts CRUD + resolve + generate, Telnyx config/register, WA rules CRUD + resolve,
 WA templates proxy, and regression on dropi + products.match."""
+from _live import require_live  # pruebas contra servidor vivo: se saltan sin entorno
+require_live()
 import os
 import pytest
 import requests
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://litper-hub.preview.emergentagent.com").rstrip("/")
-API_KEY = "litper_hub_pk_2026_prod_ChangeMe_9x2Kf7bQvE4mLnT8sZ3H"
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
+API_KEY = os.environ.get("PUBLIC_API_KEY", "")
 H = {"Content-Type": "application/json", "X-API-Key": API_KEY}
 
 
