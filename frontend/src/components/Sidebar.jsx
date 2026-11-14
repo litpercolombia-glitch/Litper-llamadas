@@ -5,16 +5,18 @@ import {
   Envelope, WhatsappLogo,
 } from "@phosphor-icons/react";
 import { api } from "../lib/api";
+import { useAssistantName } from "../lib/assistant";
+import { usePacks } from "../lib/packs";
 
 const NAV = [
   { to: "/app",            label: "Lyan",       lyan: true,   testId: "nav-copilot",    exact: true,
-    hint: "Chat con tus 5 agentes" },
-  { to: "/app/pedidos",    label: "Pedidos",    icon: Package,        testId: "nav-pedidos",
-    hint: "Cola · Importar · Novedades · Tickets" },
+    hint: "Pídele lo que necesites" },
+  { to: "/app/pedidos",    label: "Pendientes", icon: Package,        testId: "nav-pedidos",
+    hint: "Cola · Tickets", hintCod: "Cola · Importar · Novedades · Tickets" },
   { to: "/app/conexiones", label: "Conexiones", icon: PlugsConnected, testId: "nav-conexiones",
-    hint: "Credenciales · Voces · Números" },
+    hint: "Conectores · MCP · Voces · Números" },
   { to: "/app/metricas",   label: "Métricas",   icon: ChartLineUp,    testId: "nav-metricas",
-    hint: "$ recuperado y entrega efectiva" },
+    hint: "Resultados de tu operación" },
   { to: "/app/ajustes",    label: "Ajustes",    icon: Gear,           testId: "nav-ajustes",
     hint: "Perfil · Agentes · Productos · más" },
 ];
@@ -29,6 +31,8 @@ export default function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const showChats = location.pathname === "/app";
+  const asistente = useAssistantName();
+  const { hasCod } = usePacks();
   const [threads, setThreads] = useState([]);
   const activeId = new URLSearchParams(location.search).get("thread");
 
@@ -73,13 +77,13 @@ export default function Sidebar() {
           </div>
           <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-zinc-500">Zynex</span>
         </div>
-        <h1 className="text-lg font-semibold text-white mt-1">Litper OS</h1>
-        <p className="text-[11px] font-mono text-zinc-500 mt-1">COD · LATAM · v2.6</p>
+        <h1 className="text-lg font-semibold text-white mt-1">Zynex OS</h1>
+        <p className="text-[11px] font-mono text-zinc-500 mt-1">Agentes para tu negocio</p>
       </div>
 
       {/* nav — 5 top-level */}
       <nav className="py-3">
-        {NAV.map(({ to, label, icon: Icon, lyan, testId, exact, hint }) => (
+        {NAV.map(({ to, label, icon: Icon, lyan, testId, exact, hint, hintCod }) => (
           <NavLink
             key={to}
             to={to}
@@ -95,16 +99,16 @@ export default function Sidebar() {
           >
             <div className="flex items-center gap-3">
               {lyan ? (
-                <img src="/lyan.webp" alt="Lyan"
+                <img src="/lyan.webp" alt={asistente}
                      className="w-6 h-6 rounded-full object-cover ring-1 ring-cyan-400/40"
                      data-testid="sidebar-lyan-avatar" />
               ) : (
                 <Icon size={18} weight="duotone" />
               )}
-              <span className="text-sm font-medium">{label}</span>
+              <span className="text-sm font-medium">{lyan ? asistente : label}</span>
             </div>
             <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mt-0.5 ml-9">
-              {hint}
+              {hasCod && hintCod ? hintCod : hint}
             </div>
           </NavLink>
         ))}

@@ -1,5 +1,7 @@
 """HTTP-level tests for /api/dropi/* endpoints (preview → import → prompt-vars)."""
 from __future__ import annotations
+from _live import require_live  # pruebas contra servidor vivo: se saltan sin entorno
+require_live()
 
 import io
 import os
@@ -10,8 +12,8 @@ import pytest
 import requests
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/") or \
-    "https://litper-hub.preview.emergentagent.com"
-API_KEY = "litper_hub_pk_2026_prod_ChangeMe_9x2Kf7bQvE4mLnT8sZ3H"
+    ""
+API_KEY = os.environ.get("PUBLIC_API_KEY", "")
 H = {"X-API-Key": API_KEY}
 
 
