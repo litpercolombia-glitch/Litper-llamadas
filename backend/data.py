@@ -1,4 +1,4 @@
-"""Seed data + reference tables for Litper Connect Hub."""
+"""Seed data + reference tables for Zynex OS (paquete cod_colombia)."""
 from datetime import date
 
 # 12 Colombian carriers seed data
