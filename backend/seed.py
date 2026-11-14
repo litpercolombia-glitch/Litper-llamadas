@@ -1,4 +1,6 @@
-"""One-shot seed: 12 carriers + demo COD orders across different carriers.
+"""One-shot DEMO seed (desarrollo): instala el paquete "cod_colombia" y crea
+pedidos COD de ejemplo — TODO dentro de un solo cliente (SEED_ORG_ID, por
+defecto "default"). El servidor ya no siembra nada al arrancar.
 
 Idempotent — running twice will not duplicate carriers or orders (uses upsert by slug
 for carriers and skips demo orders if a demo external_ref already exists).
@@ -13,15 +15,15 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent / ".env")
 
 from db import get_db
-from data import CARRIERS_SEED
 from models import Order, QueueItem
+from packs import install_pack
+
+ORG = os.environ.get("SEED_ORG_ID", "default")
 
 
 async def seed_carriers():
-    db = get_db()
-    for c in CARRIERS_SEED:
-        await db.carriers.update_one({"slug": c["slug"]}, {"$set": c}, upsert=True)
-    print(f"[seed] carriers upserted: {len(CARRIERS_SEED)}")
+    r = await install_pack(ORG, "cod_colombia")
+    print(f"[seed] paquete cod_colombia instalado en {ORG}: {r['installed']}")
 
 
 async def seed_demo_orders():
@@ -90,46 +92,26 @@ async def seed_demo_orders():
 
     inserted = 0
     for o in demo:
-        exists = await db.orders.find_one({"external_ref": o["external_ref"]}, {"_id": 0, "id": 1})
+        exists = await db.orders.find_one({"org_id": ORG, "external_ref": o["external_ref"]},
+                                          {"_id": 0, "id": 1})
         if exists:
             continue
-        carrier = await db.carriers.find_one({"slug": o["carrier_slug"]}, {"_id": 0})
+        carrier = await db.carriers.find_one({"org_id": ORG, "slug": o["carrier_slug"]}, {"_id": 0})
         order = Order(**o, status="in_queue")
-        await db.orders.insert_one(order.model_dump())
+        await db.orders.insert_one({**order.model_dump(), "org_id": ORG})
         q = QueueItem(order_id=order.id, carrier_slug=order.carrier_slug,
                       office_arrival_date=o["office_arrival_date"],
                       office_claim_max_days=(carrier or {}).get("office_claim_max_days"),
                       country=order.country)
-        await db.call_queue.insert_one(q.model_dump())
+        await db.call_queue.insert_one({**q.model_dump(), "org_id": ORG})
         inserted += 1
     print(f"[seed] demo orders inserted: {inserted} (existing skipped)")
-
-
-async def seed_connectors():
-    db = get_db()
-    now = datetime.now(timezone.utc).isoformat()
-    conns = [
-        {"key": "chatea_pro", "name": "Chatea Pro (WhatsApp)", "status": "unconfigured",
-         "last_checked_at": None, "metadata": {}},
-        {"key": "dropi", "name": "Dropi (Fulfillment)", "status": "unconfigured",
-         "last_checked_at": None, "metadata": {}},
-        {"key": "whatsapp_business", "name": "WhatsApp Business (Meta Cloud)",
-         "status": "unconfigured", "last_checked_at": None, "metadata": {}},
-        {"key": "supabase", "name": "Supabase Postgres", "status": "unconfigured",
-         "last_checked_at": None, "metadata": {}},
-    ]
-    for c in conns:
-        c["updated_at"] = now
-        await db.integration_connectors.update_one({"key": c["key"]},
-                                                   {"$setOnInsert": c},
-                                                   upsert=True)
-    print("[seed] integration_connectors upserted")
 
 
 async def main():
     await seed_carriers()
     await seed_demo_orders()
-    await seed_connectors()
+    # Conectores: catálogo estático en routes/connectors.py (nada que sembrar).
     print("[seed] DONE")
 
 
