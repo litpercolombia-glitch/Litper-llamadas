@@ -4,18 +4,20 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Toaster, toast } from "sonner";
 import { api } from "../lib/api";
+import PageHelp from "../components/PageHelp";
+import { GOOGLE_LOGIN_ENABLED, startGoogleLogin } from "../lib/googleLogin";
 import {
   LockKey, Envelope, ArrowRight, GoogleLogo, ShieldCheck, Sparkle,
   WhatsappLogo,
 } from "@phosphor-icons/react";
 
 const BENEFITS = [
-  { title: "Recupera pedidos represados en oficina",
-    body:  "Antes de que se devuelvan. Cadencia automática con WhatsApp + llamada." },
-  { title: "Menos devoluciones, más entrega efectiva",
-    body:  "Sin contratar a nadie. Los 5 agentes trabajan 24/7 por ti." },
-  { title: "BYOK — pagas solo lo que uses",
-    body:  "Tú pones tus llaves (Chatea Pro, ElevenLabs, Telnyx). Cifradas, solo tú las ves." },
+  { title: "Crea un agente con una frase",
+    body:  "Describe tu negocio y qué debe hacer. El asistente prepara la propuesta y tú la revisas." },
+  { title: "Tú decides antes de cada cambio",
+    body:  "El asistente propone y espera a que pulses «Aplicar». Nada se hace a tus espaldas." },
+  { title: "Tus llaves, tus proveedores",
+    body:  "Conectas tus propias cuentas y pagas al proveedor solo lo que uses. Se guardan cifradas." },
 ];
 
 export default function LoginPage() {
@@ -32,8 +34,8 @@ export default function LoginPage() {
     try {
       const { data } = await api.post("/auth/login", { email: email.trim(), password });
       if (data?.ok) {
-        localStorage.setItem("litper_operator_ok", "1");
-        toast.success(`Bienvenido, ${data.user?.nombre || "operador"}.`);
+        localStorage.setItem("zynex_session_ok", "1");
+        toast.success(`Hola, ${data.user?.nombre || "bienvenido"}.`);
         const to = loc.state?.from?.pathname || "/app";
         nav(to, { replace: true });
       }
@@ -42,12 +44,6 @@ export default function LoginPage() {
     } finally { setBusy(false); }
   };
 
-  const google = () => {
-    // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
-    const redirectUrl = window.location.origin + "/app";
-    window.location.href =
-      "https://auth.emergentagent.com/?redirect=" + encodeURIComponent(redirectUrl);
-  };
 
   return (
     <div className="min-h-screen bg-[#050505] text-white flex flex-col md:flex-row relative overflow-hidden">
@@ -63,16 +59,15 @@ export default function LoginPage() {
             <img src="/lyan.webp" alt="Lyan"
                  className="w-8 h-8 rounded-full object-cover ring-1 ring-cyan-400/50" />
             <div className="text-[10px] uppercase tracking-[0.3em] font-mono text-cyan-300">
-              Zynex OS · COD · LATAM
+              Zynex OS · Agentes para tu negocio
             </div>
           </div>
 
           <h1 className="text-3xl md:text-[42px] font-semibold leading-tight mb-6"
               data-testid="login-hook">
-            El <span className="text-cyan-300">20-40%</span> de tus pedidos COD se devuelven.
-            <br />Cada devolución te cuesta <span className="text-cyan-300">USD 7-9</span>.
+            Agentes que llaman y escriben a tus clientes.
             <br />
-            <span className="text-white">Zynex los rescata antes.</span>
+            <span className="text-cyan-300">Los creas con una frase.</span>
           </h1>
 
           <div className="space-y-3" data-testid="login-benefits">
@@ -96,26 +91,32 @@ export default function LoginPage() {
       <section className="w-full md:w-[440px] flex flex-col justify-center px-8 md:px-10 py-14 bg-zinc-950 border-t md:border-t-0 md:border-l border-zinc-800">
         <div className="max-w-md w-full mx-auto">
           <h2 className="text-2xl font-semibold mb-1" data-testid="login-title">Entra a Zynex OS</h2>
-          <p className="text-sm text-zinc-400 mb-8">
-            Multi-tenant BYOK · 14 días gratis · sin tarjeta.
+          <p className="text-sm text-zinc-400 mb-6">
+            {GOOGLE_LOGIN_ENABLED ? "Entra con tu correo o con tu cuenta de Google." : "Entra con tu correo y tu contraseña."}
           </p>
 
-          <Button
-            onClick={google}
-            type="button"
-            variant="outline"
-            data-testid="login-google-btn"
-            style={{ backgroundColor: "#ffffff", color: "#18181b", borderColor: "#d4d4d8" }}
-            className="w-full h-11 mb-3 rounded-sm font-medium hover:opacity-90">
-            <GoogleLogo size={16} weight="bold" className="mr-2" />
-            Continuar con Google
-          </Button>
+          <PageHelp helpKey="login" linkAsk={false} />
 
-          <div className="flex items-center gap-3 my-4">
-            <div className="flex-1 h-px bg-zinc-800" />
-            <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">o con email</span>
-            <div className="flex-1 h-px bg-zinc-800" />
-          </div>
+          {GOOGLE_LOGIN_ENABLED && (
+            <>
+              <Button
+                onClick={startGoogleLogin}
+                type="button"
+                variant="outline"
+                data-testid="login-google-btn"
+                style={{ backgroundColor: "#ffffff", color: "#18181b", borderColor: "#d4d4d8" }}
+                className="w-full h-11 mb-3 rounded-sm font-medium hover:opacity-90">
+                <GoogleLogo size={16} weight="bold" className="mr-2" />
+                Continuar con Google
+              </Button>
+
+              <div className="flex items-center gap-3 my-4">
+                <div className="flex-1 h-px bg-zinc-800" />
+                <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">o con correo</span>
+                <div className="flex-1 h-px bg-zinc-800" />
+              </div>
+            </>
+          )}
 
           <form onSubmit={submit} className="space-y-3" data-testid="login-form">
             <div className="relative">
@@ -138,7 +139,7 @@ export default function LoginPage() {
                     data-testid="login-submit">
               <span className="hiw-glow" aria-hidden="true" />
               <span className="relative z-10 flex items-center gap-2">
-                {busy ? "Verificando…" : (<><ShieldCheck size={16} weight="fill" /> Rescatar mis pedidos</>)}
+                {busy ? "Verificando…" : (<><ShieldCheck size={16} weight="fill" /> Entrar</>)}
                 <ArrowRight size={14} weight="bold" />
               </span>
             </Button>
