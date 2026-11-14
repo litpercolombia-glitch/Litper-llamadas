@@ -4,7 +4,7 @@ Multi-tenant credentials store — encrypted at rest with Fernet (AES-128-CBC + 
 Each org owns its own set of provider keys (Chatea, Telnyx, ElevenLabs, LLMs).
 Secrets are encrypted using ENCRYPTION_KEY from backend/.env. The frontend
 NEVER receives the plaintext — only status ("connected"/"not_configured") and a
-short masked hint like "sk_…9f2c".
+short masked hint (solo los últimos 4: "…9f2c").
 
 Design:
 - Collection `org_credentials`: { org_id, provider, is_configured, hint,
@@ -62,6 +62,9 @@ PROVIDER_SCHEMAS: dict[str, dict[str, dict[str, str]]] = {
         "account_sid": {"env": "TWILIO_ACCOUNT_SID", "label": "Account SID"},
         "auth_token":  {"env": "TWILIO_AUTH_TOKEN",  "label": "Auth Token"},
     },
+    "retell": {
+        "api_key": {"env": "RETELL_API_KEY", "label": "API Key (Retell — llamadas de voz)"},
+    },
     "dropi": {
         "api_token": {"env": "DROPI_API_TOKEN", "label": "API Token"},
         "country":   {"env": "DROPI_COUNTRY",   "label": "País (CO / EC / CL / MX / PE)"},
@@ -81,23 +84,22 @@ _SECRET_FIELDS = {"api_key", "auth_token", "sip_password", "connection_id",
 
 import logging as _logging
 if os.environ.get("PLATFORM_KEYS_ORGS") is None:
-    _logging.getLogger("org_credentials").critical(
-        "PLATFORM_KEYS_ORGS no definida: TODOS los clientes pueden usar las llaves de "
-        "plataforma (.env). Definirla (org de Litper + trials) ANTES de vender.")
+    _logging.getLogger("org_credentials").warning(
+        "PLATFORM_KEYS_ORGS no definida: NINGÚN cliente usa las llaves de plataforma "
+        "(.env); cada uno debe conectar las suyas (BYOK). Para permitirlas define "
+        "PLATFORM_KEYS_ORGS=\"org1,org2\" (o \"*\" solo para uso interno).")
 
 
 def platform_keys_allowed(org_id: str) -> bool:
     """¿Puede este cliente usar las llaves de PLATAFORMA del servidor (.env)?
 
-    PLATFORM_KEYS_ORGS:
-      - sin definir  -> "*" (modo un-solo-cliente, compatibilidad: Litper hoy).
-      - "*"          -> todos (solo para uso interno).
-      - "org1,org2"  -> solo esos clientes (Litper + clientes en trial).
-      - ""           -> nadie: cada cliente trae su propia llave (BYOK puro).
-    Para vender: definirla SIEMPRE con la org de Litper + trials."""
+    PLATFORM_KEYS_ORGS (POR DEFECTO CERRADO):
+      - sin definir / "" -> nadie: cada cliente trae su propia llave (BYOK puro).
+      - "org1,org2"      -> solo esos clientes (la org interna + clientes en trial).
+      - "*"              -> todos (solo para uso interno / un solo cliente)."""
     raw = os.environ.get("PLATFORM_KEYS_ORGS")
     if raw is None:
-        return True
+        return False
     allowed = {o.strip() for o in raw.split(",") if o.strip()}
     return "*" in allowed or org_id in allowed
 
@@ -117,9 +119,9 @@ def _mask(value: str) -> str:
     if not value:
         return ""
     v = str(value)
-    if len(v) <= 6:
-        return "…" + v[-2:]
-    return v[:4] + "…" + v[-4:]
+    if len(v) <= 8:            # demasiado corta: no se revela nada
+        return "…"
+    return "…" + v[-4:]       # solo los últimos 4
 
 
 # ---------------------------------------------------------------------------
