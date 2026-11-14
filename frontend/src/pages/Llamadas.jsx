@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import Layout from "../components/Layout";
-import HowItWorks from "../components/HowItWorks";
+import EmptyState from "../components/EmptyState";
 import { api } from "../lib/api";
 import { PhoneCall, Play, ChatText } from "@phosphor-icons/react";
 import { toast } from "sonner";
@@ -30,28 +30,19 @@ export default function LlamadasPage() {
   useEffect(() => { load(); }, []);
 
   return (
-    <Layout title="Llamadas" subtitle="Historial post-llamada (transcript + audio) — Retell.">
-      <HowItWorks
-        testIdPrefix="llamadas-howitworks"
-        intro="Cuando termina cada llamada, Retell nos envía el resumen: grabación, transcript, duración y resultado. Aquí las revisas."
-        steps={[
-          "Configura RETELL_API_KEY y provisiona un número Telnyx en tu portal.",
-          "Publica un agente 'en vivo' desde Ajustes → Agentes.",
-          "Cada llamada aparece aquí automáticamente vía webhook.",
-        ]}
-      />
+    <Layout title="Llamadas" subtitle="Historial de llamadas con grabación y conversación escrita.">
 
       {loading && <div className="text-zinc-500 font-mono text-sm">Cargando…</div>}
 
       {!loading && calls.length === 0 && (
-        <div className="border border-dashed border-zinc-800 rounded-sm p-10 text-center bg-zinc-900/30"
-             data-testid="llamadas-empty">
-          <PhoneCall size={38} className="mx-auto mb-3 text-zinc-600" weight="duotone" />
-          <div className="text-lg font-semibold text-white mb-1">Aún no hay llamadas</div>
-          <p className="text-sm text-zinc-400 max-w-md mx-auto">
-            Publica un agente y realiza tu primera llamada de prueba.
-          </p>
-        </div>
+        <EmptyState
+          icon={PhoneCall}
+          testId="llamadas-empty"
+          title="Aún no hay llamadas"
+          description="Aquí verás cada llamada que hagan tus agentes, con su grabación y lo que se dijo. Crea un agente y haz una llamada de prueba para empezar."
+          action={{ label: "Ir a Agentes", to: "/app/ajustes?tab=agentes" }}
+          prompt="Ayúdame a hacer mi primera llamada de prueba con un agente."
+        />
       )}
 
       {!loading && calls.length > 0 && (
