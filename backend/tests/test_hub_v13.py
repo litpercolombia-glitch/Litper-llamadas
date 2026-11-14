@@ -1,11 +1,13 @@
 """Litper Connect Hub v1.3 — voices/TTS/metrics/agent tests."""
+from _live import require_live  # pruebas contra servidor vivo: se saltan sin entorno
+require_live()
 import os
 import pytest
 import requests
 
-BASE = os.environ.get("REACT_APP_BACKEND_URL", "https://litper-hub.preview.emergentagent.com").rstrip("/")
+BASE = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
 API = f"{BASE}/api"
-KEY = "litper_hub_pk_2026_prod_ChangeMe_9x2Kf7bQvE4mLnT8sZ3H"
+KEY = os.environ.get("PUBLIC_API_KEY", "")
 H = {"X-API-Key": KEY, "Content-Type": "application/json"}
 
 

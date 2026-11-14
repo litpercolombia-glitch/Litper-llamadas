@@ -42,7 +42,7 @@ function AuthGate({ children }) {
     );
   }
   if (state.status === "guest") {
-    localStorage.removeItem("litper_operator_ok");
+    localStorage.removeItem("zynex_session_ok");
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
   return (
@@ -105,7 +105,7 @@ function AuthRouter() {
 
 function App() {
   useTheme();
-  useEffect(() => { document.title = "Zynex OS — Litper Connect Hub"; }, []);
+  useEffect(() => { document.title = "Zynex OS"; }, []);
 
   return (
     <BrowserRouter>
