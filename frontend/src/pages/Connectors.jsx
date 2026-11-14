@@ -4,6 +4,8 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { api } from "../lib/api";
 import { toast } from "sonner";
+import { usePacks } from "../lib/packs";
+import WebhookUrls from "../components/WebhookUrls";
 import {
   CheckCircle, CaretDown, ArrowSquareOut, TestTube, FloppyDisk,
   Storefront, WhatsappLogo, PhoneCall, Waveform, ShoppingBag, Circle,
@@ -17,6 +19,7 @@ import {
 const CONNECTORS = [
   {
     key: "dropi",
+    pack: "cod_colombia",
     label: "Dropi — Trae tus pedidos y novedades",
     Icon: ShoppingBag,
     steps: [
@@ -34,14 +37,14 @@ const CONNECTORS = [
   },
   {
     key: "chatea_pro",
-    label: "Chatea Pro — WhatsApp de tu operación",
+    label: "WhatsApp — con tu cuenta de Chatea Pro",
     Icon: WhatsappLogo,
     steps: [
       "Entra a chateapro.app → Settings → API.",
       "Copia tu API Token.",
       "Pégalo aquí y dale Probar.",
     ],
-    tagline: "Zynex enviará las plantillas aprobadas y responderá dentro de la ventana de 24h.",
+    tagline: "Tus agentes envían las plantillas aprobadas y responden dentro de la ventana de 24 horas de WhatsApp.",
     docUrl: "https://chateapro.app/settings#/api",
     fields: [
       { name: "api_key",  label: "API Token",       secret: true, placeholder: "cp_…" },
@@ -50,32 +53,32 @@ const CONNECTORS = [
   },
   {
     key: "telnyx",
-    label: "Telnyx (voz) — Para que Sofía llame por teléfono",
+    label: "Telnyx (telefonía) — Para que tus agentes llamen por teléfono",
     Icon: PhoneCall,
     steps: [
       "portal.telnyx.com → API Keys → crea una (empieza con KEY...).",
       "Voice → Applications → crea una Call Control App y copia el Connection ID.",
-      "Numbers → compra un número de Colombia con Voz y asígnalo a esa App.",
-      "Pega API Key + Connection ID + número (+57...) aquí.",
+      "Numbers → compra un número de tu país con voz y asígnalo a esa App.",
+      "Pega API Key + Connection ID + número (con código de país) aquí.",
     ],
-    tagline: "La operadora IA llama con voz clara y sin corte.",
+    tagline: "La línea telefónica que usan tus agentes para llamar.",
     docUrl: "https://portal.telnyx.com",
     fields: [
       { name: "api_key",       label: "API Key",       secret: true, placeholder: "KEY01A…" },
       { name: "connection_id", label: "Connection ID", secret: true, placeholder: "1234567890" },
-      { name: "phone_number",  label: "Número (+57...)", placeholder: "+573001234567" },
+      { name: "phone_number",  label: "Número (con código de país)", placeholder: "+573001234567" },
     ],
   },
   {
     key: "elevenlabs",
-    label: "ElevenLabs — La voz de Sofía",
+    label: "ElevenLabs — La voz de tus agentes",
     Icon: Waveform,
     steps: [
       "elevenlabs.io → perfil → API Keys → copia la key (empieza con sk_).",
-      "Elige la voz o usa la de Litper.",
+      "Elige una voz en tu biblioteca y copia su Voice ID (opcional).",
       "Pega la key aquí y dale Probar.",
     ],
-    tagline: "Voz natural en español latino para el confirm/rescate.",
+    tagline: "La voz con la que hablan tus agentes en las llamadas.",
     docUrl: "https://elevenlabs.io/app/settings/api-keys",
     fields: [
       { name: "api_key",          label: "API Key",       secret: true, placeholder: "sk_…" },
@@ -91,7 +94,7 @@ const CONNECTORS = [
       "Copia el Admin API access token.",
       "Pega el token + tu URL (xxx.myshopify.com) aquí.",
     ],
-    tagline: "Sincroniza pedidos Shopify hacia Zynex (opcional).",
+    tagline: "Trae los pedidos de tu tienda Shopify (opcional).",
     docUrl: "https://help.shopify.com/manual/apps/custom-apps",
     fields: [
       { name: "access_token", label: "Admin API access token", secret: true, placeholder: "shpat_…" },
@@ -254,6 +257,9 @@ function ConnectorCard({ spec, status: srvStatus, onSaved }) {
 export default function ConnectorsPage() {
   const [statusByKey, setStatusByKey] = useState({});
   const [loading, setLoading] = useState(true);
+  const { has } = usePacks();
+  // Los conectores de un paquete solo aparecen si el paquete está instalado.
+  const visibles = CONNECTORS.filter((c) => !c.pack || has(c.pack));
 
   const load = async () => {
     setLoading(true);
@@ -274,7 +280,7 @@ export default function ConnectorsPage() {
       {loading && <div className="text-zinc-500 font-mono text-sm">Cargando…</div>}
       {!loading && (
         <div className="space-y-3 max-w-4xl">
-          {CONNECTORS.map((c) => (
+          {visibles.map((c) => (
             <ConnectorCard
               key={c.key}
               spec={c}
@@ -282,6 +288,7 @@ export default function ConnectorsPage() {
               onSaved={load}
             />
           ))}
+          <WebhookUrls />
         </div>
       )}
     </Layout>
