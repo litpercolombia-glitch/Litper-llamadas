@@ -13,6 +13,7 @@ export default function HowItWorks({
   links = [],
   testIdPrefix = "howitworks",
   defaultOpen = false,
+  children,
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
@@ -65,6 +66,7 @@ export default function HowItWorks({
               ))}
             </div>
           )}
+          {children}
         </div>
       )}
     </div>
