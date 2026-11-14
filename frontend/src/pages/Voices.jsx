@@ -69,7 +69,7 @@ export default function VoicesPage() {
       setPlaying(v.id);
       const r = await api.post("/voices/preview",
         { voice_id: v.elevenlabs_voice_id,
-          text: "Hola, le llamo de Litper. ¿Puede confirmar la recogida de su pedido en oficina?" },
+          text: "Hola, le llamo de parte de la empresa. ¿Tiene un momento para confirmar unos datos?" },
         { responseType: "blob", timeout: 30000 });
       const url = URL.createObjectURL(r.data);
       if (audioRef.current) audioRef.current.pause();
@@ -85,7 +85,7 @@ export default function VoicesPage() {
   };
 
   return (
-    <Layout title="Voces de IA" subtitle={`${voices.length}/6 voces registradas · Selección por país`}
+    <Layout title="Voces" subtitle={`${voices.length}/6 voces registradas · una por país o por tipo de llamada`}
       actions={
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
@@ -100,7 +100,7 @@ export default function VoicesPage() {
               <div>
                 <label className="text-xs uppercase font-mono tracking-widest text-zinc-500 block mb-1">Nombre</label>
                 <Input data-testid="voice-form-name" className="bg-zinc-900 border-zinc-800 rounded-sm"
-                  placeholder="Sofía CO" value={form.name}
+                  placeholder="Ej. Voz principal" value={form.name}
                   onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))} />
               </div>
               <div>
