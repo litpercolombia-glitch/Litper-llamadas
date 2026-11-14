@@ -1,17 +1,19 @@
 import { useMemo, useState } from "react";
 import Layout from "../components/Layout";
-import HowItWorks from "../components/HowItWorks";
+import { helpForTab } from "../constants/help";
 import { HubContext } from "../components/HubContext";
 import { Package, FileXls, Warning, ListChecks } from "@phosphor-icons/react";
 import QueuePage    from "./Queue";
 import ImportPage   from "./Import";
 import NovedadesPage from "./Novedades";
 import TasksPage    from "./Tasks";
+import PackNotice   from "../components/PackNotice";
+import { usePacks } from "../lib/packs";
 
 const TABS = [
-  { key: "cola",       label: "Cola",       Icon: Package,     desc: "Todos tus pedidos con semáforo por urgencia." },
-  { key: "importar",   label: "Importar",   Icon: FileXls,     desc: "Sube el Excel de Dropi (combo-safe)." },
-  { key: "novedades",  label: "Novedades",  Icon: Warning,     desc: "Estatus por transportadora." },
+  { key: "cola",       label: "Cola",       Icon: Package,     desc: "Lo que tienes pendiente con tus clientes, ordenado por urgencia." },
+  { key: "importar",   label: "Importar",   Icon: FileXls,     desc: "Sube el archivo de pedidos exportado de Dropi (Excel o CSV).", pack: "cod_colombia" },
+  { key: "novedades",  label: "Novedades",  Icon: Warning,     desc: "Avisos de las empresas de envío y qué se hace con cada uno.", pack: "cod_colombia" },
   { key: "tickets",    label: "Tickets",    Icon: ListChecks,  desc: "Casos abiertos con clientes." },
 ];
 
@@ -19,7 +21,11 @@ export default function PedidosPage() {
   const initial = new URLSearchParams(window.location.search).get("tab") || "cola";
   const [tab, setTab] = useState(TABS.find(t => t.key === initial) ? initial : "cola");
 
+  const { loaded, has } = usePacks();
+  // Las pestañas de un paquete solo aparecen si el paquete está instalado.
+  const tabs = TABS.filter((t) => !t.pack || has(t.pack));
   const current = useMemo(() => TABS.find(t => t.key === tab) || TABS[0], [tab]);
+  const blocked = !!current.pack && !has(current.pack);
 
   const switchTab = (k) => {
     setTab(k);
@@ -29,19 +35,9 @@ export default function PedidosPage() {
   };
 
   return (
-    <Layout title="Pedidos" subtitle={current.desc}>
-      <HowItWorks
-        testIdPrefix="pedidos-howitworks"
-        intro="Toda tu operación COD en un solo lugar: la cola (con semáforo), el importador Excel de Dropi, las novedades por transportadora y los tickets de rescate."
-        steps={[
-          "Conecta Dropi o sube tu Excel — Lyan crea automáticamente los pedidos.",
-          "Revisa la Cola: rojo = urgente (menos de 3 días para que el pedido se devuelva).",
-          "En Novedades ves quién está en oficina por transportadora.",
-          "Los Tickets son las conversaciones abiertas con clientes que aún no han retirado.",
-        ]}
-      />
+    <Layout title="Pendientes" subtitle={current.desc}>
       <div className="flex flex-wrap gap-1 border-b border-zinc-800 mb-6" data-testid="pedidos-tabs">
-        {TABS.map(({ key, label, Icon }) => (
+        {tabs.map(({ key, label, Icon }) => (
           <button key={key} onClick={() => switchTab(key)}
             data-testid={`pedidos-tab-${key}`}
             className={`px-4 py-2.5 text-sm font-medium flex items-center gap-2 border-b-2 -mb-px transition ${
@@ -54,10 +50,11 @@ export default function PedidosPage() {
         ))}
       </div>
 
-      <HubContext.Provider value={true}>
+      <HubContext.Provider value={helpForTab("pedidos", tab) || true}>
         {tab === "cola"      && <QueuePage />}
-        {tab === "importar"  && <ImportPage />}
-        {tab === "novedades" && <NovedadesPage />}
+        {tab === "importar"  && !blocked && <ImportPage />}
+        {tab === "novedades" && !blocked && <NovedadesPage />}
+        {blocked && loaded && <PackNotice />}
         {tab === "tickets"   && <TasksPage />}
       </HubContext.Provider>
     </Layout>
