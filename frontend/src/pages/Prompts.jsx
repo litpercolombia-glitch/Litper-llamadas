@@ -10,11 +10,14 @@ import {
 } from "../components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { toast } from "sonner";
+import { usePacks } from "../lib/packs";
 import {
   Sparkle, FloppyDisk, Play, Plus, Trash, Copy, Robot, Globe,
   Package, MegaphoneSimple, MagicWand as Wand,
 } from "@phosphor-icons/react";
 
+// Variables que solo existen con el paquete de contra entrega.
+const COD_VARS = ["carrier_name", "office_address", "guia"];
 const ALL_VARS = [
   "customer_first_name", "product_name", "carrier_name", "city",
   "office_address", "days_left", "deadline_text", "total_to_pay",
@@ -83,7 +86,7 @@ export default function PromptsPage() {
 
   return (
     <Layout
-      title="Prompts de Sofía"
+      title="Guiones"
       subtitle="Global · Producto · Campaña — la campaña gana sobre producto, y producto sobre global."
       actions={
         <div className="flex gap-2">
@@ -138,7 +141,7 @@ export default function PromptsPage() {
           {!selected && (
             <div className="rounded-lg border border-dashed border-zinc-700 p-10 text-center text-zinc-500 text-sm">
               Selecciona un prompt o crea uno nuevo. <br/>
-              <span className="text-zinc-400">Sofía habla en colombiano, &lt;60s, NUNCA "impermeable" → "antifluido".</span>
+              <span className="text-zinc-400">Escribe con tus palabras qué debe decir el agente, en qué tono y qué no debe decir.</span>
             </div>
           )}
           {selected && (
@@ -160,14 +163,15 @@ export default function PromptsPage() {
 
 // ---------------------------------------------------------------------------
 function PromptEditor({ value, onChange, onSave, onDelete, mode, onModeChange, products }) {
+  const { hasCod } = usePacks();
   const [genForm, setGenForm] = useState({
     product: "", beneficios: "", objeciones: "", transportadora: "",
-    tono: "colombiano cálido y directo", country: value.country || "CO",
+    tono: "cálido y directo", country: value.country || "CO",
   });
   const [generating, setGenerating] = useState(false);
   const [previewVars, setPreviewVars] = useState({
     customer_first_name: "María",
-    product_name: "Protector Antifluido Premium + 2 Fundas",
+    product_name: "Plan Premium",
     carrier_name: "Servientrega",
     city: "Medellín",
     office_address: "Cra 50 #10-20",
@@ -175,7 +179,7 @@ function PromptEditor({ value, onChange, onSave, onDelete, mode, onModeChange, p
     deadline_text: "hasta el jueves",
     total_to_pay: "$150.000",
     guia: "SGT-987",
-    promo_name: "Protector Antifluido Premium + 2 Fundas",
+    promo_name: "Plan Premium anual",
     promo_price: "$149.000",
   });
 
@@ -205,7 +209,7 @@ function PromptEditor({ value, onChange, onSave, onDelete, mode, onModeChange, p
   };
 
   const testVoice = async () => {
-    const text = value.first_message || rendered.fm || "Hola, soy Sofía.";
+    const text = value.first_message || rendered.fm || "Hola, le llamo de parte de la empresa.";
     try {
       const res = await api.post("/prompts/test-voice",
         { voice_id: value.voice_id || "", text: text.slice(0, 300) },
@@ -277,10 +281,10 @@ function PromptEditor({ value, onChange, onSave, onDelete, mode, onModeChange, p
         )}
         {value.scope === "campaign" && (
           <div className="col-span-2">
-            <label className="text-[10px] uppercase text-zinc-500 font-mono">Campaña / carrier slug</label>
+            <label className="text-[10px] uppercase text-zinc-500 font-mono">Clave de la campaña</label>
             <Input value={value.campaign_key || ""}
               onChange={(e) => onChange({ ...value, campaign_key: e.target.value })}
-              placeholder="ej. servientrega, envia, blackfriday"
+              placeholder="ej. renovaciones, blackfriday"
               data-testid="prompt-campaign-key" />
           </div>
         )}
@@ -305,14 +309,14 @@ function PromptEditor({ value, onChange, onSave, onDelete, mode, onModeChange, p
             <label className="text-[10px] uppercase text-zinc-500 font-mono">First message (opcional)</label>
             <Input value={value.first_message || ""}
               onChange={(e) => onChange({ ...value, first_message: e.target.value })}
-              placeholder="Hola, ¿hablo con {customer_first_name}? Soy Sofía..."
+              placeholder="Hola, ¿hablo con {customer_first_name}? Le llamo de parte de…"
               data-testid="prompt-first-message" />
           </div>
           <div>
             <label className="text-[10px] uppercase text-zinc-500 font-mono">System prompt</label>
             <Textarea rows={16} value={value.system_prompt || ""}
               onChange={(e) => onChange({ ...value, system_prompt: e.target.value })}
-              placeholder="Eres Sofía... < 60s ... antifluido ... {product_name} en {carrier_name} ..."
+              placeholder="Eres el asistente de la empresa. Llamas a {customer_first_name} para… Habla claro y breve."
               className="font-mono text-xs"
               data-testid="prompt-system" />
           </div>
@@ -321,7 +325,7 @@ function PromptEditor({ value, onChange, onSave, onDelete, mode, onModeChange, p
               Variables permitidas (haz clic para insertar)
             </div>
             <div className="flex flex-wrap gap-1.5">
-              {ALL_VARS.map((v) => (
+              {ALL_VARS.filter((v) => hasCod || !COD_VARS.includes(v)).map((v) => (
                 <button key={v} onClick={() => insertVar(v)}
                   className="zx-skill-chip" data-testid={`prompt-var-${v}`}>
                   <Copy size={10} /> {"{" + v + "}"}
@@ -333,7 +337,7 @@ function PromptEditor({ value, onChange, onSave, onDelete, mode, onModeChange, p
           {/* Preview */}
           <div className="pt-3 border-t border-zinc-800">
             <div className="text-[10px] font-mono uppercase text-zinc-500 mb-2">
-              Vista previa con datos de ejemplo — María · Servientrega · Medellín · guía SGT-987
+              Vista previa con datos de ejemplo (inventados)
             </div>
             <div className="rounded border border-zinc-800 bg-zinc-950/60 p-3 space-y-2 max-h-64 overflow-y-auto">
               {rendered.fm && (
@@ -353,14 +357,16 @@ function PromptEditor({ value, onChange, onSave, onDelete, mode, onModeChange, p
         {/* Generate */}
         <TabsContent value="generate" className="space-y-3">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <Input placeholder="Producto (ej. Protector Antifluido Premium)"
+            <Input placeholder="Producto o servicio (ej. Plan Premium)"
               value={genForm.product}
               onChange={(e) => setGenForm({ ...genForm, product: e.target.value })}
               data-testid="gen-product" />
-            <Input placeholder="Transportadora principal (opcional)"
-              value={genForm.transportadora}
-              onChange={(e) => setGenForm({ ...genForm, transportadora: e.target.value })}
-              data-testid="gen-carrier" />
+            {hasCod && (
+              <Input placeholder="Transportadora principal (opcional)"
+                value={genForm.transportadora}
+                onChange={(e) => setGenForm({ ...genForm, transportadora: e.target.value })}
+                data-testid="gen-carrier" />
+            )}
           </div>
           <Textarea rows={3} placeholder="Beneficios (uno por línea)"
             value={genForm.beneficios}
@@ -380,7 +386,9 @@ function PromptEditor({ value, onChange, onSave, onDelete, mode, onModeChange, p
             {generating ? "Generando…" : "Generar con IA"}
           </Button>
           <p className="text-[11px] text-zinc-500">
-            El LLM (Groq por defecto) escribe un system prompt completo siguiendo el flujo LIT-LOG-RO (identidad → oficina → urgencia → fecha → extensión → guía).
+            {hasCod
+              ? "La IA escribe un guion completo para pedidos contra entrega (identidad → oficina → urgencia → fecha → extensión → guía). Revísalo antes de usarlo."
+              : "La IA escribe un guion completo a partir de estos datos. Revísalo y ajústalo antes de usarlo con clientes."}
           </p>
         </TabsContent>
       </Tabs>
