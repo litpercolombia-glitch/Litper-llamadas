@@ -14,12 +14,12 @@ API=$(grep REACT_APP_BACKEND_URL /app/frontend/.env | cut -d= -f2)
 # Register
 curl -s -c /tmp/c.txt -X POST "$API/api/auth/register" \
   -H "Content-Type: application/json" \
-  -d '{"email":"qa@litper.co","password":"Litper!2026","nombre":"QA","org_name":"Litper QA"}'
+  -d '{"email":"qa@litper.co","password":"<QA_PASSWORD>","nombre":"QA","org_name":"Litper QA"}'
 
 # Login (fresh cookie jar)
 curl -s -c /tmp/c.txt -X POST "$API/api/auth/login" \
   -H "Content-Type: application/json" \
-  -d '{"email":"qa@litper.co","password":"Litper!2026"}'
+  -d '{"email":"qa@litper.co","password":"<QA_PASSWORD>"}'
 
 # Me
 curl -s -b /tmp/c.txt "$API/api/auth/me"
@@ -52,7 +52,7 @@ Response sets the `litper_session` cookie and returns:
 ## Playwright bootstrap
 ```js
 await page.request.post('https://litper-hub.preview.emergentagent.com/api/auth/login', {
-  data: { email: 'qa@litper.co', password: 'Litper!2026' }
+  data: { email: 'qa@litper.co', password: '<QA_PASSWORD>' }
 });
 await page.goto('https://litper-hub.preview.emergentagent.com/app');
 ```

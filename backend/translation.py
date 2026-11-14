@@ -26,7 +26,7 @@ class LLMProvider:
     """Placeholder LLM provider — real implementation kept behind env flag.
     Falls back to library provider if LLM_API_KEY is missing.
     """
-    name = "llm:emergent_universal"
+    name = "llm:pendiente"
 
     def translate(self, text: str, source: str, target: str) -> str:
         key = os.environ.get("LLM_API_KEY", "").strip()

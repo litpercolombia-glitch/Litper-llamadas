@@ -5,8 +5,9 @@ import axios from "axios";
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
 /**
- * AuthCallback — silently exchanges the Emergent OAuth `session_id`
- * that comes back in the URL fragment for our own `litper_session` cookie.
+ * AuthCallback — intercambia en silencio el `session_id` que devuelve el
+ * proveedor externo de acceso con Google (solo si REACT_APP_GOOGLE_LOGIN=1)
+ * por nuestra propia cookie de sesión.
  *
  * Mounted synchronously by App.js *before* the router, so it always runs
  * before ProtectedRoute checks `/api/auth/me`.
@@ -38,7 +39,7 @@ export default function AuthCallback() {
           { headers: { "X-Session-ID": sid }, withCredentials: true, timeout: 15000 }
         );
         if (r.data?.ok) {
-          localStorage.setItem("litper_operator_ok", "1");
+          localStorage.setItem("zynex_session_ok", "1");
           nav("/app", { replace: true });
         } else {
           nav("/login?err=oauth", { replace: true });
