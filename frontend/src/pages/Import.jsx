@@ -131,7 +131,7 @@ export default function ImportPage() {
   return (
     <Layout
       title="Importar desde Dropi"
-      subtitle="Excel · CSV — consolidación combo-safe (1 orden = 1 fila incluso si tiene combos/promos)"
+      subtitle="Excel o CSV. Si un pedido trae varios productos o combos, se carga como un solo pedido."
     >
       {/* ---------- STEP 1: PICK FILE ---------- */}
       <section className="rounded-lg border border-zinc-800 bg-zinc-900/40 backdrop-blur-md p-6 mb-6"
