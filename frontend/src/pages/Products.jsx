@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import Layout from "../components/Layout";
+import EmptyState from "../components/EmptyState";
 import { api, formatCOP } from "../lib/api";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -22,7 +23,7 @@ function PromotionRow({ p, onChange, onDelete }) {
           value={p.sku_pattern || ""}
           onChange={(e) => onChange({ ...p, sku_pattern: e.target.value })}
           data-testid="promo-sku" />
-        <Input placeholder="Nombre comercial (que dice Sofía)"
+        <Input placeholder="Nombre comercial (el que dice el agente)"
           value={p.nombre_comercial || ""}
           onChange={(e) => onChange({ ...p, nombre_comercial: e.target.value })}
           data-testid="promo-name" />
@@ -103,7 +104,7 @@ function ProductEditor({ product, onSave, onCancel }) {
         <Textarea rows={3}
           value={p.instrucciones_llamada || ""}
           onChange={(e) => setP({ ...p, instrucciones_llamada: e.target.value })}
-          placeholder="Tono cálido, colombiano..."
+          placeholder="Tono cálido y cercano…"
           data-testid="product-instrucciones" />
       </div>
 
@@ -173,7 +174,7 @@ export default function ProductsPage() {
   return (
     <Layout
       title="Productos & Promociones"
-      subtitle="Cataloga tus productos y define las promos que se mencionan en las llamadas."
+      subtitle="Tu catálogo de productos o servicios, con precios y promociones."
       actions={<Button onClick={() => setEditing({})} data-testid="product-new-btn">
         <Plus size={14} /> Nuevo producto
       </Button>}
@@ -187,19 +188,15 @@ export default function ProductsPage() {
 
       {loading && <div className="text-zinc-400 text-sm">Cargando…</div>}
 
-      {!loading && items.length === 0 && (
-        <div className="border border-dashed border-zinc-700 rounded-lg p-10 text-center" data-testid="products-empty">
-          <Package size={32} className="mx-auto mb-3 text-zinc-600" weight="duotone" />
-          <div className="text-lg font-semibold text-white mb-1">Aún no tienes productos</div>
-          <p className="text-sm text-zinc-400 max-w-md mx-auto mb-4">
-            Agrega el tuyo para que Lyan lo mencione en cada llamada COD.
-          </p>
-          <Button onClick={() => setEditing({})}
-                  className="btn-cta-grad rounded-sm"
-                  data-testid="products-empty-create">
-            <Plus size={14} className="mr-1" /> Agrega el tuyo
-          </Button>
-        </div>
+      {!loading && items.length === 0 && editing === null && (
+        <EmptyState
+          icon={Package}
+          testId="products-empty"
+          title="Aún no tienes productos ni servicios"
+          description="Tu catálogo le dice a los agentes qué ofreces y a qué precio, para que respondan bien a tus clientes."
+          action={{ label: "Agregar el primero", onClick: () => setEditing({}) }}
+          prompt="Agrega a mi catálogo un producto o servicio. Te dicto el nombre y el precio."
+        />
       )}
 
       <div className="grid grid-cols-1 gap-4">
