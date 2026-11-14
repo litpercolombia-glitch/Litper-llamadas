@@ -1,4 +1,6 @@
 """Iteration 17 — CEO Report → WhatsApp feature tests."""
+from _live import require_live  # pruebas contra servidor vivo: se saltan sin entorno
+require_live()
 import os
 import pytest
 import requests
@@ -13,8 +15,8 @@ if not BASE_URL:
                 break
 
 API = f"{BASE_URL}/api"
-EMAIL = "qa2@litper.co"
-PASSWORD = "Litper!2026"
+EMAIL = os.environ.get("QA_EMAIL", "")
+PASSWORD = os.environ.get("QA_PASSWORD", "")
 
 
 @pytest.fixture(scope="module")

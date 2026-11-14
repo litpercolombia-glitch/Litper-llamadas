@@ -2,6 +2,8 @@
 CEO report + novedades ticks scheduler endpoints, and regression on
 prior auth + 5-agent orchestrator behavior.
 """
+from _live import require_live  # pruebas contra servidor vivo: se saltan sin entorno
+require_live()
 import os
 import requests
 import pytest
@@ -21,9 +23,9 @@ if not BASE_URL:
 assert BASE_URL, "REACT_APP_BACKEND_URL missing"
 
 API = f"{BASE_URL}/api"
-EMAIL = "qa2@litper.co"
-PASSWORD = "Litper!2026"
-LEGACY_KEY = "litper_hub_pk_2026_prod_ChangeMe_9x2Kf7bQvE4mLnT8sZ3H"
+EMAIL = os.environ.get("QA_EMAIL", "")
+PASSWORD = os.environ.get("QA_PASSWORD", "")
+LEGACY_KEY = os.environ.get("PUBLIC_API_KEY", "")
 
 
 # ---------- fixtures ----------
