@@ -3,6 +3,8 @@
 Covers 4 new SIP endpoints + regressions.
 Prereqs: DIDWW_*, CALLER_ID_NUMBER, ELEVENLABS_AGENT_ID env vars are blank (preview default).
 """
+from _live import require_live  # pruebas contra servidor vivo: se saltan sin entorno
+require_live()
 import os
 import time
 import pytest
@@ -10,8 +12,8 @@ import requests
 from pymongo import MongoClient
 
 BASE_URL = os.environ["REACT_APP_BACKEND_URL"].rstrip("/") if os.environ.get("REACT_APP_BACKEND_URL") \
-    else "https://litper-hub.preview.emergentagent.com"
-API_KEY = "litper_hub_pk_2026_prod_ChangeMe_9x2Kf7bQvE4mLnT8sZ3H"
+    else ""
+API_KEY = os.environ.get("PUBLIC_API_KEY", "")
 H = {"X-API-Key": API_KEY, "Content-Type": "application/json"}
 
 
