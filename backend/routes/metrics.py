@@ -1,4 +1,15 @@
-"""Routes: /metrics — comprehensive KPI dashboard for COD llamadas-a-oficina."""
+"""Routes: /metrics — indicadores del negocio.
+
+Los costos y el retorno son ESTIMADOS con supuestos (margen, tasa base de
+pérdida, tipo de cambio, minutos por llamada, costos unitarios). La respuesta
+los declara bajo `supuestos` para que la interfaz los muestre. Los montos van
+en la MONEDA DEL PERFIL del cliente (`supuestos.moneda`).
+
+CLAVES: los nombres vigentes son neutros (norte.cpr, norte.roi, roi.total_cost,
+costos.totals.llamadas / telefonia / voz / whatsapp / ia / total). Las claves
+antiguas terminadas en `_cop` (cpr_cop, roi_cop, total_cop, twilio_cop…) se
+conservan SOLO como alias con el mismo valor para no romper integraciones
+viejas; su valor está en `supuestos.moneda`, no necesariamente en pesos."""
 from __future__ import annotations
 import os
 from collections import Counter, defaultdict
@@ -7,7 +18,7 @@ from fastapi import APIRouter, Depends, Query
 from typing import Optional
 
 from db import get_db
-from deps import require_api_key
+from deps import get_org, require_api_key
 from cadence import days_left as _days_left
 from data import semaphore_for
 
@@ -35,6 +46,28 @@ def _cost_config():
     }
 
 
+def fx_for(moneda: str, cfg: dict) -> tuple[float, str, bool]:
+    """(tipo de cambio USD→moneda, moneda efectiva de los montos, ¿definido?).
+
+    Los costos unitarios están en USD. Se convierten a la moneda del perfil con
+    USD_TO_<MONEDA> del entorno (USD_TO_COP trae un valor por defecto). Si no
+    hay tipo de cambio para esa moneda NO se inventa: los montos quedan en USD
+    y se avisa (`tipo_cambio_definido: false`)."""
+    moneda = (moneda or "USD").upper()
+    if moneda == "USD":
+        return 1.0, "USD", True
+    if moneda == "COP":
+        return cfg["usd_to_cop"], "COP", True
+    raw = os.environ.get(f"USD_TO_{moneda}", "").strip()
+    try:
+        rate = float(raw)
+        if rate > 0:
+            return rate, moneda, True
+    except ValueError:
+        pass
+    return 1.0, "USD", False
+
+
 def _iso(d: datetime | date) -> str:
     if isinstance(d, date) and not isinstance(d, datetime):
         d = datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
@@ -60,6 +93,20 @@ def _pct(num: float, den: float) -> float:
     return round((num / den) * 100, 1) if den else 0.0
 
 
+# Clave neutra → clave antigua (alias). Las neutras son las vigentes.
+COST_ALIASES = {"telefonia": "twilio_cop", "voz": "elevenlabs_cop",
+                "whatsapp": "whatsapp_cop", "ia": "llm_cop", "total": "total_cop"}
+
+
+def _neutral(b: dict) -> dict:
+    """Añade a un bloque de costos las claves neutras (telefonia, voz, llamadas,
+    whatsapp, ia, total) a partir de las antiguas `*_cop`, que quedan como alias."""
+    for new, old in COST_ALIASES.items():
+        b[new] = b.get(old, 0)
+    b["llamadas"] = round(b["telefonia"] + b["voz"], 2)
+    return b
+
+
 # ---------- endpoint ----------
 @router.get("", summary="Full KPI dashboard: NORTE + funnel + WhatsApp + operación + costos.")
 async def metrics(
@@ -67,9 +114,48 @@ async def metrics(
     date_to:   Optional[str] = Query(None, description="ISO date YYYY-MM-DD, inclusive."),
     country:   Optional[str] = Query(None),
     carrier_slug: Optional[str] = Query(None),
+    org: str = Depends(get_org),
 ):
+    return await compute_metrics(org, date_from, date_to, country, carrier_slug)
+
+
+async def compute_metrics(org: str, date_from: Optional[str] = None,
+                          date_to: Optional[str] = None,
+                          country: Optional[str] = None,
+                          carrier_slug: Optional[str] = None) -> dict:
+    """KPIs de UN cliente. Función plana (sin FastAPI) para poder llamarla desde
+    el scheduler y las herramientas del agente pasando siempre el org."""
     db = get_db()
     cfg = _cost_config()
+    from routes.org_profile import get_profile
+    profile = await get_profile(org)
+    fx, moneda, fx_ok = fx_for(profile.get("moneda"), cfg)
+    # A partir de aquí el "tipo de cambio" es el de la moneda del perfil.
+    cfg = {**cfg, "usd_to_cop": fx, "fx": fx, "moneda": moneda}
+    minutos_por_llamada = 2.0
+    cpr_target = round(5000 / 4200 * fx, 2)       # ≈ 1,19 USD por recuperado
+    supuestos = {
+        "moneda": moneda,
+        "moneda_perfil": (profile.get("moneda") or "USD").upper(),
+        "tipo_cambio_usd": fx,
+        "tipo_cambio_definido": fx_ok,
+        "margen_pct": cfg["cod_margin_pct"],
+        "tasa_base_pct": cfg["rto_baseline_pct"],
+        "minutos_por_llamada": minutos_por_llamada,
+        "costos_unitarios_usd": {
+            "telefonia_por_min": cfg["twilio_per_min"],
+            "voz_ia_por_min":    cfg["elevenlabs_per_min"],
+            "whatsapp_por_msg":  cfg["whatsapp_per_msg"],
+            "llm_por_1k_tokens": cfg["llm_per_1k"],
+        },
+        "costo_por_recuperado_objetivo": cpr_target,
+        "son_estimaciones": True,
+        "nota": ("Costos y retorno ESTIMADOS con estos supuestos (no son facturación real). "
+                 "Se configuran con COD_MARGIN_PCT, RTO_BASELINE_PCT, USD_TO_<MONEDA> y "
+                 "*_COST_PER_* en el servidor."
+                 + ("" if fx_ok else f" No hay tipo de cambio para {profile.get('moneda')}: "
+                                     "los costos se muestran en USD y el retorno NO es confiable.")),
+    }
 
     # Date range → default last 30 days
     today = datetime.now(timezone.utc).date()
@@ -79,7 +165,7 @@ async def metrics(
     to_iso = _iso(datetime(to_d.year, to_d.month, to_d.day, 23, 59, 59, tzinfo=timezone.utc))
 
     # Base filter for queue/orders
-    q_filter: dict = {}
+    q_filter: dict = {"org_id": org}
     if country:
         q_filter["country"] = country
     if carrier_slug:
@@ -92,7 +178,7 @@ async def metrics(
     queue_range_filter = {**q_filter,
                          "created_at": {"$gte": from_iso, "$lte": to_iso}}
     queue_range = await db.call_queue.find(queue_range_filter, {"_id": 0}).to_list(5000)
-    schedules = await db.call_schedules.find({}, {"_id": 0}).to_list(5000)
+    schedules = await db.call_schedules.find({"org_id": org}, {"_id": 0}).to_list(5000)
     q_ids_in_range = {q["id"] for q in queue_range}
     scheds_in_range = [s for s in schedules if s.get("queue_id") in q_ids_in_range]
 
@@ -113,8 +199,9 @@ async def metrics(
     # Cost model — approximate
     all_attempts = [a for s in scheds_in_range for a in s.get("attempts", [])]
     done_calls = [a for a in all_attempts if a.get("status") == "done" and a.get("channel") == "call"]
-    minutes = len(done_calls) * 2.0  # assume 2 min average per call
-    msg_range = await db.message_log.find({"created_at": {"$gte": from_iso, "$lte": to_iso}},
+    minutes = len(done_calls) * minutos_por_llamada  # supuesto: ver `supuestos`
+    msg_range = await db.message_log.find({"org_id": org,
+                                           "created_at": {"$gte": from_iso, "$lte": to_iso}},
                                            {"_id": 0, "created_at": 1, "channel": 1,
                                             "direction": 1, "provider": 1, "body": 1}).to_list(20000)
     msg_count = sum(1 for m in msg_range if m.get("channel") == "whatsapp")
@@ -125,8 +212,9 @@ async def metrics(
     llm_cost = (tokens_est / 1000.0) * cfg["llm_per_1k"]
     total_cost_usd = twilio_cost + elevenlabs_cost + whatsapp_cost + llm_cost
     total_cost_cop = total_cost_usd * cfg["usd_to_cop"]
-    cpr_cop = round(total_cost_cop / recovered, 0) if recovered else 0
-    roi = round(margin_recovered - total_cost_cop, 0)
+    nd = 0 if moneda == "COP" else 2          # decimales según la moneda
+    cpr_cop = round(total_cost_cop / recovered, nd) if recovered else 0
+    roi = round(margin_recovered - total_cost_cop, nd)
 
     # RTO reduction — baseline vs observed
     rto_current = _pct(lost, total_range)
@@ -138,14 +226,22 @@ async def metrics(
         "rto_reduction": {"value": rto_reduction, "baseline": cfg["rto_baseline_pct"],
                           "current": rto_current, "unit": "%",
                           "status": _status(rto_reduction, 15)},
-        "cpr_cop": {"value": cpr_cop, "unit": "COP",
-                    "target_max": 5000, "status": "green" if cpr_cop < 5000 else "amber" if cpr_cop < 10000 else "red"},
-        "roi_cop": {"value": roi, "recovered_value_cop": round(recovered_value, 0),
-                    "margin_recovered_cop": round(margin_recovered, 0),
-                    "total_cost_cop": round(total_cost_cop, 0),
-                    "unit": "COP",
-                    "status": "green" if roi > 0 else "red"},
+        "cpr": {"value": cpr_cop, "unit": moneda,
+                "target_max": cpr_target,
+                "status": "green" if cpr_cop < cpr_target else "amber" if cpr_cop < cpr_target * 2 else "red"},
+        "roi": {"value": roi, "recovered_value": round(recovered_value, 0),
+                "margin_recovered": round(margin_recovered, 0),
+                "total_cost": round(total_cost_cop, 0),
+                "unit": moneda,
+                # sin tipo de cambio, valor recuperado y costo están en monedas distintas
+                "confiable": fx_ok,
+                "status": "green" if roi > 0 else "red"},
     }
+    # Alias antiguos (mismo valor, en `supuestos.moneda`).
+    norte["roi"].update({"recovered_value_cop": norte["roi"]["recovered_value"],
+                         "margin_recovered_cop": norte["roi"]["margin_recovered"],
+                         "total_cost_cop": norte["roi"]["total_cost"]})
+    norte["cpr_cop"], norte["roi_cop"] = norte["cpr"], norte["roi"]
 
     # ------ GROUP B · FUNNEL / EMBUDO ------
     programados = len(all_attempts)  # planned attempts
@@ -215,8 +311,10 @@ async def metrics(
     # Simpler: of inbound-received phones, how many map to queue items now confirmed?
     phones_to_status = {}
     order_ids_by_phone: dict[str, list[str]] = defaultdict(list)
-    ords = await db.orders.find({"customer_phone": {"$in": list(inbound_phones)}} if inbound_phones else {"_id": 0},
-                                {"_id": 0, "customer_phone": 1, "id": 1}).to_list(2000)
+    ords = await db.orders.find({"org_id": org,
+                                 "customer_phone": {"$in": list(inbound_phones)}},
+                                {"_id": 0, "customer_phone": 1, "id": 1}).to_list(2000) \
+        if inbound_phones else []
     for o in ords:
         order_ids_by_phone[o["customer_phone"]].append(o["id"])
     for p in inbound_phones:
@@ -282,7 +380,7 @@ async def metrics(
     escalation_rate = _pct(escalados_range, total_range)
 
     tasks_range = await db.customer_tasks.find(
-        {"created_at": {"$gte": from_iso, "$lte": to_iso}},
+        {"org_id": org, "created_at": {"$gte": from_iso, "$lte": to_iso}},
         {"_id": 0, "type": 1, "status": 1}).to_list(5000)
     tasks_by_type = Counter(t.get("type", "otro") for t in tasks_range)
     tasks_open = sum(1 for t in tasks_range if t.get("status") in ("open", "in_progress"))
@@ -347,6 +445,7 @@ async def metrics(
         b["whatsapp_cop"] = round(b["whatsapp_cop"], 2)
         b["total_cop"] = round(b["twilio_cop"] + b["elevenlabs_cop"]
                               + b["whatsapp_cop"] + b["llm_cop"], 2)
+        _neutral(b)
     daily = sorted(days.values(), key=lambda x: x["date"])
 
     costos = {
@@ -361,7 +460,10 @@ async def metrics(
             "messages":       sum(x["messages"]     for x in daily),
         },
         "config": cfg,
+        "moneda": moneda,
+        "son_estimaciones": True,
     }
+    _neutral(costos["totals"])
 
     # ------ TREND 14 días ------
     trend_days = 14
@@ -394,7 +496,8 @@ async def metrics(
     since24 = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
     attempts_today_all = [a for s in schedules for a in s.get("attempts", [])
                          if (a.get("executed_at") or "") >= since24]
-    messages_24h = await db.message_log.count_documents({"created_at": {"$gte": since24}})
+    messages_24h = await db.message_log.count_documents(
+        {"org_id": org, "created_at": {"$gte": since24}})
 
     queue_by_status = dict(Counter(q.get("status", "unknown") for q in queue_current))
     return {
@@ -406,6 +509,9 @@ async def metrics(
         "operacion": operacion,
         "costos": costos,
         "trend": trend,
+        # Supuestos con los que se estimaron costos y retorno (mostrarlos en la UI).
+        "supuestos": supuestos,
+        "moneda": moneda,
         # Legacy compat with v1.0 dashboard
         "queue_by_status": queue_by_status,
         "queue_total": len(queue_current),
