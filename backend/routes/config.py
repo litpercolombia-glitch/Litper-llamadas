@@ -135,6 +135,20 @@ async def test_credentials(provider: str, request: Request):
         except Exception as e:
             return {"ok": False, "detail": str(e)}
 
+    if provider == "retell":
+        import httpx
+        api_key = creds.get("api_key") or ""
+        if not api_key:
+            return {"ok": False, "detail": "API key vacía."}
+        try:
+            async with httpx.AsyncClient(timeout=10) as x:
+                r = await x.get("https://api.retellai.com/list-agents",
+                                headers={"Authorization": f"Bearer {api_key}"})
+            return {"ok": r.status_code < 400,
+                    "detail": "auth OK" if r.status_code < 400 else f"HTTP {r.status_code}"}
+        except Exception as e:  # noqa: BLE001
+            return {"ok": False, "detail": type(e).__name__}
+
     if provider == "twilio":
         sid = creds.get("account_sid") or ""
         tok = creds.get("auth_token") or ""
