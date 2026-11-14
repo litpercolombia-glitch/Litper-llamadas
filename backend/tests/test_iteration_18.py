@@ -1,4 +1,6 @@
 """Iteration 18 — verify backend untouched, no seed data, empty responses."""
+from _live import require_live  # pruebas contra servidor vivo: se saltan sin entorno
+require_live()
 import os
 import requests
 import pytest
@@ -10,9 +12,9 @@ if not BASE_URL:
             if line.startswith("REACT_APP_BACKEND_URL="):
                 BASE_URL = line.strip().split("=", 1)[1].rstrip("/")
 
-EMAIL = "qa2@litper.co"
-PASSWORD = "Litper!2026"
-OPERATOR_KEY = "litper_hub_pk_2026_prod_ChangeMe_9x2Kf7bQvE4mLnT8sZ3H"
+EMAIL = os.environ.get("QA_EMAIL", "")
+PASSWORD = os.environ.get("QA_PASSWORD", "")
+OPERATOR_KEY = os.environ.get("PUBLIC_API_KEY", "")
 
 
 @pytest.fixture(scope="module")
