@@ -67,7 +67,8 @@ def _try_send_email(subject: str, body: str, reply_to: str | None) -> tuple[bool
 @router.post("", summary="Capture a feature request / bug report / suggestion.")
 async def submit_feedback(payload: FeedbackIn, request: Request):
     # Best-effort org/user attribution from the JWT cookie or X-Org-Id header.
-    org_id = request.headers.get("X-Org-Id", "").strip() or None
+    from tenant import org_from_request
+    org_id = org_from_request(request)   # nunca la cabecera X-Org-Id directa
     user_email = None
     try:
         from routes.auth import _decode, COOKIE_NAME
@@ -117,5 +118,7 @@ async def submit_feedback(payload: FeedbackIn, request: Request):
 
 
 @router.get("/count", summary="Simple counter (used to show operator karma later).")
-async def feedback_count():
-    return {"total": await get_db().feedback.count_documents({})}
+async def feedback_count(request: Request):
+    from tenant import org_from_request
+    return {"total": await get_db().feedback.count_documents(
+        {"org_id": org_from_request(request)})}
