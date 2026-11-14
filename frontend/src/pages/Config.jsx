@@ -12,14 +12,14 @@ import {
 
 const PROVIDER_META = {
   chatea_pro: {
-    label: "Chatea Pro · WhatsApp",
+    label: "WhatsApp · con tu cuenta de Chatea Pro",
     doc: "https://chateapro.app/settings#/api",
     hint: "Obtén el token en Chatea Pro → Configuración → API tokens.",
   },
   telnyx: {
     label: "Telnyx · SIP (primario)",
     doc: "https://portal.telnyx.com",
-    hint: "Compra un número CO, crea una Voice/SIP Connection y guarda API Key + Connection ID.",
+    hint: "Compra un número de tu país, crea una Voice/SIP Connection y guarda API Key + Connection ID.",
   },
   elevenlabs: {
     label: "ElevenLabs · Voz IA",
@@ -105,7 +105,7 @@ export default function ConfigPage() {
 
   return (
     <Layout
-      title="Configuración · Credenciales"
+      title="Credenciales"
       subtitle="Cada organización guarda sus propias llaves — encriptadas en el servidor. NUNCA se muestran en el navegador."
     >
       <div className="mb-4 rounded-lg border border-emerald-500/25 bg-emerald-500/5 backdrop-blur-md p-3 text-xs text-emerald-200 flex gap-2 items-start"

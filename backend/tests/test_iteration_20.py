@@ -1,14 +1,16 @@
 """Iteration 20 backend tests: branding, profile CRUD, feedback, zero-demo, intact APIs."""
+from _live import require_live  # pruebas contra servidor vivo: se saltan sin entorno
+require_live()
 import os
 import base64
 import pytest
 import requests
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://litper-hub.preview.emergentagent.com").rstrip("/")
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
 API = f"{BASE_URL}/api"
 
-EMAIL = "qa2@litper.co"
-PASSWORD = "Litper!2026"
+EMAIL = os.environ.get("QA_EMAIL", "")
+PASSWORD = os.environ.get("QA_PASSWORD", "")
 
 
 @pytest.fixture(scope="module")
@@ -84,17 +86,17 @@ def test_profile_update_nombre(session):
 
 def test_password_wrong_current(session):
     r = session.put(f"{API}/auth/password",
-                    json={"current_password": "WRONG_pw_xyz", "new_password": "Litper!2026x"})
+                    json={"current_password": "WRONG_pw_xyz", "new_password": (PASSWORD + "x")})
     assert r.status_code == 401
 
 
 def test_password_change_and_revert(session):
     r = session.put(f"{API}/auth/password",
-                    json={"current_password": PASSWORD, "new_password": "Litper!2026x"})
+                    json={"current_password": PASSWORD, "new_password": (PASSWORD + "x")})
     assert r.status_code == 200, r.text
     # Revert
     r2 = session.put(f"{API}/auth/password",
-                     json={"current_password": "Litper!2026x", "new_password": PASSWORD})
+                     json={"current_password": (PASSWORD + "x"), "new_password": PASSWORD})
     assert r2.status_code == 200, f"Revert failed: {r2.text}"
 
 

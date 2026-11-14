@@ -1,20 +1,17 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../components/Layout";
-import HowItWorks from "../components/HowItWorks";
+import EmptyState from "../components/EmptyState";
+import SupuestosList, { EstimadoBadge, findSupuestos, declaredCurrency } from "../components/Supuestos";
 import { api } from "../lib/api";
-import { Button } from "../components/ui/button";
+import { formatMoney, useOrgProfile } from "../lib/assistant";
+import { usePacks } from "../lib/packs";
 import {
-  CurrencyCircleDollar, TrendUp, Package, TrendDown,
-  Truck, MapPin, ArrowRight, ChartLineUp,
+  CurrencyCircleDollar, TrendUp, TrendDown, Truck, MapPin, ChartLineUp,
+  ListChecks, PhoneCall, Receipt,
 } from "@phosphor-icons/react";
 
-function fmtCOP(v) {
-  if (v == null || Number.isNaN(v)) return "$0";
-  return `$${Math.round(v).toLocaleString("es-CO")}`;
-}
-
-function StarCard({ label, value, sub, tone = "cyan", icon: Icon, testId }) {
+function StarCard({ label, value, sub, tone = "cyan", icon: Icon, testId, estimado = false, children }) {
   const bar = tone === "green" ? "from-emerald-500/40" :
               tone === "amber" ? "from-yellow-500/40" :
               tone === "red"   ? "from-red-500/40" :
@@ -22,160 +19,195 @@ function StarCard({ label, value, sub, tone = "cyan", icon: Icon, testId }) {
   return (
     <div data-testid={testId}
          className={`relative rounded-sm border border-zinc-800 bg-gradient-to-br ${bar} to-transparent p-6 overflow-hidden`}>
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between gap-2 mb-4">
         <div className="text-[10px] uppercase tracking-widest font-mono text-zinc-400">{label}</div>
-        {Icon && <Icon size={20} weight="duotone" className="text-white/70" />}
+        <div className="flex items-center gap-2">
+          {estimado && <EstimadoBadge />}
+          {Icon && <Icon size={20} weight="duotone" className="text-white/70" />}
+        </div>
       </div>
-      <div className="text-4xl font-semibold text-white mb-2">{value}</div>
+      <div className="text-4xl font-semibold text-white mb-2 break-words">{value}</div>
       {sub && <div className="text-xs text-zinc-400">{sub}</div>}
+      {children}
     </div>
   );
 }
 
-function EmptyState({ onImport, onOpenCopilot }) {
+function Breakdown({ title, icon: Icon, rows, money, testId }) {
   return (
-    <div className="border border-dashed border-zinc-800 rounded-sm p-10 text-center bg-zinc-900/30"
-         data-testid="metricas-empty">
-      <ChartLineUp size={40} className="mx-auto mb-4 text-zinc-600" weight="duotone" />
-      <h3 className="text-lg font-semibold text-white mb-1">Aún no hay métricas</h3>
-      <p className="text-sm text-zinc-400 max-w-md mx-auto mb-5">
-        Corre tu primer rescate para ver <b className="text-white">$ recuperado</b>, entrega efectiva y
-        devoluciones evitadas.
-      </p>
-      <div className="flex flex-wrap justify-center gap-2">
-        <Button onClick={onImport} className="btn-cta-grad rounded-sm" data-testid="metricas-cta-importar">
-          Importar Excel de Dropi <ArrowRight size={14} className="ml-1" />
-        </Button>
-        <Button onClick={onOpenCopilot} variant="outline"
-                className="rounded-sm border-zinc-700 bg-zinc-900 hover:bg-zinc-800"
-                data-testid="metricas-cta-copilot">
-          Abrir Copilot
-        </Button>
+    <div className="border border-zinc-800 rounded-sm p-5 bg-zinc-900/30" data-testid={testId}>
+      <div className="text-[10px] uppercase tracking-widest font-mono text-zinc-500 mb-4 flex items-center gap-2">
+        <Icon size={13} weight="duotone" /> {title}
       </div>
+      {rows.length === 0 ? (
+        <div className="text-xs text-zinc-500">Sin datos aún.</div>
+      ) : (
+        <div className="space-y-2">
+          {rows.map(({ k, v }) => (
+            <div key={k} className="flex items-center justify-between text-sm">
+              <span className="text-zinc-300">{k}</span>
+              <span className="text-white font-mono">{money(v)}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
+
+const pct = (v) => (v == null || Number.isNaN(Number(v)) ? "—" : `${v}%`);
 
 export default function MetricasPage() {
   const nav = useNavigate();
+  const { loaded: packsLoaded, hasCod } = usePacks();
+  const profile = useOrgProfile();
   const [m, setM] = useState(null);
   const [byCarrier, setByCarrier] = useState([]);
   const [byCity, setByCity] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     (async () => {
       try {
         const r = await api.get("/metrics");
         setM(r.data);
-        // Group orders by carrier/city on the client from queue.
+      } catch { setError(true); }
+      finally { setLoading(false); }
+    })();
+  }, []);
+
+  // Desglose por transportadora y ciudad: solo con el paquete de contra entrega.
+  useEffect(() => {
+    if (!hasCod) return;
+    (async () => {
+      try {
         const q = await api.get("/queue", { params: { limit: 500 } });
-        const rows = q.data || [];
         const carr = {}; const cty = {};
-        rows.forEach((x) => {
-          const isRec = x.status === "confirmado" || x.status === "ya_recogio";
-          if (!isRec) return;
+        (q.data || []).forEach((x) => {
+          if (!(x.status === "confirmado" || x.status === "ya_recogio")) return;
           const c = x.carrier_name || x.carrier_slug || "—";
           const t = x.city || "—";
           carr[c] = (carr[c] || 0) + (x.total_amount || 0);
           cty[t]  = (cty[t]  || 0) + (x.total_amount || 0);
         });
-        setByCarrier(Object.entries(carr).map(([k, v]) => ({ k, v })).sort((a, b) => b.v - a.v).slice(0, 5));
-        setByCity(Object.entries(cty).map(([k, v]) => ({ k, v })).sort((a, b) => b.v - a.v).slice(0, 5));
-      } finally { setLoading(false); }
+        const top = (o) => Object.entries(o).map(([k, v]) => ({ k, v })).sort((a, b) => b.v - a.v).slice(0, 5);
+        setByCarrier(top(carr)); setByCity(top(cty));
+      } catch { /* el desglose es opcional */ }
     })();
-  }, []);
+  }, [hasCod]);
 
   const norte = m?.norte || {};
-  const roi = norte.roi_cop || {};
-  const recovered = roi.recovered_value_cop || 0;
-  const recoveryRate = norte.recovery_rate?.value || 0;
-  const rtoReduction = norte.rto_reduction?.value || 0;
-  const ordersTotal = m?.orders_total || 0;
+  const roi = norte.roi || {};
+  const supuestos = findSupuestos(m);
+  // Moneda: la que declare el servidor para estas cifras; si no, la del perfil del negocio.
+  const currency = declaredCurrency(m) || profile?.moneda || "";
+  const money = (v) => formatMoney(v, currency);
 
-  const isEmpty = !loading && ordersTotal === 0;
+  const actividad = (m?.orders_total || 0) + (m?.queue_total || 0)
+    + ((m?.funnel?.stages || []).reduce((n, s) => n + (s.count || 0), 0));
+  const isEmpty = !loading && !error && actividad === 0;
+  const ready = !loading && !error && !isEmpty && packsLoaded;
 
   return (
     <Layout
       title="Métricas"
-      subtitle="Solo lo que mueve la aguja: $ recuperado, entrega efectiva, devoluciones evitadas."
+      subtitle="Los resultados de tu operación, en números."
     >
-      <HowItWorks
-        testIdPrefix="metricas-howitworks"
-        intro="Solo métricas de North Star: cuánto dinero recuperó Lyan, cuál es tu tasa de entrega efectiva y cuántas devoluciones evitaste."
-        steps={[
-          "Corre tu primer rescate — la cascada de 5 agentes activa las métricas.",
-          "Ves el $ recuperado por transportadora y por ciudad.",
-          "Compara semana a semana para probar el impacto real.",
-        ]}
-      />
       {loading && <div className="text-zinc-500 font-mono text-sm">Cargando…</div>}
+
+      {error && (
+        <div className="border border-red-500/30 bg-red-500/10 text-red-300 text-sm rounded-sm p-3" role="alert"
+             data-testid="metricas-error">
+          No pudimos cargar las métricas. Recarga la página para intentarlo de nuevo.
+        </div>
+      )}
 
       {isEmpty && (
         <EmptyState
-          onImport={() => nav("/app/pedidos?tab=importar")}
-          onOpenCopilot={() => nav("/app")}
+          icon={ChartLineUp}
+          testId="metricas-empty"
+          title="Aún no hay métricas"
+          description="Aquí verás los resultados de tu operación en cuanto haya actividad real: crea tu primer agente y ponlo a trabajar."
+          action={hasCod
+            ? { label: "Importar un archivo", onClick: () => nav("/app/pedidos?tab=importar") }
+            : { label: "Crear un agente", onClick: () => nav("/app/ajustes?tab=agentes") }}
+          prompt="Resume mis resultados de esta semana y dime qué puedo mejorar."
         />
       )}
 
-      {!loading && !isEmpty && (
+      {ready && (
         <>
-          {/* North Star */}
+          {/* Cifras medidas (sin supuestos) */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <StarCard label="$ Recuperado (30 días)"
-                      value={fmtCOP(recovered)}
-                      sub={`${recoveryRate}% de tasa de recuperación`}
-                      tone="green" icon={CurrencyCircleDollar}
-                      testId="star-recuperado" />
-            <StarCard label="Entrega efectiva"
-                      value={`${recoveryRate}%`}
-                      sub={`${m?.queue_total || 0} pedidos activos`}
-                      tone="cyan" icon={TrendUp}
-                      testId="star-entrega" />
-            <StarCard label="Devoluciones evitadas"
-                      value={`${rtoReduction}%`}
-                      sub={`baseline ${norte.rto_reduction?.baseline || 0}% → ${norte.rto_reduction?.current || 0}%`}
-                      tone="amber" icon={TrendDown}
-                      testId="star-devoluciones" />
+            {hasCod ? (
+              <>
+                <StarCard label="Valor de pedidos recuperados"
+                          value={money(roi.recovered_value || 0)}
+                          sub="Suma del valor de los pedidos confirmados o recogidos."
+                          tone="green" icon={CurrencyCircleDollar}
+                          testId="star-recuperado" />
+                <StarCard label="Tasa de recuperación"
+                          value={pct(norte.recovery_rate?.value ?? 0)}
+                          sub={`${m?.queue_total || 0} pedidos en el periodo`}
+                          tone="cyan" icon={TrendUp}
+                          testId="star-entrega" />
+              </>
+            ) : (
+              <>
+                <StarCard label="Pendientes en el periodo"
+                          value={(m?.queue_total || 0).toLocaleString("es")}
+                          sub={`${m?.operacion?.tasks_open ?? 0} tickets abiertos`}
+                          tone="cyan" icon={ListChecks}
+                          testId="star-pendientes" />
+                <StarCard label="Llamadas contestadas"
+                          value={pct(m?.funnel?.connect_rate?.value)}
+                          sub="De las llamadas que hicieron tus agentes."
+                          tone="green" icon={PhoneCall}
+                          testId="star-contacto" />
+              </>
+            )}
+            <StarCard label="Costo de uso del periodo"
+                      value={money(m?.costos?.totals?.total)} estimado
+                      sub="Estimado: llamadas, WhatsApp e inteligencia artificial."
+                      tone="amber" icon={Receipt}
+                      testId="star-costo" />
           </div>
 
-          {/* Breakdown */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-            <div className="border border-zinc-800 rounded-sm p-5 bg-zinc-900/30" data-testid="breakdown-carrier">
-              <div className="text-[10px] uppercase tracking-widest font-mono text-zinc-500 mb-4 flex items-center gap-2">
-                <Truck size={13} weight="duotone" /> $ recuperado por transportadora
-              </div>
-              {byCarrier.length === 0 ? (
-                <div className="text-xs text-zinc-500">Sin recuperaciones aún.</div>
-              ) : (
-                <div className="space-y-2">
-                  {byCarrier.map(({ k, v }) => (
-                    <div key={k} className="flex items-center justify-between text-sm">
-                      <span className="text-zinc-300">{k}</span>
-                      <span className="text-white font-mono">{fmtCOP(v)}</span>
-                    </div>
-                  ))}
-                </div>
+          {/* Cifras estimadas: solo si la API declara sus supuestos */}
+          {supuestos ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4" data-testid="metricas-estimados">
+              <StarCard label="Retorno" estimado
+                        value={money(roi.value)}
+                        sub="Margen de lo recuperado menos el costo de uso."
+                        tone={Number(roi.value) >= 0 ? "green" : "red"} icon={CurrencyCircleDollar}
+                        testId="star-roi">
+                <SupuestosList rows={supuestos} testId="star-roi-supuestos" />
+              </StarCard>
+              {hasCod && (
+                <StarCard label="Devoluciones evitadas" estimado
+                          value={pct(norte.rto_reduction?.value ?? 0)}
+                          sub={`Tasa base ${norte.rto_reduction?.baseline ?? "—"}% → actual ${norte.rto_reduction?.current ?? "—"}%`}
+                          tone="amber" icon={TrendDown}
+                          testId="star-devoluciones">
+                  <SupuestosList rows={supuestos} testId="star-devoluciones-supuestos" />
+                </StarCard>
               )}
             </div>
-            <div className="border border-zinc-800 rounded-sm p-5 bg-zinc-900/30" data-testid="breakdown-city">
-              <div className="text-[10px] uppercase tracking-widest font-mono text-zinc-500 mb-4 flex items-center gap-2">
-                <MapPin size={13} weight="duotone" /> $ recuperado por ciudad
-              </div>
-              {byCity.length === 0 ? (
-                <div className="text-xs text-zinc-500">Sin recuperaciones aún.</div>
-              ) : (
-                <div className="space-y-2">
-                  {byCity.map(({ k, v }) => (
-                    <div key={k} className="flex items-center justify-between text-sm">
-                      <span className="text-zinc-300">{k}</span>
-                      <span className="text-white font-mono">{fmtCOP(v)}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
+          ) : (
+            <p className="text-xs text-zinc-500 mt-4" data-testid="metricas-sin-estimados">
+              El retorno no se muestra: es una cifra estimada y el servidor no envió los supuestos con los que se calcula.
+            </p>
+          )}
+
+          {hasCod && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+              <Breakdown title="Valor recuperado por transportadora" icon={Truck}
+                         rows={byCarrier} money={money} testId="breakdown-carrier" />
+              <Breakdown title="Valor recuperado por ciudad" icon={MapPin}
+                         rows={byCity} money={money} testId="breakdown-city" />
             </div>
-          </div>
+          )}
         </>
       )}
     </Layout>
