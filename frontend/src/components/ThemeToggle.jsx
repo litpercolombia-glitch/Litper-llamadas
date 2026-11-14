@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Sun, Moon } from "@phosphor-icons/react";
 
-const KEY = "litper-theme";
+const KEY = "zynex-theme";
 
 export function useTheme() {
   const [theme, setTheme] = useState(() => localStorage.getItem(KEY) || "night");

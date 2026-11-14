@@ -7,5 +7,5 @@ router = APIRouter(tags=["health"])
 
 @router.get("/health", summary="Liveness probe (no auth).")
 async def health():
-    return {"ok": True, "service": "litper-connect-hub",
+    return {"ok": True, "service": "zynex-os",
             "ts": datetime.now(timezone.utc).isoformat()}

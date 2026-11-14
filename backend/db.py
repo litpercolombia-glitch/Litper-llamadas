@@ -1,4 +1,4 @@
-"""MongoDB connection singleton for Litper Connect Hub."""
+"""MongoDB connection singleton for Zynex OS."""
 import os
 from motor.motor_asyncio import AsyncIOMotorClient
 
