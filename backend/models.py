@@ -1,9 +1,16 @@
-"""Pydantic models for Litper Connect Hub."""
+"""Pydantic models for Zynex OS (multi-cliente, cualquier país/moneda)."""
 from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Optional, Literal
-from pydantic import BaseModel, Field, ConfigDict
+from typing import Annotated, Any, Optional, Literal
+from pydantic import BaseModel, Field, ConfigDict, StringConstraints
+
+# País y moneda ABIERTOS: cualquier código ISO (3166-1 alfa-2/3 · 4217), no solo
+# CO/EC/CL. Se aceptan también los valores históricos "OTHER"/"OTRO".
+CountryCode = Annotated[str, StringConstraints(strip_whitespace=True, min_length=2,
+                                               max_length=5, pattern=r"^[A-Za-z]+$")]
+CurrencyCode = Annotated[str, StringConstraints(strip_whitespace=True, min_length=3,
+                                                max_length=5, pattern=r"^[A-Za-z]+$")]
 
 
 def _now_iso() -> str:
@@ -37,15 +44,21 @@ class OrderIn(BaseModel):
     customer_email: Optional[str] = None
     address: Optional[str] = ""
     city: Optional[str] = ""
-    country: Literal["CO", "EC", "CL"] = "CO"
+    # None → se toma del perfil del cliente (org_profiles) al crear el pedido.
+    country: Optional[CountryCode] = None
     total_amount: float = 0
-    currency: str = "COP"
-    carrier_slug: str = Field(..., description="Slug of the carrier (see /carriers)")
+    currency: Optional[CurrencyCode] = None
+    # Opcional: un "pedido" puede ser una cita, un cobro o un lead (sin envío).
+    carrier_slug: Optional[str] = Field(
+        None, description="Slug de la transportadora (ver /carriers). Opcional: sin ella "
+                          "el registro no entra a la cola de reclamo en oficina.")
+    # Tipo libre de registro: "pedido" (por defecto), "cita", "cobro", "lead", …
+    tipo: str = Field("pedido", min_length=1, max_length=40)
     tracking_number: Optional[str] = None
     products: list[Product] = []
     # Dropi combo/promo support: many rows per order collapse into one order
     # with a list of items. products_display renders it e.g.
-    #   "Protector Antifluido (Verde Menta/Doble) + Protector Antifluido (Lila/Semi)"
+    #   "Producto A (Verde/Doble) + Producto A (Lila/Sencillo)"
     items: list[OrderItem] = []
     items_count: int = 0
     is_combo: bool = False
@@ -169,7 +182,8 @@ TASK_TYPES = ["cambio_direccion", "factura", "mas_dias", "cambio_oficina", "otro
 class TaskIn(BaseModel):
     order_id: Optional[str] = None
     queue_id: Optional[str] = None
-    type: Literal["cambio_direccion", "factura", "mas_dias", "cambio_oficina", "otro"] = "otro"
+    # Tipo ABIERTO (texto libre): cada negocio usa los suyos.
+    type: str = Field("otro", min_length=1, max_length=60)
     description: str
     source: Literal["customer", "agent", "ai", "webhook"] = "agent"
     assigned_to: Optional[str] = None
@@ -188,7 +202,7 @@ class TaskUpdate(BaseModel):
     description: Optional[str] = None
     assigned_to: Optional[str] = None
     due_at: Optional[str] = None
-    type: Optional[Literal["cambio_direccion", "factura", "mas_dias", "cambio_oficina", "otro"]] = None
+    type: Optional[str] = Field(None, min_length=1, max_length=60)
 
 
 # ---------- CARRIER ----------
@@ -251,8 +265,8 @@ class TranslateResponse(BaseModel):
 class VoiceProfileIn(BaseModel):
     name: str = Field(..., description="Nombre corto, ej. 'Sofía CO'.")
     elevenlabs_voice_id: str
-    language: Literal["es-CO", "es-EC", "es-CL", "es-MX", "es-AR", "es", "en", "pt"] = "es-CO"
-    country: Literal["CO", "EC", "CL", "OTHER"] = "CO"
+    language: str = Field("es-CO", min_length=2, max_length=10, description="BCP-47, ej. es-MX, en-US.")
+    country: CountryCode = "CO"
     is_default: bool = False
     description: str = ""
 
@@ -267,7 +281,7 @@ class VoiceProfileUpdate(BaseModel):
     name: Optional[str] = None
     elevenlabs_voice_id: Optional[str] = None
     language: Optional[str] = None
-    country: Optional[Literal["CO", "EC", "CL", "OTHER"]] = None
+    country: Optional[CountryCode] = None
     is_default: Optional[bool] = None
     description: Optional[str] = None
 
@@ -275,7 +289,7 @@ class VoiceProfileUpdate(BaseModel):
 # ---------- CONNECTED NUMBERS (Twilio verified caller IDs) ----------
 class NumberVerifyStart(BaseModel):
     phone_number: str = Field(..., description="Número en formato E.164, ej. +573001234567")
-    country: Literal["CO", "EC", "CL", "OTHER"] = "CO"
+    country: CountryCode = "CO"
     friendly_name: Optional[str] = None
 
 
@@ -287,7 +301,7 @@ class NumberImport(BaseModel):
     phone_number: str
     twilio_sid: Optional[str] = None
     friendly_name: Optional[str] = None
-    country: Literal["CO", "EC", "CL", "OTHER"] = "CO"
+    country: CountryCode = "CO"
 
 
 class ConnectedNumber(BaseModel):
@@ -295,7 +309,7 @@ class ConnectedNumber(BaseModel):
     phone_number: str
     friendly_name: Optional[str] = None
     country: str = "CO"
-    provider: Literal["twilio", "manual", "didww_sip"] = "twilio"
+    provider: Literal["twilio", "manual", "didww_sip", "telnyx_sip"] = "twilio"
     status: Literal["pending", "verified", "failed", "imported", "sip_registered"] = "pending"
     validation_code: Optional[str] = None
     call_sid: Optional[str] = None
@@ -436,7 +450,7 @@ class ProductUpdate(BaseModel):
 class VipLeadIn(BaseModel):
     nombre: str
     whatsapp: str = Field(..., description="Ej. +573001234567")
-    pais: Literal["CO", "EC", "CL", "MX", "PE", "AR", "OTRO"] = "CO"
+    pais: CountryCode = "CO"
     pedidos_semana: Optional[str] = Field(None, description="Rango: <50, 50-200, 200-500, 500+")
     email: Optional[str] = None
     utm: dict[str, Any] = {}
@@ -454,11 +468,11 @@ class VipLead(VipLeadIn):
 class PromptIn(BaseModel):
     name: str
     scope: Literal["global", "product", "campaign"] = "global"
-    country: Optional[Literal["CO", "EC", "CL"]] = None
+    country: Optional[CountryCode] = None
     product_id: Optional[str] = None
     campaign_key: Optional[str] = Field(
         None, description="Free-form key used to match a campaign (e.g. carrier slug or shopify campaign)")
-    system_prompt: str = Field(..., description="Sofía's full system prompt (Colombian, <60s, antifluido).")
+    system_prompt: str = Field(..., description="Full system prompt of the voice agent.")
     first_message: str = Field("", description="Optional opening line.")
     variables: list[str] = Field(default_factory=list,
                                  description="Whitelist of allowed variables; UI-only reference.")
@@ -476,7 +490,7 @@ class Prompt(PromptIn):
 class PromptUpdate(BaseModel):
     name: Optional[str] = None
     scope: Optional[Literal["global", "product", "campaign"]] = None
-    country: Optional[Literal["CO", "EC", "CL"]] = None
+    country: Optional[CountryCode] = None
     product_id: Optional[str] = None
     campaign_key: Optional[str] = None
     system_prompt: Optional[str] = None
@@ -492,16 +506,19 @@ class PromptGenerateIn(BaseModel):
     beneficios: str = ""
     objeciones: str = ""
     transportadora: str = ""
-    tono: str = Field("colombiano cálido y directo",
-                      description="Adjective/style for Sofía's tone.")
-    country: Literal["CO", "EC", "CL"] = "CO"
+    tono: str = Field("cálido y directo",
+                      description="Adjective/style for the agent's tone.")
+    # Qué debe lograr la llamada (flujo genérico). Vacío → se deduce del perfil.
+    objetivo: str = Field("", max_length=600)
+    # None → país del perfil del negocio.
+    country: Optional[CountryCode] = None
     model: Optional[str] = None  # forwarded to the LLM router
 
 
 class PromptResolveIn(BaseModel):
     order_id: Optional[str] = None
     product_id: Optional[str] = None
-    country: Optional[Literal["CO", "EC", "CL"]] = None
+    country: Optional[CountryCode] = None
     carrier_slug: Optional[str] = None
 
 
