@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import Layout from "../components/Layout";
-import HowItWorks from "../components/HowItWorks";
+import EmptyState from "../components/EmptyState";
+import AgentFromPrompt from "../components/AgentFromPrompt";
+import { useAssistantName } from "../lib/assistant";
 import { api } from "../lib/api";
 import { toast } from "sonner";
 import { Button } from "../components/ui/button";
@@ -103,7 +105,10 @@ function Wizard({ initial, templates, tools, voices, onCancel, onSaved }) {
     try {
       const r = await api.post(`/custom-agents/${draft.id}/test-call`, { numero: draft.numero.trim() });
       setTestResult(r.data);
-      if (r.data?.ok) toast.success(r.data?.detail || "Prueba OK.");
+      // Solo es un éxito si de verdad se marcó. Sin telefonía conectada el
+      // servidor responde ok:false + error: se muestra como aviso, no en verde.
+      if (r.data?.ok && r.data?.dialed !== false) toast.success(r.data?.detail || "Llamada iniciada.");
+      else toast.warning(r.data?.error || r.data?.detail || "No se hizo la llamada.");
     } catch (e) {
       toast.error(e?.response?.data?.detail || "Falló la prueba.");
     } finally { setSavingCall(false); }
@@ -131,7 +136,7 @@ function Wizard({ initial, templates, tools, voices, onCancel, onSaved }) {
       {step === 0 && (
         <div data-testid="agentwiz-step-proposito" className="space-y-3">
           <div className="text-sm text-zinc-300 mb-2">
-            ¿Qué quieres que haga tu agente? Elige una plantilla — Lyan te pre-llenará el prompt.
+            ¿Qué quieres que haga tu agente? Elige una plantilla y el guion se rellena solo.
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             {templates.map((t) => (
@@ -157,7 +162,7 @@ function Wizard({ initial, templates, tools, voices, onCancel, onSaved }) {
           <div>
             <label className="text-xs text-zinc-400 block mb-1">Nombre del agente</label>
             <Input value={draft.nombre} onChange={(e) => set({ nombre: e.target.value })}
-                   placeholder="Ej: Sofía · Rescate Envía"
+                   placeholder="Ej: Recordatorio de citas"
                    data-testid="agentwiz-nombre"
                    className="bg-black/40 border-zinc-700 text-white" />
           </div>
@@ -193,7 +198,7 @@ function Wizard({ initial, templates, tools, voices, onCancel, onSaved }) {
                      data-testid="agentwiz-prompt"
                      className="bg-black/40 border-zinc-700 text-white font-mono text-xs" />
             <p className="text-[10px] text-zinc-500 mt-1">
-              Usa <code className="text-cyan-300">{"{{variable}}"}</code>. Nunca digas "impermeable".
+              Usa <code className="text-cyan-300">{"{{variable}}"}</code> para los datos que cambian en cada llamada.
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -285,12 +290,16 @@ function Wizard({ initial, templates, tools, voices, onCancel, onSaved }) {
           </div>
           {testResult && (
             <div data-testid="agentwiz-testresult"
+                 role="status"
                  className={`text-xs px-3 py-2 rounded-sm border ${
-                   testResult.ok
+                   testResult.ok && testResult.dialed !== false
                      ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
-                     : "border-red-500/40 bg-red-500/10 text-red-200"
+                     : testResult.beta
+                       ? "border-yellow-500/40 bg-yellow-500/10 text-yellow-200"
+                       : "border-red-500/40 bg-red-500/10 text-red-200"
                  }`}>
-              {testResult.beta && <b>BETA · </b>}{testResult.detail}
+              {!(testResult.ok && testResult.dialed !== false) && <b>No se llamó · </b>}
+              {testResult.error || testResult.detail}
             </div>
           )}
         </div>
@@ -353,23 +362,25 @@ export default function AgentesPage() {
   };
 
   const activeDraft = useMemo(() => editing || null, [editing]);
+  const asistente = useAssistantName();
 
   return (
     <Layout title="Agentes"
-            subtitle="Crea tu propio agente de voz para rescate, confirmación o cobranza. Beta.">
-      <HowItWorks
-        testIdPrefix="agentes-howitworks"
-        intro="Los 5 agentes operativos (Riesgo, COD, Novedades, Rescate, Analítica) siguen firmes. Aquí construyes agentes propios para casos particulares — como plantillas de Vapi o Retell."
-        steps={[
-          "Elige una plantilla (rescate, confirmación, citas, cobranza) o parte de cero.",
-          "Personaliza el guion con variables tipo {{nombre}} o {{producto}}.",
-          "Selecciona la voz y las acciones (herramientas) habilitadas.",
-          "Pega tu número y prueba la llamada — Beta: si aún no conectas voz, valida el config.",
-        ]}
-      />
+            subtitle="Crea un agente describiendo tu negocio en una frase.">
+
+      <p className="mb-4 text-xs text-zinc-400 border border-zinc-800 bg-zinc-900/40 rounded-sm px-3 py-2"
+         data-testid="agentes-beta-llamadas">
+        Llamadas telefónicas: en beta, pendiente de verificación con el proveedor de voz.
+      </p>
 
       {!creating && !editing && (
         <>
+          <AgentFromPrompt
+            assistantName={asistente}
+            onApplied={(saved) => { load(); if (saved?.id) { setEditing(saved); setCreating(true); } }}
+            onDiscarded={load}
+          />
+
           <div className="flex items-center justify-between mb-4">
             <div className="text-[10px] uppercase font-mono tracking-widest text-zinc-500">
               {agents.length} agente{agents.length === 1 ? "" : "s"} · BETA
@@ -377,26 +388,21 @@ export default function AgentesPage() {
             <Button onClick={() => { setCreating(true); setEditing({ ...EMPTY }); }}
                     data-testid="agentes-create-btn"
                     className="btn-cta-grad rounded-sm">
-              <Plus size={13} className="mr-1" /> Nuevo agente
+              <Plus size={13} className="mr-1" /> Crear paso a paso
             </Button>
           </div>
 
           {loading && <div className="text-zinc-500 font-mono text-sm">Cargando…</div>}
 
           {!loading && agents.length === 0 && (
-            <div className="border border-dashed border-zinc-800 rounded-sm p-10 text-center bg-zinc-900/30"
-                 data-testid="agentes-empty">
-              <Robot size={40} className="mx-auto mb-3 text-zinc-600" weight="duotone" />
-              <div className="text-lg font-semibold text-white mb-1">Aún no tienes agentes</div>
-              <p className="text-sm text-zinc-400 max-w-md mx-auto mb-4">
-                Crea el primero — Lyan te guía en 5 pasos.
-              </p>
-              <Button onClick={() => { setCreating(true); setEditing({ ...EMPTY }); }}
-                      data-testid="agentes-empty-create"
-                      className="btn-cta-grad rounded-sm">
-                Crea el primero
-              </Button>
-            </div>
+            <EmptyState
+              icon={Robot}
+              testId="agentes-empty"
+              title="Aún no tienes agentes"
+              description="Un agente llama o escribe a tus clientes para una tarea concreta. Descríbelo arriba en una frase, o créalo paso a paso."
+              action={{ label: "Crear paso a paso", onClick: () => { setCreating(true); setEditing({ ...EMPTY }); } }}
+              prompt="Crea un agente que llame a mis clientes para recordarles su cita de mañana."
+            />
           )}
 
           {!loading && agents.length > 0 && (
@@ -428,7 +434,7 @@ export default function AgentesPage() {
                   </div>
                   <p className="text-xs text-zinc-400 mt-3 line-clamp-2">{a.prompt}</p>
                   <div className="mt-3 flex flex-wrap gap-1">
-                    {(a.tools || []).slice(0, 6).map((t) => (
+                    {(a.herramientas || a.tools || []).slice(0, 6).map((t) => (
                       <span key={t}
                             className="text-[10px] font-mono px-1.5 py-0.5 border border-zinc-700 rounded-sm text-zinc-300">
                         {t}
