@@ -8,9 +8,19 @@ import httpx
 log = logging.getLogger("elevenlabs")
 
 
+NOT_CONNECTED = "Conecta tu cuenta de ElevenLabs en Conexiones."
+
+
 class ElevenLabsClient:
-    def __init__(self):
-        self.api_key = os.environ.get("ELEVENLABS_API_KEY", "")
+    """Cliente de UN cliente (org): `await client_for(org_id)`. La llave no se
+    lee del entorno aquí (ver org_credentials.get_credentials)."""
+
+    def __init__(self, api_key: str | None = None, agent_id: str | None = None,
+                 default_voice_id: str | None = None, org_id: str | None = None):
+        self.org_id = org_id
+        self.api_key = (api_key or "").strip()
+        self.agent_id = (agent_id or "").strip()
+        self.default_voice_id = (default_voice_id or "").strip()
         self.base_url = os.environ.get("ELEVENLABS_BASE_URL", "https://api.elevenlabs.io/v1").rstrip("/")
 
     @property
@@ -23,7 +33,7 @@ class ElevenLabsClient:
     async def list_voices(self) -> dict[str, Any]:
         if not self.configured:
             return {"ok": False, "configured": False,
-                    "error": "ELEVENLABS_API_KEY no configurada",
+                    "error": NOT_CONNECTED,
                     "voices": []}
         url = f"{self.base_url}/voices"
         try:
@@ -49,7 +59,7 @@ class ElevenLabsClient:
                          model_id: str = "eleven_multilingual_v2") -> tuple[bytes | None, str | None]:
         """POST /text-to-speech/{voice_id} → returns (audio_bytes, error)."""
         if not self.configured:
-            return None, "ELEVENLABS_API_KEY no configurada"
+            return None, NOT_CONNECTED
         url = f"{self.base_url}/text-to-speech/{voice_id}"
         payload = {
             "text": text,
@@ -75,7 +85,7 @@ class ElevenLabsClient:
         import os as _os
         if not self.configured:
             return {"ok": False, "configured": False,
-                    "error": "ELEVENLABS_API_KEY no configurada"}
+                    "error": NOT_CONNECTED}
         path = _os.environ.get("ELEVENLABS_SIP_REGISTER_PATH",
                               "/convai/phone-numbers/create")
         url = f"{self.base_url}{path}"
@@ -110,7 +120,7 @@ class ElevenLabsClient:
         import os as _os
         if not self.configured:
             return {"ok": False, "configured": False,
-                    "error": "ELEVENLABS_API_KEY no configurada"}
+                    "error": NOT_CONNECTED}
         path = _os.environ.get("ELEVENLABS_SIP_CALL_PATH",
                               "/convai/sip-trunk/outbound-call")
         url = f"{self.base_url}{path}"
@@ -137,5 +147,13 @@ class ElevenLabsClient:
             return {"ok": False, "error": str(e)}
 
 
-def get_client() -> ElevenLabsClient:
-    return ElevenLabsClient()
+async def client_for(org_id: str) -> ElevenLabsClient:
+    """Cliente de ElevenLabs con las credenciales de ESTE cliente (org)."""
+    from org_credentials import get_credentials
+    try:
+        c = await get_credentials("elevenlabs", org_id)
+    except Exception as e:  # noqa: BLE001
+        log.warning("No pude leer credenciales elevenlabs/%s: %s", org_id, type(e).__name__)
+        c = {}
+    return ElevenLabsClient(api_key=c.get("api_key"), agent_id=c.get("agent_id"),
+                            default_voice_id=c.get("default_voice_id"), org_id=org_id)
