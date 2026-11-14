@@ -19,11 +19,22 @@ log = logging.getLogger("twilio")
 TWILIO_BASE = "https://api.twilio.com/2010-04-01"
 
 
+NOT_CONNECTED = "Conecta tu cuenta de Twilio en Conexiones."
+
+
 class TwilioClient:
-    def __init__(self):
-        self.sid = os.environ.get("TWILIO_ACCOUNT_SID", "")
-        self.token = os.environ.get("TWILIO_AUTH_TOKEN", "")
-        self.status_callback_base = os.environ.get("TWILIO_STATUS_CALLBACK_BASE", "").rstrip("/")
+    """Cliente de UN cliente (org): `await client_for(org_id)`."""
+
+    def __init__(self, account_sid: str | None = None, auth_token: str | None = None,
+                 org_id: str | None = None):
+        self.org_id = org_id
+        self.sid = (account_sid or "").strip()
+        self.token = (auth_token or "").strip()
+        self.status_callback_base = (os.environ.get("TWILIO_STATUS_CALLBACK_BASE", "")
+                                     or os.environ.get("PUBLIC_BASE_URL", "")).rstrip("/")
+        # Token de webhooks de ESTE cliente (lo fija client_for): la URL de
+        # callback lo lleva para que el evento se atribuya solo a él.
+        self.webhook_token: str | None = None
 
     @property
     def configured(self) -> bool:
@@ -39,12 +50,13 @@ class TwilioClient:
                                ) -> dict[str, Any]:
         if not self.configured:
             return {"ok": False, "configured": False,
-                    "error": "TWILIO_ACCOUNT_SID/TWILIO_AUTH_TOKEN no configurados"}
+                    "error": NOT_CONNECTED}
         form: dict[str, str] = {"PhoneNumber": phone_number}
         if friendly_name:
             form["FriendlyName"] = friendly_name
-        if self.status_callback_base:
-            form["StatusCallback"] = f"{self.status_callback_base}/api/webhooks/twilio"
+        if self.status_callback_base and self.webhook_token:
+            form["StatusCallback"] = (f"{self.status_callback_base}/api/webhooks/twilio/"
+                                      f"{self.webhook_token}")
         try:
             async with httpx.AsyncClient(timeout=20) as cli:
                 r = await cli.post(self._url("/OutgoingCallerIds.json"),
@@ -63,7 +75,7 @@ class TwilioClient:
 
     async def list_verified(self) -> dict[str, Any]:
         if not self.configured:
-            return {"ok": False, "configured": False, "verified": []}
+            return {"ok": False, "configured": False, "error": NOT_CONNECTED, "verified": []}
         try:
             async with httpx.AsyncClient(timeout=15) as cli:
                 r = await cli.get(self._url("/OutgoingCallerIds.json"), auth=self._auth())
@@ -91,5 +103,20 @@ class TwilioClient:
         return False
 
 
-def get_client() -> TwilioClient:
-    return TwilioClient()
+async def client_for(org_id: str) -> TwilioClient:
+    """Cliente de Twilio con las credenciales de ESTE cliente (org)."""
+    from org_credentials import get_credentials
+    try:
+        c = await get_credentials("twilio", org_id)
+    except Exception as e:  # noqa: BLE001
+        log.warning("No pude leer credenciales twilio/%s: %s", org_id, type(e).__name__)
+        c = {}
+    cli = TwilioClient(account_sid=c.get("account_sid"), auth_token=c.get("auth_token"),
+                       org_id=org_id)
+    if cli.configured and cli.status_callback_base:
+        try:
+            import webhook_tokens
+            cli.webhook_token = await webhook_tokens.token_for(org_id)
+        except Exception as e:  # noqa: BLE001 — sin token no se pide callback
+            log.warning("Sin token de webhooks para %s: %s", org_id, type(e).__name__)
+    return cli
