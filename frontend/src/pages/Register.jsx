@@ -7,6 +7,8 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Toaster, toast } from "sonner";
 import { api } from "../lib/api";
+import PageHelp from "../components/PageHelp";
+import { GOOGLE_LOGIN_ENABLED, startGoogleLogin } from "../lib/googleLogin";
 import { LockKey, ShieldCheck, ArrowRight, GoogleLogo, User, Envelope, Buildings } from "@phosphor-icons/react";
 
 export default function RegisterPage() {
@@ -29,21 +31,15 @@ export default function RegisterPage() {
         org_name: org.trim() || "Mi organización",
       });
       if (data?.ok) {
-        localStorage.setItem("litper_operator_ok", "1");
+        localStorage.setItem("zynex_session_ok", "1");
         toast.success(`Cuenta creada. Bienvenido, ${data.user?.nombre}.`);
-        nav("/app", { replace: true });
+        nav("/app/onboarding", { replace: true });
       }
     } catch (er) {
       toast.error(er?.response?.data?.detail || "No se pudo registrar.");
     } finally { setBusy(false); }
   };
 
-  const google = () => {
-    // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
-    const redirectUrl = window.location.origin + "/app";
-    window.location.href =
-      "https://auth.emergentagent.com/?redirect=" + encodeURIComponent(redirectUrl);
-  };
 
   return (
     <div className="min-h-screen grid place-items-center bg-[var(--bg-primary)] text-[var(--text-primary)] relative overflow-hidden">
@@ -61,25 +57,31 @@ export default function RegisterPage() {
           Crea tu organización
         </h1>
         <p className="text-sm text-zinc-400 text-center mb-8">
-          BYOK · Sin límite de operadores · 14 días gratis.
+          Crea el espacio de tu empresa. Las llaves de tus proveedores las pones tú.
         </p>
 
-        <Button
-          onClick={google}
-          type="button"
-          variant="outline"
-          data-testid="register-google-btn"
-          style={{ backgroundColor: "#ffffff", color: "#18181b", borderColor: "#d4d4d8" }}
-          className="w-full h-11 mb-3 rounded-sm font-medium hover:opacity-90">
-          <GoogleLogo size={16} weight="bold" className="mr-2" />
-          Continuar con Google
-        </Button>
+        <PageHelp helpKey="register" linkAsk={false} />
 
-        <div className="flex items-center gap-3 my-4">
-          <div className="flex-1 h-px bg-zinc-800" />
-          <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">o con email</span>
-          <div className="flex-1 h-px bg-zinc-800" />
-        </div>
+        {GOOGLE_LOGIN_ENABLED && (
+          <>
+            <Button
+              onClick={startGoogleLogin}
+              type="button"
+              variant="outline"
+              data-testid="register-google-btn"
+              style={{ backgroundColor: "#ffffff", color: "#18181b", borderColor: "#d4d4d8" }}
+              className="w-full h-11 mb-3 rounded-sm font-medium hover:opacity-90">
+              <GoogleLogo size={16} weight="bold" className="mr-2" />
+              Continuar con Google
+            </Button>
+
+            <div className="flex items-center gap-3 my-4">
+              <div className="flex-1 h-px bg-zinc-800" />
+              <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">o con correo</span>
+              <div className="flex-1 h-px bg-zinc-800" />
+            </div>
+          </>
+        )}
 
         <form onSubmit={submit} className="space-y-3" data-testid="register-form">
           <div className="relative">
