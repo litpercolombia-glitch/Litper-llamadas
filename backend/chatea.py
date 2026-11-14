@@ -1,7 +1,8 @@
 """Chatea Pro WhatsApp client — real endpoints wired per confirmed spec.
 
-Base URL: https://chateapro.app/api (env-overridable)
-Auth: Authorization: Bearer {CHATEA_PRO_API_KEY}
+Base URL: https://chateapro.app/api (por cliente, en Conexiones)
+Auth: Authorization: Bearer <llave del cliente (org)> — ver client_for(org_id).
+NUNCA se usa una llave global: cada cliente envía por SU cuenta.
 
 Endpoints wired (all overridable via env so the paths stay editable):
   * GET  /me                                → workspace/token validation
@@ -26,11 +27,21 @@ import httpx
 log = logging.getLogger("chatea_pro")
 
 
+NOT_CONNECTED = "Conecta tu cuenta de Chatea Pro (WhatsApp) en Conexiones."
+
+
 class ChateaProClient:
-    def __init__(self, api_key: str | None = None, base_url: str | None = None):
-        self.api_key = (api_key if api_key is not None else os.environ.get("CHATEA_PRO_API_KEY", "")) or ""
-        base = base_url if base_url is not None else os.environ.get("CHATEA_PRO_BASE_URL", "https://chateapro.app/api")
-        self.base_url = base.rstrip("/") if base else "https://chateapro.app/api"
+    """Cliente de UN cliente (org). La llave NUNCA se lee del entorno aquí:
+    llega de org_credentials.get_credentials("chatea_pro", org_id) — usar
+    `await client_for(org_id)`. Sin llave → `configured` False y toda llamada
+    devuelve {"ok": False, "error": NOT_CONNECTED} sin tocar la red."""
+
+    def __init__(self, api_key: str | None = None, base_url: str | None = None,
+                 org_id: str | None = None):
+        self.org_id = org_id
+        self.api_key = (api_key or "").strip()
+        base = (base_url or "").strip() or "https://chateapro.app/api"
+        self.base_url = base.rstrip("/")
         self.me_path = os.environ.get("CHATEA_PRO_ME_PATH", "/me")
         self.send_text_path = os.environ.get("CHATEA_PRO_SEND_TEXT_PATH", "/subscriber/send-text")
         self.send_template_path = os.environ.get("CHATEA_PRO_SEND_TEMPLATE_PATH",
@@ -41,8 +52,6 @@ class ChateaProClient:
                                                   "/subscriber/get-info")
         self.subscriber_create_path = os.environ.get("CHATEA_PRO_SUBSCRIBER_CREATE_PATH",
                                                      "/subscriber/create")
-        if not self.api_key:
-            log.warning("CHATEA_PRO_API_KEY is empty — outbound WhatsApp will fail.")
 
     @property
     def configured(self) -> bool:
@@ -57,6 +66,8 @@ class ChateaProClient:
     async def _req(self, method: str, path: str, *, params=None, json=None,
                    timeout: int = 15) -> dict[str, Any]:
         url = f"{self.base_url}{path}"
+        if not self.configured:
+            return {"ok": False, "status_code": 0, "error": NOT_CONNECTED, "url": url}
         try:
             async with httpx.AsyncClient(timeout=timeout) as cli:
                 r = await cli.request(method, url, headers=self._headers(),
@@ -65,8 +76,9 @@ class ChateaProClient:
             body = _safe_json(r)
             return {"ok": ok, "status_code": r.status_code, "body": body, "url": url}
         except Exception as e:  # noqa: BLE001
-            log.exception("Chatea Pro request failed: %s %s", method, url)
-            return {"ok": False, "status_code": 0, "error": str(e), "url": url}
+            err = f"{type(e).__name__}: {e}".replace(self.api_key, "***")[:300]
+            log.warning("Chatea Pro request failed: %s %s — %s", method, url, err)
+            return {"ok": False, "status_code": 0, "error": err, "url": url}
 
     # ------- high-level -------
     async def me(self) -> dict[str, Any]:
@@ -197,20 +209,24 @@ def _extract_message_id(body: Any) -> str | None:
             or (body.get("data") or {}).get("message_id"))
 
 
-_singleton: ChateaProClient | None = None
+async def client_for(org_id: str) -> ChateaProClient:
+    """Cliente de Chatea Pro con las credenciales de ESTE cliente (org).
 
-
-def get_client() -> ChateaProClient:
-    global _singleton
-    if _singleton is None:
-        _singleton = ChateaProClient()
-    return _singleton
+    get_credentials respeta PLATFORM_KEYS_ORGS: un cliente sin llave propia y
+    sin permiso de plataforma obtiene un cliente NO configurado (jamás la
+    llave del servidor)."""
+    from org_credentials import get_credentials
+    try:
+        creds = await get_credentials("chatea_pro", org_id)
+    except Exception as e:  # noqa: BLE001 — sin credenciales legibles = no conectado
+        log.warning("No pude leer credenciales chatea_pro/%s: %s", org_id, type(e).__name__)
+        creds = {}
+    return ChateaProClient(api_key=creds.get("api_key"), base_url=creds.get("base_url"),
+                           org_id=org_id)
 
 
 def reset_client() -> None:
-    """Force a re-read of env vars on next call (used by tests / hot reload)."""
-    global _singleton
-    _singleton = None
+    """Compatibilidad: ya no hay cliente global que reiniciar."""
 
 
 # Public alias used by /config/credentials/{provider}/test to instantiate
@@ -222,7 +238,7 @@ ChateaClient = ChateaProClient
 # method to any ChateaProClient instance via monkey-patch.
 async def _chatea_health(self) -> dict[str, Any]:
     if not self.configured:
-        return {"ok": False, "status_code": 0, "error": "API key vacía", "body": None}
+        return {"ok": False, "status_code": 0, "error": NOT_CONNECTED, "body": None}
     async with httpx.AsyncClient(timeout=10) as x:
         try:
             r = await x.get(f"{self.base_url}{self.me_path}",

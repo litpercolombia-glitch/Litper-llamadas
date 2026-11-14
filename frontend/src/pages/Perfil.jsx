@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import Layout from "../components/Layout";
-import HowItWorks from "../components/HowItWorks";
+import BusinessProfile from "../components/BusinessProfile";
 import { api } from "../lib/api";
 import { toast } from "sonner";
 import { Button } from "../components/ui/button";
@@ -130,17 +130,8 @@ export default function PerfilPage() {
   };
 
   return (
-    <Layout title="Perfil" subtitle="Ajustes de tu cuenta.">
-      <HowItWorks
-        testIdPrefix="perfil-howitworks"
-        intro="Aquí gestionas tu foto, nombre, correo, contraseña y los datos de tu organización."
-        steps={[
-          "Sube tu foto (arrastrada a cuadrado, máximo 2 MB).",
-          "Cambia tu nombre visible; el email requiere que confirmes la contraseña actual.",
-          "Si iniciaste con Google, la contraseña la gestiona Google (no aparece el campo).",
-          "Guarda cambios — Zynex avisa con un toast en la esquina.",
-        ]}
-      />
+    <Layout title="Perfil" subtitle="Tu cuenta y el perfil de tu negocio.">
+      <BusinessProfile />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl">
         {/* Avatar */}
