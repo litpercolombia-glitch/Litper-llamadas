@@ -2,7 +2,7 @@ import axios from "axios";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
-// Zynex OS v2 uses HttpOnly cookie auth (`litper_session`). No more operator
+// Zynex OS v2 uses HttpOnly cookie auth (session cookie). No more operator
 // key on the client — internal routes now accept either the JWT cookie OR
 // the legacy X-API-Key (kept for external agents). The browser stops
 // shipping the static key entirely.
@@ -23,7 +23,7 @@ api.interceptors.response.use(
         && !window.location.pathname.startsWith("/register")
         && !window.location.pathname.startsWith("/funnel")
         && window.location.pathname !== "/") {
-      localStorage.removeItem("litper_operator_ok");
+      localStorage.removeItem("zynex_session_ok");
       window.location.href = "/login";
     }
     return Promise.reject(err);
