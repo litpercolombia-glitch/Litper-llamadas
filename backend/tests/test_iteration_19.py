@@ -1,15 +1,17 @@
 """Iteration 19 backend regression: providers list, dropi + shopify test endpoints,
 auth/agents/cascade/WA templates untouched."""
+from _live import require_live  # pruebas contra servidor vivo: se saltan sin entorno
+require_live()
 import os
 import pytest
 import requests
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL") or open("/app/frontend/.env").read().split("REACT_APP_BACKEND_URL=")[1].split("\n")[0].strip()
 BASE_URL = BASE_URL.rstrip("/")
-API_KEY = "litper_hub_pk_2026_prod_ChangeMe_9x2Kf7bQvE4mLnT8sZ3H"
+API_KEY = os.environ.get("PUBLIC_API_KEY", "")
 
-EMAIL = "qa2@litper.co"
-PASSWORD = "Litper!2026"
+EMAIL = os.environ.get("QA_EMAIL", "")
+PASSWORD = os.environ.get("QA_PASSWORD", "")
 
 
 @pytest.fixture(scope="module")
