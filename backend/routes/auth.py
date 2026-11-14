@@ -1,6 +1,7 @@
-"""Auth: email + password (bcrypt) + JWT (httponly cookie) + Google OAuth
-(Emergent-managed). Both flows land in the same `users` collection and issue
-the same `litper_session` cookie so the app has ONE session model."""
+"""Auth: email + password (bcrypt) + JWT (httponly cookie). Opcionalmente,
+inicio de sesión con Google a través de un servicio externo de intercambio de
+sesión (apagado por defecto: ver `google_login_enabled`). Ambos flujos usan la
+misma colección `users` y la misma cookie `litper_session`."""
 from __future__ import annotations
 import os, re, uuid
 from datetime import datetime, timezone, timedelta
@@ -13,10 +14,12 @@ from fastapi import APIRouter, Depends, HTTPException, Response, Cookie, Request
 from pydantic import BaseModel, EmailStr, Field
 
 from db import get_db
+import ratelimit
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-JWT_SECRET = os.environ.get("JWT_SECRET", "dev-only-not-secret")
+from deps import check_jwt_secret  # falla al arrancar en producción sin secreto real
+JWT_SECRET = check_jwt_secret()
 JWT_ALG = "HS256"
 JWT_TTL_HOURS = 24 * 14  # 14 days
 COOKIE_NAME = "litper_session"
@@ -64,6 +67,24 @@ def _slug(s: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-") or "org"
 
 
+# ---------- Límite de intentos (login / registro) ----------
+# 10 fallos por IP+correo en 15 minutos → 429. Contador EN MEMORIA (ratelimit.py):
+# con varias réplicas debe ir a Mongo/Redis, porque cada proceso lleva su cuenta.
+AUTH_MAX_FAILS = 10
+AUTH_WINDOW_S = 15 * 60
+
+
+def _rl_key(kind: str, request: Request | None, email: str) -> str:
+    ip = ratelimit.client_ip(request) if request is not None else "sin-ip"
+    return f"auth:{kind}:{ip}:{email}"
+
+
+def _check_attempts(key: str) -> None:
+    if ratelimit.count(key, AUTH_WINDOW_S) >= AUTH_MAX_FAILS:
+        raise HTTPException(429, "Demasiados intentos fallidos. Espera 15 minutos e inténtalo de nuevo.",
+                            headers={"Retry-After": str(AUTH_WINDOW_S)})
+
+
 async def _set_cookie(resp: Response, token: str):
     resp.set_cookie(
         key=COOKIE_NAME, value=token,
@@ -73,10 +94,13 @@ async def _set_cookie(resp: Response, token: str):
 
 
 @router.post("/register", summary="Sign up + create org.")
-async def register(payload: RegisterIn, response: Response):
+async def register(payload: RegisterIn, response: Response, request: Request = None):
     db = get_db()
     email = payload.email.lower().strip()
+    key = _rl_key("register", request, email)
+    _check_attempts(key)
     if await db.users.find_one({"email": email}, {"_id": 0, "id": 1}):
+        ratelimit.hit(key, AUTH_WINDOW_S)
         raise HTTPException(409, "Email ya registrado. Inicia sesión.")
     org_id = _slug(payload.org_name) + "-" + uuid.uuid4().hex[:6]
     user_id = uuid.uuid4().hex
@@ -96,12 +120,16 @@ async def register(payload: RegisterIn, response: Response):
 
 
 @router.post("/login", summary="Log in with email + password.")
-async def login(payload: LoginIn, response: Response):
+async def login(payload: LoginIn, response: Response, request: Request = None):
     db = get_db()
     email = payload.email.lower().strip()
+    key = _rl_key("login", request, email)
+    _check_attempts(key)                      # bloqueado: ni siquiera se comprueba la clave
     user = await db.users.find_one({"email": email}, {"_id": 0})
     if not user or not _verify(payload.password, user.get("password_hash", "")):
+        ratelimit.hit(key, AUTH_WINDOW_S)
         raise HTTPException(401, "Credenciales inválidas.")
+    ratelimit.clear(key)
     tok = _issue_token(user["id"], user["org_id"], email)
     await _set_cookie(response, tok)
     return {"ok": True, "user": {"id": user["id"], "email": email,
@@ -140,30 +168,40 @@ async def me(request: Request):
     return {"user": user, "org_id": payload.get("org")}
 
 
-# ---------- Emergent-managed Google OAuth ----------
-# Frontend redirects the user to
-#   https://auth.emergentagent.com/?redirect=<origin>/app
-# The provider bounces back to `<origin>/app#session_id=xxx`. The React
-# AuthCallback POSTs that id here — we exchange it server-side and set the
-# same `litper_session` cookie used by the email/password flow.
-EMERGENT_SESSION_URL = "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data"
+# ---------- Inicio de sesión con Google (APAGADO por defecto) ----------
+# El navegador vuelve del proveedor con `#session_id=xxx`; el frontend lo envía
+# aquí y el servidor lo intercambia por el perfil en GOOGLE_SESSION_URL (un
+# servicio externo de intercambio de sesión que define quien despliega; no hay
+# ninguna URL escrita en el código). Compuerta de SERVIDOR: solo responde si
+# GOOGLE_LOGIN=1 y GOOGLE_SESSION_URL está definida; si no → 404, aunque el
+# frontend enseñe el botón.
+def google_session_url() -> str:
+    return os.environ.get("GOOGLE_SESSION_URL", "").strip()
 
 
-@router.post("/google/session", summary="Exchange an Emergent OAuth session_id for a JWT cookie.")
+def google_login_enabled() -> bool:
+    on = os.environ.get("GOOGLE_LOGIN", "").strip().lower() in ("1", "true", "yes")
+    return on and google_session_url().lower().startswith("https://")
+
+
+@router.post("/google/session", summary="Intercambia un session_id de Google por la cookie de sesión "
+                                        "(404 salvo GOOGLE_LOGIN=1 y GOOGLE_SESSION_URL).")
 async def google_session(response: Response,
                          x_session_id: str = Header(None, alias="X-Session-ID")):
+    if not google_login_enabled():
+        raise HTTPException(404, "Not Found")
     if not x_session_id:
         raise HTTPException(400, "Falta X-Session-ID.")
     try:
         async with httpx.AsyncClient(timeout=10) as client:
-            r = await client.get(EMERGENT_SESSION_URL, headers={"X-Session-ID": x_session_id})
+            r = await client.get(google_session_url(), headers={"X-Session-ID": x_session_id})
         if r.status_code != 200:
             raise HTTPException(401, f"Sesión Google inválida ({r.status_code}).")
         data = r.json()
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(502, f"No se pudo contactar Emergent Auth: {e}")
+        raise HTTPException(502, f"No se pudo contactar el servicio de inicio de sesión: {type(e).__name__}")
 
     email = (data.get("email") or "").lower().strip()
     name  = (data.get("name") or "").strip() or (email.split("@")[0] if email else "Usuario")
