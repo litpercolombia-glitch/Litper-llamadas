@@ -1,10 +1,12 @@
 """Iteration 22 — Retell/Telnyx/BETA custom agents, tools, calls webhook."""
+from _live import require_live  # pruebas contra servidor vivo: se saltan sin entorno
+require_live()
 import os, re, requests, pytest
 
 BASE = os.environ.get("REACT_APP_BACKEND_URL") or open("/app/frontend/.env").read().split("REACT_APP_BACKEND_URL=")[1].split("\n")[0]
 BASE = BASE.rstrip("/")
-API_KEY = "litper_hub_pk_2026_prod_ChangeMe_9x2Kf7bQvE4mLnT8sZ3H"
-EMAIL, PWD = "qa2@litper.co", "Litper!2026"
+API_KEY = os.environ.get("PUBLIC_API_KEY", "")
+EMAIL, PWD = os.environ.get("QA_EMAIL", ""), os.environ.get("QA_PASSWORD", "")
 ORG_ID = "litper-qa-0712bf"
 
 
