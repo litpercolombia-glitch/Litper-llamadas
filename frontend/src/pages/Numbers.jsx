@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import Layout from "../components/Layout";
+import EmptyState from "../components/EmptyState";
 import { api, formatDateTime } from "../lib/api";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -90,7 +91,7 @@ export default function NumbersPage() {
   };
 
   return (
-    <Layout title="Números Conectados" subtitle="Caller ID verificado con Twilio para llamadas salientes"
+    <Layout title="Números" subtitle="Los números verificados desde los que llaman tus agentes."
       actions={
         <Button variant="outline" onClick={load} className="border-zinc-700 bg-transparent rounded-sm">
           <ArrowsClockwise size={14} />
@@ -222,7 +223,7 @@ export default function NumbersPage() {
             <div>
               <label className="text-[10px] uppercase font-mono tracking-widest text-zinc-500 block mb-1">Nombre (opcional)</label>
               <Input className="bg-zinc-900 border-zinc-800 rounded-sm"
-                value={friendly} onChange={(e) => setFriendly(e.target.value)} placeholder="Sofía · Litper Bogotá" />
+                value={friendly} onChange={(e) => setFriendly(e.target.value)} placeholder="Ej. Línea principal" />
             </div>
             <Button onClick={start} disabled={starting} data-testid="numbers-start"
               className="w-full bg-white text-black hover:bg-zinc-200 rounded-sm">
@@ -290,7 +291,16 @@ export default function NumbersPage() {
           </thead>
           <tbody>
             {numbers.length === 0 && (
-              <tr><td colSpan={7} className="py-8 text-center text-zinc-500 text-sm">Sin números conectados.</td></tr>
+              <tr><td colSpan={7} className="p-4">
+                <EmptyState
+                  icon={Phone}
+                  testId="numbers-empty"
+                  compact
+                  title="Aún no hay números conectados"
+                  description="Es el número de teléfono que verá tu cliente cuando el agente lo llame. Agrégalo y verifícalo con el formulario de esta página."
+                  prompt="Explícame cómo conectar y verificar mi número de teléfono para que mis agentes puedan llamar."
+                />
+              </td></tr>
             )}
             {numbers.map(n => (
               <tr key={n.id} className="data-row" data-testid={`number-row-${n.id}`}>
