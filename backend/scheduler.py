@@ -315,6 +315,18 @@ async def daily_ceo_report_wa():
             log.warning("daily_ceo_report_wa[%s] skipped: %s", org, e)
 
 
+async def automations_tick():
+    """Reglas de automatización con disparador `horario` (por cliente, en la
+    zona horaria de su perfil). Nunca tumba el planificador."""
+    try:
+        from automation_engine import tick_horario
+        n = await tick_horario()
+        if n:
+            log.info("automations_tick: %s regla(s) por horario ejecutadas", n)
+    except Exception as e:  # noqa: BLE001
+        log.warning("automations_tick falló: %s", type(e).__name__)
+
+
 def start():
     global _scheduler
     if _scheduler is not None:
@@ -334,6 +346,9 @@ def start():
     # 15 min después: envío por WhatsApp (solo si el cliente configuró destino).
     _scheduler.add_job(daily_ceo_report_wa, CronTrigger(minute="15,45", timezone="UTC"),
                        id="daily_ceo_report_wa")
+    # Automatizaciones por horario: cada minuto se revisa cuáles toca disparar.
+    _scheduler.add_job(automations_tick, "interval", minutes=1, id="automations_tick",
+                       max_instances=1, coalesce=True)
     _scheduler.start()
     log.info("APScheduler started; dispatch tick=%s min · novedades every 15 min · reporte diario a las %s:00 hora local de cada negocio", tick, report_hour())
     return _scheduler

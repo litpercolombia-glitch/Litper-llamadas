@@ -52,6 +52,8 @@ from routes.agent_tools import router as agent_tools_router  # noqa: E402
 from routes.org_profile import router as org_profile_router  # noqa: E402
 from routes.packs import router as packs_router  # noqa: E402
 from routes.mcp_servers import router as mcp_servers_router  # noqa: E402
+from routes.kb import router as kb_router  # noqa: E402
+from routes.automations import router as automations_router  # noqa: E402
 
 logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
@@ -118,6 +120,21 @@ async def _ensure_indexes():
     await _index(db.org_webhook_tokens, "token", unique=True)
     await _index(db.custom_agents, "tool_token", unique=True, sparse=True)
     await _index(db.agent_call_results, [("org_id", 1), ("created_at", -1)])
+    # Base de conocimiento (una por cliente) y automatizaciones.
+    await _index(db.org_kb, "org_id", unique=True)
+    await _index(db.automations, "id", unique=True)
+    await _index(db.automations, [("org_id", 1), ("trigger.tipo", 1), ("activa", 1)])
+    await _index(db.automation_runs, [("org_id", 1), ("created_at", -1)])
+    await _index(db.automation_runs, [("org_id", 1), ("rule_id", 1), ("created_at", -1)])
+    # Contadores atómicos (límite diario por regla, tope por destinatario, eventos
+    # repetidos): el índice ÚNICO es lo que hace atómica la reserva. Se borran
+    # solos 3 días después de su último uso.
+    await _index(db.automation_counters, [("org_id", 1), ("key", 1), ("day", 1)], unique=True)
+    await _index(db.automation_counters, "exp", expireAfterSeconds=3 * 24 * 3600)
+    await _index(db.message_log, [("org_id", 1), ("phone_digits", 1), ("created_at", -1)], sparse=True)
+    # Intentos fallidos de login/registro: Mongo los borra solos a los 15 min.
+    await _index(db.auth_attempts, "at", expireAfterSeconds=15 * 60)
+    await _index(db.auth_attempts, [("key", 1), ("at", -1)])
 
     # --- Únicos por DATO DE NEGOCIO: antes eran globales (dos clientes no podían
     # tener el mismo teléfono/estatus/clave). Ahora compuestos con org_id.
@@ -166,6 +183,10 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
+    # Documentación de la API cerrada en producción (mapa gratis para atacantes/copiones).
+    docs_url=None if os.environ.get("EXPOSE_DOCS") != "1" else "/docs",
+    redoc_url=None if os.environ.get("EXPOSE_DOCS") != "1" else "/redoc",
+    openapi_url=None if os.environ.get("EXPOSE_DOCS") != "1" else "/openapi.json",
     title="Zynex OS API",
     description=(
         "Zynex OS — plataforma multi-cliente de agentes de IA (copiloto, voz y "
@@ -179,8 +200,6 @@ app = FastAPI(
     ),
     version="1.0.0",
     lifespan=lifespan,
-    docs_url="/docs",
-    redoc_url="/redoc",
 )
 
 app.add_middleware(
@@ -232,6 +251,8 @@ api.include_router(agent_tools_router)
 api.include_router(org_profile_router)
 api.include_router(packs_router)
 api.include_router(mcp_servers_router)
+api.include_router(kb_router)
+api.include_router(automations_router)
 
 
 @api.get("/", tags=["health"], summary="Root health.")
