@@ -135,6 +135,9 @@ async def attempt_result(payload: AttemptResult, org: str = Depends(get_org)):
         if new_queue_status in ("rechazado", "detenido", "escalado", "extension"):
             await _create_followup_task(payload.queue_id, new_queue_status, org)
     await db.call_queue.update_one({"id": payload.queue_id, "org_id": org}, {"$set": q_upd})
+    if new_queue_status:                 # automatizaciones: "cuando un pedido cambia de estado"
+        from automation_engine import emit_queue_status
+        await emit_queue_status(org, payload.queue_id, new_queue_status)
     return {"ok": True, "queue_status": new_queue_status or "in_progress",
             "next_attempt_at": next_at}
 

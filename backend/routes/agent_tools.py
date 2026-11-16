@@ -254,7 +254,10 @@ async def confirmar_pedido(request: Request, ctx: dict = Depends(tool_ctx)):
         {"_id": 0, "id": 1})
     if q:
         from routes.webhooks import _stop_cadence
-        await _stop_cadence(q["id"], "confirmado", org)
+        await _stop_cadence(q["id"], "confirmado", org)   # también avisa a las automatizaciones
+    else:
+        from automation_engine import emit_order_status
+        await emit_order_status(org, order["id"], "confirmado")
     tid = await _log("confirmar_pedido", p.model_dump(), ctx, True)
     return {"ok": True, "tool_call_id": tid, "cola_cerrada": bool(q),
             "detail": f"{p.pedido_id} quedó confirmado."}

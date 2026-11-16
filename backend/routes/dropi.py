@@ -198,6 +198,8 @@ async def dropi_import(payload: DropiImportIn, org: str = Depends(get_org)):
 
         order = Order(**order_in.model_dump(), status="in_queue")
         await db.orders.insert_one({**order.model_dump(), "org_id": org})
+        from automation_engine import emit, order_payload
+        await emit(org, "pedido_creado", order_payload(order.model_dump()))
 
         arrival = order_in.office_arrival_date or _today()
         q = QueueItem(
