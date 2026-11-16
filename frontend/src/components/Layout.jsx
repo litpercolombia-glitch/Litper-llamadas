@@ -1,4 +1,5 @@
-import Sidebar from "./Sidebar";
+import { useCallback, useState } from "react";
+import Sidebar, { MenuButton } from "./Sidebar";
 import MatrixRain from "./MatrixRain";
 import Constellation from "./Constellation";
 import ThemeToggle from "./ThemeToggle";
@@ -18,6 +19,8 @@ import { helpForRoute } from "../constants/help";
 export default function Layout({ children, title, subtitle, actions, helpKey }) {
   const inHub = useInHub();
   const location = useLocation();
+  const [menuOpen, setMenuOpen] = useState(false);       // menú lateral en celular
+  const closeMenu = useCallback(() => setMenuOpen(false), []);
   // When embedded inside a hub tab, drop the chrome (Sidebar + Header) so we
   // don't double it up. The hub owns the outer chrome.
   if (inHub) {
@@ -38,24 +41,27 @@ export default function Layout({ children, title, subtitle, actions, helpKey }) 
     <div className="min-h-screen flex bg-zinc-950 text-zinc-100 relative">
       <Constellation density={55} />
       <MatrixRain />
-      <Sidebar />
+      <Sidebar open={menuOpen} onClose={closeMenu} />
       <div className="flex-1 flex flex-col min-w-0">
         <header className="border-b border-zinc-800 bg-zinc-950/80 backdrop-blur-xl sticky top-0 z-20">
-          <div className="px-8 py-5 flex items-center justify-between gap-4">
-            <div>
-              <div className="text-[10px] uppercase tracking-[0.2em] font-mono text-zinc-500 mb-0.5">
-                Command Center
+          <div className="px-4 py-3 md:px-8 md:py-5 flex items-center justify-between gap-3 md:gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <MenuButton onClick={() => setMenuOpen(true)} />
+              <div className="min-w-0">
+                <div className="text-[10px] uppercase tracking-[0.2em] font-mono text-zinc-500 mb-0.5">
+                  Command Center
+                </div>
+                <h2 className="text-lg md:text-xl font-semibold text-white truncate">{title}</h2>
+                {subtitle && <p className="text-xs md:text-sm text-zinc-400 mt-0.5 line-clamp-2">{subtitle}</p>}
               </div>
-              <h2 className="text-xl font-semibold text-white">{title}</h2>
-              {subtitle && <p className="text-sm text-zinc-400 mt-0.5">{subtitle}</p>}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
               {actions}
               <ThemeToggle />
             </div>
           </div>
         </header>
-        <main className="flex-1 p-8">
+        <main className="flex-1 p-4 md:p-8 min-w-0">
           {pageKey && <PageHelp helpKey={pageKey} />}
           {children}
         </main>
