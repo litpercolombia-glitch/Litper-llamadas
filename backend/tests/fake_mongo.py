@@ -89,8 +89,23 @@ class Cursor:
         except StopIteration: raise StopAsyncIteration
 
 
+class DuplicateKeyError(Exception):
+    pass
+
+
+# Índices únicos que el servidor crea al arrancar y de los que depende la lógica.
+UNIQUE = {"automation_counters": [("org_id", "key", "day")]}
+
+
 class Coll:
-    def __init__(self): self.docs = []
+    def __init__(self, unique=None):
+        self.docs = []
+        self.unique = list(unique or [])
+
+    def _check_unique(self, d):
+        for keys in self.unique:
+            if any(all(o.get(k) == d.get(k) for k in keys) for o in self.docs if o is not d):
+                raise DuplicateKeyError(f"E11000 duplicate key error: {keys}")
 
     def _find(self, q): return [d for d in self.docs if match(d, q or {})]
 
@@ -105,6 +120,7 @@ class Coll:
         return Cursor(found)
 
     async def insert_one(self, d):
+        self._check_unique(d)
         self.docs.append(dict(d)); return SimpleNamespace(inserted_id=d.get("id"))
 
     def _apply(self, d, upd, inserting=False):
@@ -129,7 +145,7 @@ class Coll:
             return SimpleNamespace(matched_count=1, modified_count=1, upserted_id=None)
         if upsert:
             d = {k: v for k, v in q.items() if not k.startswith("$") and not isinstance(v, dict)}
-            self._apply(d, upd, inserting=True); self.docs.append(d)
+            self._apply(d, upd, inserting=True); self._check_unique(d); self.docs.append(d)
             return SimpleNamespace(matched_count=0, modified_count=0, upserted_id=1)
         return SimpleNamespace(matched_count=0, modified_count=0, upserted_id=None)
 
@@ -148,6 +164,10 @@ class Coll:
     async def find_one_and_update(self, q, upd, return_document=True, projection=None, upsert=False):
         for d in self._find(q):
             self._apply(d, upd); return _project(d, projection)
+        if upsert:                            # como Mongo: inserta con los campos de igualdad del filtro
+            d = {k: v for k, v in q.items() if not k.startswith("$") and not isinstance(v, dict)}
+            self._apply(d, upd, inserting=True); self._check_unique(d); self.docs.append(d)
+            return _project(d, projection)
         return None
 
     async def delete_one(self, q):
@@ -198,5 +218,7 @@ class DB:
     def __init__(self): self.c = {}
     def __getattr__(self, n):
         if n == "c": raise AttributeError
-        return self.c.setdefault(n, Coll())
+        if n not in self.c:
+            self.c[n] = Coll(UNIQUE.get(n))
+        return self.c[n]
     def __getitem__(self, n): return getattr(self, n)
