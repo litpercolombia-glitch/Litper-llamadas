@@ -68,8 +68,11 @@ def _slug(s: str) -> str:
 
 
 # ---------- Límite de intentos (login / registro) ----------
-# 10 fallos por IP+correo en 15 minutos → 429. Contador EN MEMORIA (ratelimit.py):
-# con varias réplicas debe ir a Mongo/Redis, porque cada proceso lleva su cuenta.
+# 10 fallos por IP+correo en 15 minutos → 429. El contador vive en MONGO
+# (colección `auth_attempts`, índice TTL de 15 min: ver server.py), así que vale
+# para todas las réplicas y sobrevive a reinicios. Cada fallo se anota TAMBIÉN en
+# memoria (ratelimit.py): si la base falla, el límite sigue funcionando con esa
+# copia local en vez de quedar abierto.
 AUTH_MAX_FAILS = 10
 AUTH_WINDOW_S = 15 * 60
 
@@ -79,8 +82,33 @@ def _rl_key(kind: str, request: Request | None, email: str) -> str:
     return f"auth:{kind}:{ip}:{email}"
 
 
-def _check_attempts(key: str) -> None:
-    if ratelimit.count(key, AUTH_WINDOW_S) >= AUTH_MAX_FAILS:
+async def _fails(key: str) -> int:
+    """Fallos recientes de `key`: Mongo; si la base falla, la copia en memoria."""
+    try:
+        desde = datetime.now(timezone.utc) - timedelta(seconds=AUTH_WINDOW_S)
+        return await get_db().auth_attempts.count_documents({"key": key, "at": {"$gte": desde}})
+    except Exception:  # noqa: BLE001 — respaldo en memoria
+        return ratelimit.count(key, AUTH_WINDOW_S)
+
+
+async def _fail_hit(key: str) -> None:
+    ratelimit.hit(key, AUTH_WINDOW_S)
+    try:
+        await get_db().auth_attempts.insert_one({"key": key, "at": datetime.now(timezone.utc)})
+    except Exception:  # noqa: BLE001 — queda la copia en memoria
+        pass
+
+
+async def _fail_clear(key: str) -> None:
+    ratelimit.clear(key)
+    try:
+        await get_db().auth_attempts.delete_many({"key": key})
+    except Exception:  # noqa: BLE001
+        pass
+
+
+async def _check_attempts(key: str) -> None:
+    if await _fails(key) >= AUTH_MAX_FAILS:
         raise HTTPException(429, "Demasiados intentos fallidos. Espera 15 minutos e inténtalo de nuevo.",
                             headers={"Retry-After": str(AUTH_WINDOW_S)})
 
@@ -98,9 +126,9 @@ async def register(payload: RegisterIn, response: Response, request: Request = N
     db = get_db()
     email = payload.email.lower().strip()
     key = _rl_key("register", request, email)
-    _check_attempts(key)
+    await _check_attempts(key)
     if await db.users.find_one({"email": email}, {"_id": 0, "id": 1}):
-        ratelimit.hit(key, AUTH_WINDOW_S)
+        await _fail_hit(key)
         raise HTTPException(409, "Email ya registrado. Inicia sesión.")
     org_id = _slug(payload.org_name) + "-" + uuid.uuid4().hex[:6]
     user_id = uuid.uuid4().hex
@@ -124,12 +152,12 @@ async def login(payload: LoginIn, response: Response, request: Request = None):
     db = get_db()
     email = payload.email.lower().strip()
     key = _rl_key("login", request, email)
-    _check_attempts(key)                      # bloqueado: ni siquiera se comprueba la clave
+    await _check_attempts(key)                      # bloqueado: ni siquiera se comprueba la clave
     user = await db.users.find_one({"email": email}, {"_id": 0})
     if not user or not _verify(payload.password, user.get("password_hash", "")):
-        ratelimit.hit(key, AUTH_WINDOW_S)
+        await _fail_hit(key)
         raise HTTPException(401, "Credenciales inválidas.")
-    ratelimit.clear(key)
+    await _fail_clear(key)
     tok = _issue_token(user["id"], user["org_id"], email)
     await _set_cookie(response, tok)
     return {"ok": True, "user": {"id": user["id"], "email": email,

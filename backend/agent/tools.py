@@ -292,6 +292,8 @@ async def tool_import_orders_from_file(ctx, file_id: str,
             products=[], status="in_queue" if carrier_slug else "imported",
         )
         await db.orders.insert_one({**order.model_dump(), "org_id": org})
+        from automation_engine import emit, order_payload
+        await emit(org, "pedido_creado", order_payload(order.model_dump()))
         if carrier_slug:
             q = QueueItem(order_id=order.id, carrier_slug=carrier_slug,
                          office_arrival_date=date.today().isoformat(),
@@ -381,12 +383,15 @@ CONFIRM_TOOLS: set[str] = {
     "send_whatsapp", "schedule_cadence", "import_orders_from_file",
     "publish_agent", "test_call", "launch_calls",
     "update_business_profile", "update_agent", "create_agent_from_prompt",
+    "update_knowledge_base", "create_automation", "toggle_automation",
 }
 
 # Nativas cuyo resultado contiene texto escrito por TERCEROS (clientes finales,
 # archivos subidos, mensajes entrantes): el modelo lo recibe envuelto.
 UNTRUSTED_NATIVE: set[str] = {
     "get_orders", "get_queue", "list_tasks", "import_orders_from_file",
+    # Texto libre guardado en la cuenta (base de conocimiento, reglas): dato, no orden.
+    "get_knowledge_base", "list_automations",
 }
 
 MCP_PREFIX = "mcp__"
@@ -623,6 +628,29 @@ def summarize_action(name: str, args: dict[str, Any]) -> str:
         n = len(a.get("telefonos") or [])
         a_quien = f"{n} número(s)" if n else f"los pedidos que cumplan {corto(a.get('filtro_pedidos'), 80)}"
         return f"Lanzar llamadas con el agente {a.get('agent_id')} a {a_quien}"
+    if name == "update_knowledge_base":
+        partes_kb = []
+        for k, v in a.items():
+            if v is None:
+                continue
+            partes_kb.append(f"{k} ({len(v)} elemento(s))" if isinstance(v, list)
+                             else f"{k} → «{corto(v, 60)}»")
+        return "Cambiar la base de conocimiento del negocio: " + (", ".join(partes_kb) or "(sin cambios)")
+    if name == "create_automation":
+        try:
+            import automation_engine as _ae
+            r = _ae.validate_rule(a)
+            return (f"Crear la automatización «{corto(r['nombre'], 60)}»: cuando ocurra "
+                    f"«{r['trigger']['tipo']}»"
+                    + (f" ({corto(r['trigger'].get('cron'), 40)})" if r['trigger'].get('cron') else "")
+                    + (f" con filtro {corto(r['trigger']['filtro'], 80)}" if r['trigger']['filtro'] else "")
+                    + " → " + corto(_ae.describe(r, None, raw=True).replace("ría", "r", 1), 240)
+                    + f" (límite {r['limite_diario']}/día)")
+        except Exception:  # noqa: BLE001 — regla inválida: se verá al aplicar
+            return f"Crear la automatización «{corto(a.get('nombre'), 60)}»"
+    if name == "toggle_automation":
+        return (("Activar" if a.get("activa") else "Pausar")
+                + f" la automatización {a.get('rule_id')}")
     if name.startswith(MCP_PREFIX):
         partes = name.split("__")
         srv, tool = (partes[1], "__".join(partes[2:])) if len(partes) >= 3 else ("externo", name)
@@ -866,3 +894,95 @@ register_tool("update_business_profile", tool_update_business_profile, {
     "args": {"empresa": "str?", "sector": "str?", "pais": "str?", "moneda": "str?",
              "zona_horaria": "str?", "idioma": "str?", "nombre_asistente": "str?", "descripcion": "str?"}},
     requires_confirm=True)
+
+
+# ======================================================================
+# Base de conocimiento y automatizaciones (por cliente; escribir exige "Aplicar")
+# ======================================================================
+async def tool_get_knowledge_base(ctx) -> Any:
+    from routes.kb import get_kb
+    return await get_kb(_org(ctx))
+
+
+async def tool_update_knowledge_base(ctx, descripcion: str | None = None, tono: str | None = None,
+                                     horarios: list | None = None, catalogo: list | None = None,
+                                     faqs: list | None = None, politicas: str | None = None,
+                                     palabras_prohibidas: list | None = None,
+                                     reglas_marca: str | None = None) -> Any:
+    from fastapi import HTTPException
+    from routes.kb import KbIn, save_kb
+    campos = {k: v for k, v in dict(descripcion=descripcion, tono=tono, horarios=horarios,
+                                    catalogo=catalogo, faqs=faqs, politicas=politicas,
+                                    palabras_prohibidas=palabras_prohibidas,
+                                    reglas_marca=reglas_marca).items() if v is not None}
+    if not campos:
+        raise ToolError("No indicaste ningún dato para actualizar.")
+    try:
+        kb = await save_kb(_org(ctx), KbIn(**campos))
+    except HTTPException as e:
+        raise ToolError(_http_detail(e))
+    except Exception as e:  # noqa: BLE001 — validación de forma/longitudes
+        raise ToolError(f"Datos no válidos para la base de conocimiento ({type(e).__name__}).")
+    return {"ok": True, "actualizado": sorted(campos), "kb": kb}
+
+
+async def tool_list_automations(ctx) -> Any:
+    from routes.automations import list_rules
+    items = await list_rules(_org(ctx))
+    return {"count": len(items), "items": items}
+
+
+async def tool_create_automation(ctx, nombre: str, trigger: dict, accion: dict,
+                                 limite_diario: int | None = None, activa: bool = True) -> Any:
+    from fastapi import HTTPException
+    from routes.automations import create_rule
+    data = {"nombre": nombre, "trigger": trigger, "accion": accion, "activa": activa}
+    if limite_diario is not None:
+        data["limite_diario"] = limite_diario
+    try:
+        return {"ok": True, "rule": await create_rule(_org(ctx), data)}
+    except HTTPException as e:
+        raise ToolError(_http_detail(e))
+
+
+async def tool_toggle_automation(ctx, rule_id: str, activa: bool) -> Any:
+    from fastapi import HTTPException
+    from routes.automations import update_rule
+    try:
+        r = await update_rule(_org(ctx), rule_id, {"activa": bool(activa)})
+    except HTTPException as e:
+        raise ToolError(_http_detail(e))
+    return {"ok": True, "rule": {"id": r["id"], "nombre": r["nombre"], "activa": r["activa"]}}
+
+
+register_tool("get_knowledge_base", tool_get_knowledge_base, {
+    "name": "get_knowledge_base",
+    "description": "Lee la base de conocimiento del negocio (descripción, tono, horarios, catálogo, "
+                   "preguntas frecuentes, políticas, palabras prohibidas, reglas de marca).",
+    "args": {}})
+register_tool("update_knowledge_base", tool_update_knowledge_base, {
+    "name": "update_knowledge_base",
+    "description": "Actualiza la base de conocimiento. Envía solo los campos a cambiar; una lista "
+                   "enviada REEMPLAZA a la anterior (lee primero con get_knowledge_base para no perder "
+                   "ítems). horarios: [{dia, abre 'HH:MM', cierra 'HH:MM', cerrado}]; catalogo: "
+                   "[{nombre, precio, descripcion}]; faqs: [{pregunta, respuesta}].",
+    "args": {"descripcion": "str?", "tono": "str?", "horarios": "list[dict]?", "catalogo": "list[dict]?",
+             "faqs": "list[dict]?", "politicas": "str?", "palabras_prohibidas": "list[str]?",
+             "reglas_marca": "str?"}}, requires_confirm=True)
+register_tool("list_automations", tool_list_automations, {
+    "name": "list_automations",
+    "description": "Lista las automatizaciones del negocio (reglas «cuando pase X, haz Y»).",
+    "args": {}})
+register_tool("create_automation", tool_create_automation, {
+    "name": "create_automation",
+    "description": "Crea una automatización. trigger: {tipo: 'pedido_creado'|'pedido_estado'|"
+                   "'llamada_terminada'|'mensaje_entrante'|'horario', filtro: {campo: valor o "
+                   "{contiene|mayor|menor: valor}}, cron (solo horario, mínimo cada 15 min)}. accion: "
+                   "{tipo: 'enviar_whatsapp'|'crear_tarea'|'lanzar_llamada'|'llamar_herramienta_mcp', "
+                   "params}. params admite variables {{campo}} del evento (ej. {{customer_phone}}).",
+    "args": {"nombre": "str", "trigger": "dict", "accion": "dict", "limite_diario": "int?",
+             "activa": "bool?"}}, requires_confirm=True)
+register_tool("toggle_automation", tool_toggle_automation, {
+    "name": "toggle_automation",
+    "description": "Activa (activa=true) o pausa (activa=false) una automatización por su id.",
+    "args": {"rule_id": "str", "activa": "bool"}}, requires_confirm=True)

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   Package, PlugsConnected, ChartLineUp, Gear, House, Plus, TrashSimple,
-  Envelope, WhatsappLogo,
+  Envelope, WhatsappLogo, List, X,
 } from "@phosphor-icons/react";
 import { api } from "../lib/api";
 import { useAssistantName } from "../lib/assistant";
@@ -27,7 +27,22 @@ export function notifyThreadsChanged() {
   window.dispatchEvent(new Event(THREADS_CHANGED));
 }
 
-export default function Sidebar() {
+/** Botón de menú (solo en pantallas pequeñas) que abre el menú lateral. */
+export function MenuButton({ onClick, className = "" }) {
+  return (
+    <button type="button" onClick={onClick} aria-label="Abrir menú" data-testid="mobile-menu-open"
+            className={`md:hidden shrink-0 h-10 w-10 grid place-items-center rounded-sm border border-zinc-700 bg-zinc-900 text-zinc-200 hover:bg-zinc-800 ${className}`}>
+      <List size={20} />
+    </button>
+  );
+}
+
+/**
+ * Menú lateral. En escritorio (md+) es una columna fija. En celular es un
+ * cajón: oculto por defecto, se abre con <MenuButton> (`open`) y se cierra al
+ * tocar fuera, con la X, con Escape o al cambiar de pantalla (`onClose`).
+ */
+export default function Sidebar({ open = false, onClose }) {
   const location = useLocation();
   const navigate = useNavigate();
   const showChats = location.pathname === "/app";
@@ -67,10 +82,33 @@ export default function Sidebar() {
     } catch {}
   };
 
+  // En celular el cajón se cierra al navegar y con Escape.
+  useEffect(() => { onClose?.(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ },
+            [location.pathname, location.search]);
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (e) => { if (e.key === "Escape") onClose?.(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
   return (
-    <aside className="w-64 shrink-0 border-r border-zinc-800 bg-zinc-950 h-screen sticky top-0 flex flex-col">
+    <>
+    {open && (
+      <div className="fixed inset-0 z-40 bg-black/60 md:hidden" onClick={onClose}
+           data-testid="mobile-menu-backdrop" aria-hidden="true" />
+    )}
+    <aside data-testid="sidebar" data-open={open ? "true" : "false"}
+           className={`w-64 max-w-[85vw] shrink-0 border-r border-zinc-800 bg-zinc-950 h-screen flex flex-col
+             fixed inset-y-0 left-0 z-50 transform transition-transform duration-200
+             ${open ? "translate-x-0" : "-translate-x-full"}
+             md:sticky md:top-0 md:z-auto md:translate-x-0 md:transition-none`}>
       {/* brand */}
-      <div className="px-5 py-6 border-b border-zinc-800">
+      <div className="px-5 py-6 border-b border-zinc-800 relative">
+        <button type="button" onClick={onClose} aria-label="Cerrar menú" data-testid="mobile-menu-close"
+                className="md:hidden absolute top-4 right-3 h-9 w-9 grid place-items-center rounded-sm text-zinc-400 hover:text-white hover:bg-zinc-800">
+          <X size={18} />
+        </button>
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-md neon-glow grid place-items-center bg-gradient-to-br from-white/25 to-white/5 border border-white/25">
             <House size={14} weight="fill" className="text-white" />
@@ -175,5 +213,6 @@ export default function Sidebar() {
         </a>
       </div>
     </aside>
+    </>
   );
 }

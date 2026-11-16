@@ -671,6 +671,12 @@ html.matrix-day .constellation-canvas { opacity: 0.42; }
               box-shadow 250ms ease;
 }
 .feedback-fab:hover { transform: translateY(-2px); }
+/* Con una barra fija abajo (p. ej. «Guardar») el botón sube para no taparla. */
+body:has([data-bottom-bar]) .feedback-fab { bottom: 76px; }
+@media (max-width: 767px) {
+  /* En celular el cuadro para escribir al asistente ocupa el borde inferior. */
+  body:has([data-bottom-bar="tall"]) .feedback-fab { bottom: 150px; }
+}
 .feedback-fab:focus-visible {
   outline: 2px solid #fff; outline-offset: 3px;
 }

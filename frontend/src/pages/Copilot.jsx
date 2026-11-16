@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import Sidebar, { notifyThreadsChanged } from "../components/Sidebar";
+import Sidebar, { MenuButton, notifyThreadsChanged } from "../components/Sidebar";
 import PageHelp from "../components/PageHelp";
 import { api, formatDateTime } from "../lib/api";
 import { useAssistantName, useOrgProfile, formatMoney, errorText } from "../lib/assistant";
@@ -378,6 +378,8 @@ export default function CopilotPage() {
   const [activityOpen, setActivityOpen] = useState(false);
   const [activityTick, setActivityTick] = useState(0); // fuerza la recarga de la bitácora
   const [pendingAction, setPendingActionState] = useState(null); // {id, tool, resumen, args, thread_id}
+  const [menuOpen, setMenuOpen] = useState(false);               // menú lateral en celular
+  const closeMenu = useCallback(() => setMenuOpen(false), []);
   const [confirming, setConfirming] = useState(false);
   const [threads, setThreads] = useState([]);
   const [activeId, setActiveId] = useState(null);
@@ -451,8 +453,18 @@ export default function CopilotPage() {
     const msgs = r.data || [];
     setMessages(msgs);
     // Recupera la tarjeta de acción pendiente (por ejemplo tras recargar la página).
-    const restored = pendingFromMessages(tid, msgs);
-    setPendingActionState((prev) => (prev && prev.thread_id === tid ? prev : restored));
+    let restored = pendingFromMessages(tid, msgs);
+    // La fuente de verdad es el servidor: así la tarjeta sobrevive a recargar la
+    // página, a cerrar la pestaña y a abrir la conversación en otro dispositivo.
+    let fromServer = false;
+    try {
+      const t = await api.get(`/copilot/threads/${tid}`);
+      const pa = t.data?.pending_action;
+      restored = pa && pa.id ? { ...pa, thread_id: tid } : null;
+      savePending(tid, restored);
+      fromServer = true;
+    } catch { /* servidor antiguo o sin red: queda lo guardado en esta pestaña */ }
+    setPendingActionState((prev) => (!fromServer && prev && prev.thread_id === tid ? prev : restored));
   };
 
   const location = useLocation();
@@ -756,12 +768,13 @@ export default function CopilotPage() {
     <div className="min-h-screen flex bg-zinc-950 text-zinc-100 relative">
       <Constellation density={55} />
       <MatrixRain />
-      <Sidebar />
+      <Sidebar open={menuOpen} onClose={closeMenu} />
       <div className="flex-1 flex flex-col min-w-0 h-screen">
         <header className="border-b border-zinc-800 bg-zinc-950/80 backdrop-blur-xl sticky top-0 z-10">
-          <div className="px-8 py-4 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full overflow-hidden border border-zinc-700 bg-zinc-800">
+          <div className="px-4 py-3 md:px-8 md:py-4 flex flex-wrap items-center justify-between gap-3 md:gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <MenuButton onClick={() => setMenuOpen(true)} />
+              <div className="w-9 h-9 shrink-0 rounded-full overflow-hidden border border-zinc-700 bg-zinc-800">
                 <img src="/lyan.webp" alt={asistente} className="w-full h-full object-cover" />
               </div>
               <div>
@@ -771,7 +784,7 @@ export default function CopilotPage() {
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2 md:gap-3 max-w-full">
               <Select value={modelOverride} onValueChange={setModelOverride}>
                 <SelectTrigger data-testid="copilot-model-select"
                   className="w-32 bg-zinc-900 border-zinc-800 rounded-sm text-xs font-mono">
@@ -788,7 +801,7 @@ export default function CopilotPage() {
               </Select>
               <Select value={skillId} onValueChange={setSkillId}>
                 <SelectTrigger data-testid="copilot-skill-select"
-                  className="w-56 bg-zinc-900 border-zinc-800 rounded-sm text-sm">
+                  className="w-36 md:w-56 bg-zinc-900 border-zinc-800 rounded-sm text-sm">
                   <Sparkle size={13} className="mr-1" />
                   <SelectValue placeholder="Sin skill" />
                 </SelectTrigger>
@@ -823,7 +836,7 @@ export default function CopilotPage() {
           </div>
         </header>
 
-        <div ref={scrollRef} className="flex-1 overflow-y-auto px-8">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 md:px-8">
           <div className="max-w-3xl mx-auto py-6">
             {messages.length === 0 && !running && (
               <div className="py-12 text-center">
@@ -928,7 +941,7 @@ export default function CopilotPage() {
           </div>
         </div>
 
-        <footer className="border-t border-zinc-800 bg-zinc-950 px-8 py-4">
+        <footer className="border-t border-zinc-800 bg-zinc-950 px-4 md:px-8 py-3 md:py-4" data-bottom-bar="tall">
           <div className="max-w-3xl mx-auto">
             {activeSkill && activeSkill.id !== "none" && (
               <div className="mb-2 text-[11px] font-mono text-zinc-500 flex items-center gap-2">

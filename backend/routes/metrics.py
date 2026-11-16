@@ -151,8 +151,9 @@ async def compute_metrics(org: str, date_from: Optional[str] = None,
         "costo_por_recuperado_objetivo": cpr_target,
         "son_estimaciones": True,
         "nota": ("Costos y retorno ESTIMADOS con estos supuestos (no son facturación real). "
-                 "Se configuran con COD_MARGIN_PCT, RTO_BASELINE_PCT, USD_TO_<MONEDA> y "
-                 "*_COST_PER_* en el servidor."
+                 "El margen, la tasa base, el tipo de cambio y los costos unitarios son "
+                 "valores de referencia de la plataforma; si los tuyos son distintos, "
+                 "pide a soporte que los ajuste."
                  + ("" if fx_ok else f" No hay tipo de cambio para {profile.get('moneda')}: "
                                      "los costos se muestran en USD y el retorno NO es confiable.")),
     }

@@ -117,6 +117,20 @@ async def _store_call(body: dict, org: str | None) -> dict:
         if "duplicate" in str(e).lower() or type(e).__name__ == "DuplicateKeyError":
             raise HTTPException(409, "Esa llamada pertenece a otra cuenta.")
         raise
+    # Automatizaciones ("cuando termina una llamada…"): solo con dueño verificado y
+    # una vez por llamada aunque el proveedor repita el aviso.
+    if org_id and str(event).lower() in ("call_ended", "call.ended", "ended"):
+        from automation_engine import emit
+        try:
+            depth = int(meta.get("automation_depth") or (1 if meta.get("origen") == "automatizacion" else 0))
+        except (TypeError, ValueError):
+            depth = 1
+        await emit(org_id, "llamada_terminada", {
+            "call_id": call_id, "telefono": doc["telefono"] or "", "resultado": doc["resultado"],
+            "duracion": doc["duracion"], "direction": doc["direction"] or "",
+            "agent_id": agent_id or "", "_dedupe": f"call:{call_id}",
+            # llamada que lanzó una automatización: su fin solo encadena una vez
+            "origen": "automatizacion" if depth else "", "_depth": depth})
     return {"ok": True, "stored": call_id, "org_resolved": bool(org_id)}
 
 

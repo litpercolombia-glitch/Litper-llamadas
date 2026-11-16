@@ -317,6 +317,27 @@ export const HELP = {
     ],
     pideselo: "Muéstrame los interesados VIP que aún no hemos contactado.",
   },
+  kb: {
+    titulo: "Base de conocimiento",
+    intro: "Aquí escribes lo que tu negocio sabe: qué vende, horarios, precios, preguntas frecuentes y políticas. El asistente y tus agentes de voz usan esta información para responder con datos reales en lugar de inventar.",
+    pasos: [
+      "Llena las secciones que apliquen a tu negocio; puedes dejar vacías las demás.",
+      "Si quieres ahorrar tiempo, pulsa «Sugerir con IA», pega una descripción y acepta solo lo que esté bien.",
+      "Pulsa «Guardar» en la barra de abajo. Tus agentes publicados se actualizan solos.",
+    ],
+    pideselo: "Agrega a mi base de conocimiento que abrimos de lunes a viernes de 9:00 a 18:00.",
+  },
+  automations: {
+    titulo: "Automatizaciones",
+    intro: "Reglas del tipo «cuando pase esto, haz aquello»: por ejemplo, cuando entra un pedido, enviar un WhatsApp o crear una tarea. Cada regla tiene un límite diario y deja registro de cada vez que se ejecuta.",
+    pasos: [
+      "Pulsa «Nueva regla», o describe lo que quieres en «Describe la regla» y revisa la propuesta.",
+      "Elige cuándo se ejecuta y qué hace. Pulsa «Guardar».",
+      "Usa «Probar sin enviar» para ver qué haría con un ejemplo, sin mandar nada.",
+      "Enciende o apaga cada regla con su interruptor y revisa el historial. Al mismo número se le hacen como máximo 3 llamadas y 5 WhatsApp al día.",
+    ],
+    pideselo: "Crea una automatización que cree una tarea cada vez que entre un pedido nuevo.",
+  },
 };
 
 /** Ruta real (definida en App.js) → clave de HELP. */
@@ -358,6 +379,8 @@ export const TAB_HELP = {
     transportadoras: "carriers",
     habilidades: "skills",
     vip: "vipLeads",
+    conocimiento: "kb",
+    automatizaciones: "automations",
   },
 };
 

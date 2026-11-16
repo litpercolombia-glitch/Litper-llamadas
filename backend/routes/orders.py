@@ -57,6 +57,9 @@ async def _create_one(order_in: OrderIn, org: str) -> Order:
     await supabase_upsert("orders", {**order.model_dump(),
                                      "org_id": org,
                                      "external_id": order.external_ref})
+    # Automatizaciones del cliente ("cuando se crea un pedido…"). Nunca rompe el alta.
+    from automation_engine import emit, order_payload
+    await emit(org, "pedido_creado", order_payload(order.model_dump()))
     return order
 
 

@@ -53,6 +53,31 @@ async def create_thread(payload: Optional[ThreadCreate] = None, org: str = Depen
     return t
 
 
+async def current_pending(org: str, thread_id: str) -> dict | None:
+    """Acción del hilo que sigue esperando "Aplicar/Cancelar" (pendiente y sin
+    vencer), tal como la muestra la tarjeta. None si no hay."""
+    docs = await get_db().pending_actions.find(
+        {"org_id": org, "thread_id": thread_id, "status": "pending"},
+        {"_id": 0, "state": 0}).sort("created_at", -1).limit(1).to_list(1)
+    if not docs or (docs[0].get("expires_at") or "") < _now():
+        return None
+    a = docs[0]
+    return {"id": a["id"], "tool": a.get("tool"), "resumen": a.get("resumen"),
+            "args": a.get("args") or {}, "expires_at": a.get("expires_at")}
+
+
+@router.get("/copilot/threads/{thread_id}",
+            summary="Un hilo + su acción pendiente vigente (para que la tarjeta de "
+                    "confirmación sobreviva a recargar o a abrir en otro dispositivo).")
+@router.get("/threads/{thread_id}", summary="Igual que /copilot/threads/{id}.")
+async def get_thread(thread_id: str, org: str = Depends(get_org)):
+    t = await get_db().chat_threads.find_one({"id": thread_id, "org_id": org}, {"_id": 0})
+    if not t:
+        raise HTTPException(404, "Thread not found")
+    t.pop("org_id", None)
+    return {**t, "pending_action": await current_pending(org, thread_id)}
+
+
 @router.patch("/threads/{thread_id}", response_model=ChatThread,
               summary="Rename a thread.")
 async def rename_thread(thread_id: str, payload: ThreadRename, org: str = Depends(get_org)):

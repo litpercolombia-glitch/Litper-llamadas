@@ -196,8 +196,10 @@ def build_custom_tools(agent_tools: list | None, mcp_tools: list[dict] | None,
 
 
 def build_agent_payload(a: dict, tools: list[dict] | None = None,
-                        webhook_url: str | None = None) -> dict:
-    """Cuerpo de create/update-agent a partir de nuestro custom_agent."""
+                        webhook_url: str | None = None, kb: str = "") -> dict:
+    """Cuerpo de create/update-agent a partir de nuestro custom_agent. `kb` =
+    bloque de la base de conocimiento del cliente (routes.kb.kb_prefix): va
+    DELANTE del guion, delimitado como información del negocio."""
     payload = {
         "agent_name": a.get("nombre", "Asistente"),
         "voice_id":   a.get("voz_id") or "EXAVITQu4vr4xnSDxMaL",
@@ -206,7 +208,7 @@ def build_agent_payload(a: dict, tools: list[dict] | None = None,
             "provider":    "anthropic",
             "model":       LLM_MODEL,
             "temperature": LLM_TEMP,
-            "system_prompt": a.get("prompt", ""),
+            "system_prompt": (f"{kb}\n\n" if kb else "") + a.get("prompt", ""),
             # Herramientas que el agente puede usar durante la llamada.
             "tools": list(tools or []),
         },
@@ -318,7 +320,9 @@ async def upsert_agent(a: dict, org_id: str | None = None) -> dict:
     if not await configured(org_id):
         return {"ok": False, "beta": True, "detail": NOT_CONNECTED}
     tools, hook, aviso = await _tools_and_webhook(a, org_id)
-    payload = build_agent_payload(a, tools, hook)
+    from routes.kb import kb_prefix
+    kb = await kb_prefix(org_id)          # información del negocio de ESTE cliente
+    payload = build_agent_payload(a, tools, hook, kb)
     existing = a.get("retell_agent_id")
     if existing:
         ok, body = await _req(org_id, "PATCH", f"/update-agent/{existing}", payload)
@@ -326,7 +330,8 @@ async def upsert_agent(a: dict, org_id: str | None = None) -> dict:
     else:
         ok, body = await _req(org_id, "POST", "/create-agent", payload)
         rid = body.get("agent_id") if ok else None
-    out = {"ok": ok, "retell_agent_id": rid, "response": body, "tools_sent": len(tools)}
+    out = {"ok": ok, "retell_agent_id": rid, "response": body, "tools_sent": len(tools),
+           "kb_incluida": bool(kb)}
     if aviso:
         out["aviso"] = aviso
     return out

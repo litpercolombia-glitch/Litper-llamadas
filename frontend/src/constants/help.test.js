@@ -83,6 +83,18 @@ describe("help.js — instrucciones de todas las pantallas", () => {
     expect(missing).toEqual([]);
   });
 
+  test("Base de conocimiento y Automatizaciones son pestañas de Ajustes con instrucciones y estado vacío", () => {
+    const tabs = declaredTabs("pages/Ajustes.jsx");
+    [["conocimiento", "kb", "components/KnowledgeBase.jsx"],
+     ["automatizaciones", "automations", "components/Automations.jsx"]].forEach(([tab, key, file]) => {
+      expect({ tab, declared: tabs.includes(tab) }).toEqual({ tab, declared: true });
+      expect({ tab, key: helpForTab("ajustes", tab) }).toEqual({ tab, key });
+      expect(HELP[key].pasos.length).toBeGreaterThanOrEqual(2);
+      expect(read("pages/Ajustes.jsx")).toMatch(new RegExp(`tab === "${tab}"`));
+      expect(read(file)).toMatch(/<EmptyState/);
+    });
+  });
+
   test("las pestañas exclusivas de contra entrega declaran su paquete (se ocultan si no está instalado)", () => {
     const packTabs = { "pages/Pedidos.jsx": ["importar", "novedades"], "pages/Ajustes.jsx": ["cadencia", "transportadoras"] };
     Object.entries(packTabs).forEach(([file, keys]) => {

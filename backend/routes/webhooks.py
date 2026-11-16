@@ -246,6 +246,15 @@ async def _handle_chatea(org: str, body: dict) -> dict:
                         await _stop_cadence(q["id"], action, org)
                         processed_notes.append(f"queue {q['id']} → {action}")
 
+            # Automatizaciones del cliente ("cuando llega un mensaje…"). El texto
+            # entrante es un DATO: solo rellena variables de la acción configurada.
+            # Se ejecutan en segundo plano: el webhook responde sin esperarlas.
+            from automation_engine import emit, inbound_depth
+            await emit(org, "mensaje_entrante",
+                       {"phone": phone, "text": text, "channel": "whatsapp",
+                        "_depth": await inbound_depth(org, phone),
+                        **({"_dedupe": f"wa:{pmid}"} if pmid else {})})
+
     await _log_event("chatea_pro", event_type or "unknown", body, True,
                      "; ".join(processed_notes), org)
     return {"ok": True, "processed": processed_notes}
@@ -409,6 +418,14 @@ async def _handle_elevenlabs(org: str, body: dict) -> dict:
             except Exception as e:  # noqa: BLE001
                 processed_notes.append(f"advance error: {type(e).__name__}")
 
+    from automation_engine import emit
+    cid = body.get("conversation_id") or body.get("call_id")
+    await emit(org, "llamada_terminada", {
+        "call_id": cid, "telefono": body.get("phone") or body.get("to_number") or "",
+        "resultado": result or detected or "sin_clasificar", "duracion": body.get("duration"),
+        "direction": "outbound", "agent_id": body.get("agent_id") or "",
+        **({"_dedupe": f"el:{cid}"} if cid else {})})
+
     await _log_event("elevenlabs", f"call_ended:{detected or 'unknown'}",
                     body, processed, "; ".join(processed_notes), org)
     return {"ok": True, "result": result, "processed": processed_notes}
@@ -428,6 +445,8 @@ async def _stop_cadence(queue_id: str, action: str, org: str) -> None:
                 a["status"] = "skipped"
         await db.call_schedules.update_one({"queue_id": queue_id, "org_id": org},
                                           {"$set": {"attempts": sched["attempts"]}})
+    from automation_engine import emit_queue_status
+    await emit_queue_status(org, queue_id, action)
 
 
 # =========================================================================
