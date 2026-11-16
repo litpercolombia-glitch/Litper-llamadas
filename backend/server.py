@@ -179,8 +179,10 @@ app = FastAPI(
     ),
     version="1.0.0",
     lifespan=lifespan,
-    docs_url="/docs",
-    redoc_url="/redoc",
+    # Documentación de la API cerrada en producción (mapa gratis para atacantes y copiones).
+    docs_url="/docs" if os.environ.get("EXPOSE_DOCS") == "1" else None,
+    redoc_url="/redoc" if os.environ.get("EXPOSE_DOCS") == "1" else None,
+    openapi_url="/openapi.json" if os.environ.get("EXPOSE_DOCS") == "1" else None,
 )
 
 app.add_middleware(
