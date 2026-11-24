@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "https://api.zynexapp.com/api/:path*" },
+    { "source": "/((?!static/|.*\\.[a-z0-9]+$).*)", "destination": "/index.html" }
+  ]
+}
