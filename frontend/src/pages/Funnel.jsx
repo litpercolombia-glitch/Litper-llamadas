@@ -277,7 +277,7 @@ export default function FunnelPage() {
                className="inline-flex items-center gap-1.5 hover:text-[var(--text-primary)] transition">
               <Envelope size={14} aria-hidden="true" /> zynexproai@gmail.com
             </a>
-            <a href="https://wa.me/573144754115" target="_blank" rel="noreferrer" data-testid="funnel-support-whatsapp"
+            <a href="https://wa.me/573144644054" target="_blank" rel="noreferrer" data-testid="funnel-support-whatsapp"
                className="inline-flex items-center gap-1.5 hover:text-[var(--text-primary)] transition">
               <WhatsappLogo size={14} aria-hidden="true" /> Soporte por WhatsApp
             </a>
