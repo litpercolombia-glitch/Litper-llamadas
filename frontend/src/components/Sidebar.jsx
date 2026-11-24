@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   Package, PlugsConnected, ChartLineUp, Gear, House, Plus, TrashSimple,
-  Envelope, WhatsappLogo, List, X,
+  Envelope, WhatsappLogo, List, X, PhoneCall,
 } from "@phosphor-icons/react";
 import { api } from "../lib/api";
 import { useAssistantName } from "../lib/assistant";
@@ -13,8 +13,10 @@ const NAV = [
     hint: "Pídele lo que necesites" },
   { to: "/app/pedidos",    label: "Pendientes", icon: Package,        testId: "nav-pedidos",
     hint: "Cola · Tickets", hintCod: "Cola · Importar · Novedades · Tickets" },
+  { to: "/app/llamadas",   label: "Llamadas",   icon: PhoneCall,      testId: "nav-llamadas",
+    hint: "Agentes de voz por estado de Dropi" },
   { to: "/app/conexiones", label: "Conexiones", icon: PlugsConnected, testId: "nav-conexiones",
-    hint: "Conectores · MCP · Voces · Números" },
+    hint: "Claude · Conectores · MCP · Voces · Números" },
   { to: "/app/metricas",   label: "Métricas",   icon: ChartLineUp,    testId: "nav-metricas",
     hint: "Resultados de tu operación" },
   { to: "/app/ajustes",    label: "Ajustes",    icon: Gear,           testId: "nav-ajustes",
@@ -206,10 +208,10 @@ export default function Sidebar({ open = false, onClose }) {
            data-testid="support-email">
           <Envelope size={11} weight="fill" /> zynexproai@gmail.com
         </a>
-        <a href="https://wa.me/573144754115" target="_blank" rel="noreferrer"
+        <a href="https://wa.me/573144644054" target="_blank" rel="noreferrer"
            className="flex items-center gap-1.5 hover:text-white transition"
            data-testid="support-whatsapp">
-          <WhatsappLogo size={11} weight="fill" className="text-emerald-400" /> WhatsApp 3144754115
+          <WhatsappLogo size={11} weight="fill" className="text-emerald-400" /> WhatsApp 314 464 4054
         </a>
       </div>
     </aside>

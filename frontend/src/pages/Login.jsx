@@ -164,10 +164,10 @@ export default function LoginPage() {
                 <Envelope size={11} weight="fill" /> zynexproai@gmail.com
               </a>
               <span className="text-zinc-700">·</span>
-              <a href="https://wa.me/573144754115" target="_blank" rel="noreferrer"
+              <a href="https://wa.me/573144644054" target="_blank" rel="noreferrer"
                  className="inline-flex items-center gap-1 hover:text-white transition"
                  data-testid="login-support-whatsapp">
-                <WhatsappLogo size={11} weight="fill" className="text-emerald-400" /> 3144754115
+                <WhatsappLogo size={11} weight="fill" className="text-emerald-400" /> 314 464 4054
               </a>
             </div>
             <p className="text-[11px] text-zinc-500 mt-2">

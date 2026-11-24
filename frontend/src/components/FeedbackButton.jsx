@@ -132,8 +132,8 @@ export default function FeedbackButton() {
             <a href="mailto:zynexproai@gmail.com"
                className="text-cyan-300 hover:text-cyan-200">zynexproai@gmail.com</a>
             {" "}o WhatsApp{" "}
-            <a href="https://wa.me/573144754115" target="_blank" rel="noreferrer"
-               className="text-emerald-300 hover:text-emerald-200">3144754115</a>.
+            <a href="https://wa.me/573144644054" target="_blank" rel="noreferrer"
+               className="text-emerald-300 hover:text-emerald-200">314 464 4054</a>.
           </div>
         </DialogContent>
       </Dialog>
