@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Layout from "../components/Layout";
 import EmptyState from "../components/EmptyState";
+import ZynexSetup from "../components/ZynexSetup";
 import { api } from "../lib/api";
 import { errorText } from "../lib/assistant";
 import { toast } from "sonner";
@@ -9,10 +10,11 @@ import { Input } from "../components/ui/input";
 import { Switch } from "../components/ui/switch";
 import {
   PhoneCall, ArrowsClockwise, PaperPlaneTilt, Robot, TreeStructure, SlidersHorizontal, MagicWand,
-  CheckCircle, WarningCircle, XCircle, Copy, MagnifyingGlass, Prohibit,
+  CheckCircle, WarningCircle, XCircle, Copy, MagnifyingGlass, Prohibit, RocketLaunch,
 } from "@phosphor-icons/react";
 
 const TABS = [
+  { key: "configurar", label: "Configurar",      Icon: RocketLaunch,      desc: "Deja tus llamadas listas en 4 pasos: solo necesitas tu ElevenLabs y tu celular." },
   { key: "panel",     label: "Llamadas",        Icon: PhoneCall,         desc: "Cola, resultados y botones para traer pedidos y llamar." },
   { key: "variables", label: "Variables",       Icon: TreeStructure,     desc: "Qué campo de tu Chatea Pro llena cada dato que dice el agente." },
   { key: "agentes",   label: "Agentes",         Icon: Robot,             desc: "Un agente de voz por estado de Dropi, con su ID de ElevenLabs." },
@@ -484,15 +486,21 @@ function Reglas({ d, recargar }) {
 }
 
 export default function ZynexCallPage() {
-  const initial = new URLSearchParams(window.location.search).get("tab") || "panel";
+  const pedido = new URLSearchParams(window.location.search).get("tab");
+  const initial = pedido || "panel";
   const [tab, setTab] = useState(TABS.find((t) => t.key === initial) ? initial : "panel");
   const [d, setD] = useState(null);
   const [err, setErr] = useState("");
 
   const recargar = useCallback(async () => {
-    try { const r = await api.get("/zcall/estado"); setD(r.data); setErr(""); }
+    try {
+      const r = await api.get("/zcall/estado"); setD(r.data); setErr("");
+      // Primera vez (sin número o sin agentes): abre la configuración guiada.
+      const listo = r.data?.conexiones?.numero && (r.data?.agentes || []).some((a) => a.elevenlabs_agent_id);
+      if (!pedido && !listo) setTab((t) => (t === "panel" ? "configurar" : t));
+    }
     catch (e) { setErr(errorText(e, "No se pudo cargar Zynex Call.")); }
-  }, []);
+  }, [pedido]);
   useEffect(() => { recargar(); }, [recargar]);
 
   const current = TABS.find((t) => t.key === tab) || TABS[0];
@@ -515,6 +523,7 @@ export default function ZynexCallPage() {
       </div>
       {err && <div role="alert" className="text-sm px-3 py-2 rounded-sm border border-red-500/30 bg-red-500/10 text-red-300 mb-4">{err}</div>}
       {!d && !err && <div className="text-zinc-400 font-mono text-sm">Cargando…</div>}
+      {d && tab === "configurar" && <ZynexSetup d={d} recargar={recargar} />}
       {d && tab === "panel" && <Panel d={d} recargar={recargar} />}
       {d && tab === "variables" && <Variables d={d} recargar={recargar} />}
       {d && tab === "agentes" && <Agentes d={d} recargar={recargar} />}
