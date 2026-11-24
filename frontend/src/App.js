@@ -1,21 +1,31 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import "@/index.css";
 import { useTheme } from "@/components/ThemeToggle";
 import { api } from "@/lib/api";
 
-import FunnelPage      from "@/pages/Funnel";
-import CopilotPage     from "@/pages/Copilot";
-import PedidosPage     from "@/pages/Pedidos";
-import ConexionesPage  from "@/pages/Conexiones";
-import ZynexCallPage   from "@/pages/ZynexCall";
-import MetricasPage    from "@/pages/Metricas";
-import AjustesPage     from "@/pages/Ajustes";
-import OnboardingPage  from "@/pages/Onboarding";
 import LoginPage       from "@/pages/Login";
-import RegisterPage    from "@/pages/Register";
 import AuthCallback    from "@/pages/AuthCallback";
 import FeedbackButton  from "@/components/FeedbackButton";
+
+// Cada pantalla se descarga solo cuando se abre: el login carga liviano.
+const FunnelPage = lazy(() => import("@/pages/Funnel"));
+const RegisterPage = lazy(() => import("@/pages/Register"));
+const CopilotPage = lazy(() => import("@/pages/Copilot"));
+const PedidosPage = lazy(() => import("@/pages/Pedidos"));
+const ConexionesPage = lazy(() => import("@/pages/Conexiones"));
+const ZynexCallPage = lazy(() => import("@/pages/ZynexCall"));
+const MetricasPage = lazy(() => import("@/pages/Metricas"));
+const AjustesPage = lazy(() => import("@/pages/Ajustes"));
+const OnboardingPage = lazy(() => import("@/pages/Onboarding"));
+
+function Cargando() {
+  return (
+    <div className="min-h-screen grid place-items-center bg-black text-white" role="status" aria-label="Cargando">
+      <div className="w-10 h-10 border-2 border-zinc-700 border-t-white rounded-full animate-spin" />
+    </div>
+  );
+}
 
 function AuthGate({ children }) {
   const location = useLocation();
@@ -47,10 +57,10 @@ function AuthGate({ children }) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
   return (
-    <>
+    <Suspense fallback={<Cargando />}>
       {children}
       <FeedbackButton />
-    </>
+    </Suspense>
   );
 }
 
@@ -59,6 +69,7 @@ function AuthRouter() {
     return <AuthCallback />;
   }
   return (
+    <Suspense fallback={<Cargando />}>
     <Routes>
       {/* Public */}
       <Route path="/"         element={<FunnelPage />} />
@@ -102,6 +113,7 @@ function AuthRouter() {
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </Suspense>
   );
 }
 
