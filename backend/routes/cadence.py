@@ -4,10 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from typing import List
 
 from db import get_db
-from deps import require_api_key
+from deps import get_org, require_api_key
 from models import CallSchedule, ScheduleRequest, AttemptResult, Attempt
 from cadence import build_plan
-from chatea import get_client as get_chatea
+from chatea import client_for as chatea_for
 
 router = APIRouter(prefix="/calls", tags=["cadence"],
                    dependencies=[Depends(require_api_key)])
@@ -15,21 +15,24 @@ router = APIRouter(prefix="/calls", tags=["cadence"],
 
 @router.post("/schedule", response_model=CallSchedule,
              summary="Build (or rebuild) the 5-attempt cadence for a queue item.")
-async def schedule(payload: ScheduleRequest):
+async def schedule(payload: ScheduleRequest, org: str = Depends(get_org)):
     db = get_db()
-    q = await db.call_queue.find_one({"id": payload.queue_id}, {"_id": 0})
+    q = await db.call_queue.find_one({"id": payload.queue_id, "org_id": org}, {"_id": 0})
     if not q:
         raise HTTPException(404, "Queue item not found")
 
-    plan = build_plan(country=q.get("country", "CO"),
+    from routes.org_profile import get_profile
+    profile = await get_profile(org)
+    plan = build_plan(country=q.get("country") or profile["pais"],
                       start_date=date.fromisoformat(q["office_arrival_date"][:10]),
-                      office_claim_max_days=q.get("office_claim_max_days"))
+                      office_claim_max_days=q.get("office_claim_max_days"),
+                      tz_name=profile["zona_horaria"])
     sched = CallSchedule(queue_id=payload.queue_id,
                          attempts=[Attempt(**a) for a in plan])
 
-    await db.call_schedules.replace_one({"queue_id": payload.queue_id},
-                                        sched.model_dump(), upsert=True)
-    await db.call_queue.update_one({"id": payload.queue_id},
+    await db.call_schedules.replace_one({"queue_id": payload.queue_id, "org_id": org},
+                                        {**sched.model_dump(), "org_id": org}, upsert=True)
+    await db.call_queue.update_one({"id": payload.queue_id, "org_id": org},
                                    {"$set": {"next_attempt_at": plan[0]["scheduled_at"],
                                              "updated_at": _now_iso()}})
     return sched
@@ -37,8 +40,8 @@ async def schedule(payload: ScheduleRequest):
 
 @router.get("/schedule/{queue_id}", response_model=CallSchedule,
             summary="Fetch the current cadence plan for a queue item.")
-async def get_schedule(queue_id: str):
-    doc = await get_db().call_schedules.find_one({"queue_id": queue_id}, {"_id": 0})
+async def get_schedule(queue_id: str, org: str = Depends(get_org)):
+    doc = await get_db().call_schedules.find_one({"queue_id": queue_id, "org_id": org}, {"_id": 0})
     if not doc:
         raise HTTPException(404, "No cadence plan for this queue item")
     return doc
@@ -46,9 +49,12 @@ async def get_schedule(queue_id: str):
 
 @router.post("/attempt-result",
              summary="Register the outcome of an attempt; advances or stops the cadence.")
-async def attempt_result(payload: AttemptResult):
+async def attempt_result(payload: AttemptResult, org: str = Depends(get_org)):
+    """OJO: también se llama como función (herramientas del agente, webhooks);
+    en ese caso `org` se pasa SIEMPRE explícito."""
     db = get_db()
-    sched = await db.call_schedules.find_one({"queue_id": payload.queue_id}, {"_id": 0})
+    sched = await db.call_schedules.find_one({"queue_id": payload.queue_id, "org_id": org},
+                                             {"_id": 0})
     if not sched:
         raise HTTPException(404, "No cadence plan for this queue item")
 
@@ -87,10 +93,11 @@ async def attempt_result(payload: AttemptResult):
     # WhatsApp fallback after 3 consecutive no_contesta
     last3 = [a["result"] for a in updated if a["status"] == "done"][-3:]
     if len(last3) == 3 and all(r == "no_contesta" for r in last3):
-        q = await db.call_queue.find_one({"id": payload.queue_id}, {"_id": 0})
-        order = await db.orders.find_one({"id": q["order_id"]}, {"_id": 0}) if q else None
+        q = await db.call_queue.find_one({"id": payload.queue_id, "org_id": org}, {"_id": 0})
+        order = await db.orders.find_one({"id": q["order_id"], "org_id": org},
+                                         {"_id": 0}) if q else None
         if order:
-            chatea = get_chatea()
+            chatea = await chatea_for(org)
             product_name = (order.get("products_display")
                             or (order.get("items") or [{}])[0].get("product", "")
                             or "tu pedido")
@@ -98,9 +105,10 @@ async def attempt_result(payload: AttemptResult):
                     f"por tu pedido de {product_name} en oficina. "
                     f"¿Puedes confirmar si lo recogerás?")
             res = await chatea.send_message(order["customer_phone"], text) \
-                if chatea.configured else {"ok": False, "error": "unconfigured"}
+                if chatea.configured else {"ok": False, "error": "Conecta tu cuenta de Chatea Pro (WhatsApp) en Conexiones."}
             await db.message_log.insert_one({
-                "id": _uuid(), "order_id": order["id"], "queue_id": payload.queue_id,
+                "id": _uuid(), "org_id": org,
+                "order_id": order["id"], "queue_id": payload.queue_id,
                 "direction": "outbound", "channel": "whatsapp",
                 "phone": order["customer_phone"], "body": text,
                 "provider": "chatea_pro", "provider_message_id": res.get("provider_message_id"),
@@ -117,7 +125,7 @@ async def attempt_result(payload: AttemptResult):
     # next_attempt_at
     next_at = next((a["scheduled_at"] for a in updated if a["status"] == "pending"), None)
 
-    await db.call_schedules.update_one({"queue_id": payload.queue_id},
+    await db.call_schedules.update_one({"queue_id": payload.queue_id, "org_id": org},
                                        {"$set": {"attempts": updated}})
     q_upd = {"current_attempt": payload.attempt_number,
              "next_attempt_at": next_at, "updated_at": _now_iso()}
@@ -125,21 +133,25 @@ async def attempt_result(payload: AttemptResult):
         q_upd["status"] = new_queue_status
         # If confirmed/refused/etc create a customer task for handoff
         if new_queue_status in ("rechazado", "detenido", "escalado", "extension"):
-            await _create_followup_task(payload.queue_id, new_queue_status)
-    await db.call_queue.update_one({"id": payload.queue_id}, {"$set": q_upd})
+            await _create_followup_task(payload.queue_id, new_queue_status, org)
+    await db.call_queue.update_one({"id": payload.queue_id, "org_id": org}, {"$set": q_upd})
+    if new_queue_status:                 # automatizaciones: "cuando un pedido cambia de estado"
+        from automation_engine import emit_queue_status
+        await emit_queue_status(org, payload.queue_id, new_queue_status)
     return {"ok": True, "queue_status": new_queue_status or "in_progress",
             "next_attempt_at": next_at}
 
 
-async def _create_followup_task(queue_id: str, reason: str):
+async def _create_followup_task(queue_id: str, reason: str, org: str):
     db = get_db()
-    q = await db.call_queue.find_one({"id": queue_id}, {"_id": 0})
+    q = await db.call_queue.find_one({"id": queue_id, "org_id": org}, {"_id": 0})
     if not q:
         return
     task_type_map = {"rechazado": "otro", "detenido": "cambio_direccion",
                      "escalado": "otro", "extension": "mas_dias"}
     doc = {
         "id": _uuid(),
+        "org_id": org,
         "order_id": q["order_id"],
         "queue_id": queue_id,
         "type": task_type_map.get(reason, "otro"),

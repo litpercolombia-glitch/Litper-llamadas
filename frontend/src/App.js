@@ -2,87 +2,116 @@ import { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import "@/index.css";
 import { useTheme } from "@/components/ThemeToggle";
+import { api } from "@/lib/api";
 
-import FunnelPage     from "@/pages/Funnel";
-import DashboardPage  from "@/pages/Dashboard";
-import CopilotPage    from "@/pages/Copilot";
-import SkillsPage     from "@/pages/Skills";
-import QueuePage      from "@/pages/Queue";
-import CadencePage    from "@/pages/Cadence";
-import TasksPage      from "@/pages/Tasks";
-import MessagesPage   from "@/pages/Messages";
-import ConnectorsPage from "@/pages/Connectors";
-import CarriersPage   from "@/pages/Carriers";
-import VoicesPage     from "@/pages/Voices";
-import NumbersPage    from "@/pages/Numbers";
-import NovedadesPage  from "@/pages/Novedades";
-import ImportPage     from "@/pages/Import";
-import ProductsPage   from "@/pages/Products";
-import VipLeadsPage   from "@/pages/VipLeads";
-import PromptsPage    from "@/pages/Prompts";
-import ConfigPage     from "@/pages/Config";
-import OnboardingPage from "@/pages/Onboarding";
-import LoginPage      from "@/pages/Login";
+import FunnelPage      from "@/pages/Funnel";
+import CopilotPage     from "@/pages/Copilot";
+import PedidosPage     from "@/pages/Pedidos";
+import ConexionesPage  from "@/pages/Conexiones";
+import ZynexCallPage   from "@/pages/ZynexCall";
+import MetricasPage    from "@/pages/Metricas";
+import AjustesPage     from "@/pages/Ajustes";
+import OnboardingPage  from "@/pages/Onboarding";
+import LoginPage       from "@/pages/Login";
+import RegisterPage    from "@/pages/Register";
+import AuthCallback    from "@/pages/AuthCallback";
+import FeedbackButton  from "@/components/FeedbackButton";
 
-// Simple operator gate — checks localStorage token exists.
-function OperatorGate({ children }) {
+function AuthGate({ children }) {
   const location = useLocation();
-  const authed = typeof window !== "undefined" && !!localStorage.getItem("litper_operator_ok");
-  if (!authed) return <Navigate to="/login" state={{ from: location }} replace />;
-  return children;
+  const [state, setState] = useState({ status: "checking", user: null });
+
+  useEffect(() => {
+    if (window.location.hash?.includes("session_id=")) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await api.get("/auth/me");
+        if (!cancelled) setState({ status: "authed", user: r.data?.user });
+      } catch {
+        if (!cancelled) setState({ status: "guest", user: null });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  if (state.status === "checking") {
+    return (
+      <div className="min-h-screen grid place-items-center bg-black text-white">
+        <div className="w-10 h-10 border-2 border-zinc-700 border-t-white rounded-full animate-spin" />
+      </div>
+    );
+  }
+  if (state.status === "guest") {
+    localStorage.removeItem("zynex_session_ok");
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+  return (
+    <>
+      {children}
+      <FeedbackButton />
+    </>
+  );
+}
+
+function AuthRouter() {
+  if (typeof window !== "undefined" && window.location.hash?.includes("session_id=")) {
+    return <AuthCallback />;
+  }
+  return (
+    <Routes>
+      {/* Public */}
+      <Route path="/"         element={<FunnelPage />} />
+      <Route path="/funnel"   element={<FunnelPage />} />
+      <Route path="/login"    element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
+
+      {/* 5-item nav */}
+      <Route path="/app"             element={<AuthGate><CopilotPage /></AuthGate>} />
+      <Route path="/app/pedidos"     element={<AuthGate><PedidosPage /></AuthGate>} />
+      <Route path="/app/conexiones"  element={<AuthGate><ConexionesPage /></AuthGate>} />
+      <Route path="/app/llamadas"    element={<AuthGate><ZynexCallPage /></AuthGate>} />
+      <Route path="/app/metricas"    element={<AuthGate><MetricasPage /></AuthGate>} />
+      <Route path="/app/ajustes"     element={<AuthGate><AjustesPage /></AuthGate>} />
+      <Route path="/app/onboarding"  element={<AuthGate><OnboardingPage /></AuthGate>} />
+
+      {/* Back-compat: old routes → new tabbed hubs */}
+      <Route path="/app/queue"       element={<Navigate to="/app/pedidos?tab=cola" replace />} />
+      <Route path="/app/import"      element={<Navigate to="/app/pedidos?tab=importar" replace />} />
+      <Route path="/app/novedades"   element={<Navigate to="/app/pedidos?tab=novedades" replace />} />
+      <Route path="/app/tasks"       element={<Navigate to="/app/pedidos?tab=tickets" replace />} />
+      <Route path="/app/connectors"  element={<Navigate to="/app/conexiones?tab=conectores" replace />} />
+      <Route path="/app/config"      element={<Navigate to="/app/conexiones?tab=credenciales" replace />} />
+      <Route path="/app/voices"      element={<Navigate to="/app/conexiones?tab=voces" replace />} />
+      <Route path="/app/numbers"     element={<Navigate to="/app/conexiones?tab=numeros" replace />} />
+      <Route path="/app/metrics"     element={<Navigate to="/app/metricas" replace />} />
+      <Route path="/app/messages"    element={<Navigate to="/app/pedidos?tab=tickets" replace />} />
+      <Route path="/app/products"    element={<Navigate to="/app/ajustes?tab=productos" replace />} />
+      <Route path="/app/prompts"     element={<Navigate to="/app/ajustes?tab=prompts" replace />} />
+      <Route path="/app/cadence"     element={<Navigate to="/app/ajustes?tab=cadencia" replace />} />
+      <Route path="/app/carriers"    element={<Navigate to="/app/ajustes?tab=transportadoras" replace />} />
+      <Route path="/app/skills"      element={<Navigate to="/app/ajustes?tab=habilidades" replace />} />
+      <Route path="/app/vip-leads"   element={<Navigate to="/app/ajustes?tab=vip" replace />} />
+      <Route path="/app/perfil"      element={<Navigate to="/app/ajustes?tab=perfil" replace />} />
+
+      {/* Legacy top-level shortcuts */}
+      <Route path="/copilot"    element={<Navigate to="/app" replace />} />
+      <Route path="/metrics"    element={<Navigate to="/app/metricas" replace />} />
+      <Route path="/queue"      element={<Navigate to="/app/pedidos?tab=cola" replace />} />
+      <Route path="/connectors" element={<Navigate to="/app/conexiones?tab=conectores" replace />} />
+
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
 }
 
 function App() {
   useTheme();
-  useEffect(() => { document.title = "Litper Connect Hub"; }, []);
+  useEffect(() => { document.title = "Zynex OS"; }, []);
 
   return (
     <BrowserRouter>
-      <Routes>
-        {/* Public funnel */}
-        <Route path="/"        element={<FunnelPage />} />
-        <Route path="/funnel"  element={<FunnelPage />} />
-        <Route path="/login"   element={<LoginPage />} />
-
-        {/* Internal app — operator-gated */}
-        <Route path="/app"             element={<OperatorGate><CopilotPage /></OperatorGate>} />
-        <Route path="/app/skills"      element={<OperatorGate><SkillsPage /></OperatorGate>} />
-        <Route path="/app/metrics"     element={<OperatorGate><DashboardPage /></OperatorGate>} />
-        <Route path="/app/queue"       element={<OperatorGate><QueuePage /></OperatorGate>} />
-        <Route path="/app/cadence"     element={<OperatorGate><CadencePage /></OperatorGate>} />
-        <Route path="/app/tasks"       element={<OperatorGate><TasksPage /></OperatorGate>} />
-        <Route path="/app/messages"    element={<OperatorGate><MessagesPage /></OperatorGate>} />
-        <Route path="/app/voices"      element={<OperatorGate><VoicesPage /></OperatorGate>} />
-        <Route path="/app/numbers"     element={<OperatorGate><NumbersPage /></OperatorGate>} />
-        <Route path="/app/carriers"    element={<OperatorGate><CarriersPage /></OperatorGate>} />
-        <Route path="/app/novedades"   element={<OperatorGate><NovedadesPage /></OperatorGate>} />
-        <Route path="/app/connectors"  element={<OperatorGate><ConnectorsPage /></OperatorGate>} />
-        <Route path="/app/import"      element={<OperatorGate><ImportPage /></OperatorGate>} />
-        <Route path="/app/products"    element={<OperatorGate><ProductsPage /></OperatorGate>} />
-        <Route path="/app/vip-leads"   element={<OperatorGate><VipLeadsPage /></OperatorGate>} />
-        <Route path="/app/prompts"     element={<OperatorGate><PromptsPage /></OperatorGate>} />
-        <Route path="/app/config"      element={<OperatorGate><ConfigPage /></OperatorGate>} />
-        <Route path="/app/onboarding"  element={<OperatorGate><OnboardingPage /></OperatorGate>} />
-
-        {/* Back-compat redirects from old URLs */}
-        <Route path="/copilot"    element={<Navigate to="/app" replace />} />
-        <Route path="/metrics"    element={<Navigate to="/app/metrics" replace />} />
-        <Route path="/queue"      element={<Navigate to="/app/queue" replace />} />
-        <Route path="/cadence"    element={<Navigate to="/app/cadence" replace />} />
-        <Route path="/tasks"      element={<Navigate to="/app/tasks" replace />} />
-        <Route path="/messages"   element={<Navigate to="/app/messages" replace />} />
-        <Route path="/voices"     element={<Navigate to="/app/voices" replace />} />
-        <Route path="/numbers"    element={<Navigate to="/app/numbers" replace />} />
-        <Route path="/carriers"   element={<Navigate to="/app/carriers" replace />} />
-        <Route path="/novedades"  element={<Navigate to="/app/novedades" replace />} />
-        <Route path="/connectors" element={<Navigate to="/app/connectors" replace />} />
-        <Route path="/skills"     element={<Navigate to="/app/skills" replace />} />
-        <Route path="/import"     element={<Navigate to="/app/import" replace />} />
-        <Route path="/products"   element={<Navigate to="/app/products" replace />} />
-        <Route path="/vip-leads"  element={<Navigate to="/app/vip-leads" replace />} />
-
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      <AuthRouter />
     </BrowserRouter>
   );
 }

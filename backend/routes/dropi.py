@@ -20,7 +20,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, Form
 from pydantic import BaseModel
 
 from db import get_db
-from deps import require_api_key
+from deps import get_org, require_api_key
 from dropi_import import (
     parse_sheet,
     read_workbook_info,
@@ -68,7 +68,8 @@ async def dropi_sheets(file: UploadFile = File(...)):
              summary="Parse a Dropi Excel/CSV export, group rows per order (combo-safe), "
                      "and return a consolidated preview + heuristic warnings.")
 async def dropi_preview(file: UploadFile = File(...),
-                        sheet: Optional[str] = Form(None)):
+                        sheet: Optional[str] = Form(None),
+                        org: str = Depends(get_org)):
     data = await file.read()
     try:
         result = parse_sheet(data, file.filename or "", sheet)
@@ -78,6 +79,7 @@ async def dropi_preview(file: UploadFile = File(...),
     preview_id = str(uuid.uuid4())
     doc = {
         "id":                 preview_id,
+        "org_id":             org,
         "filename":           file.filename or "",
         "sheet_used":         result.sheet_used,
         "created_at":         _now_iso(),
@@ -100,8 +102,8 @@ async def dropi_preview(file: UploadFile = File(...),
 
 @router.get("/preview/{preview_id}",
             summary="Fetch a stored preview (for re-review before import).")
-async def dropi_preview_get(preview_id: str):
-    doc = await get_db().dropi_previews.find_one({"id": preview_id}, {"_id": 0})
+async def dropi_preview_get(preview_id: str, org: str = Depends(get_org)):
+    doc = await get_db().dropi_previews.find_one({"id": preview_id, "org_id": org}, {"_id": 0})
     if not doc:
         raise HTTPException(404, "Preview no encontrado.")
     return doc
@@ -110,9 +112,10 @@ async def dropi_preview_get(preview_id: str):
 @router.post("/import",
              summary="Commit selected orders from a preview into the DB + queue. "
                      "Deduplicates by external_ref/tracking_number.")
-async def dropi_import(payload: DropiImportIn):
+async def dropi_import(payload: DropiImportIn, org: str = Depends(get_org)):
     db = get_db()
-    preview = await db.dropi_previews.find_one({"id": payload.preview_id}, {"_id": 0})
+    preview = await db.dropi_previews.find_one({"id": payload.preview_id, "org_id": org},
+                                               {"_id": 0})
     if not preview:
         raise HTTPException(404, "Preview no encontrado. Sube el archivo de nuevo.")
 
@@ -124,7 +127,7 @@ async def dropi_import(payload: DropiImportIn):
         raise HTTPException(400, "No hay órdenes seleccionadas para importar.")
 
     # Load carriers slug set for validation
-    carriers = await db.carriers.find({}, {"_id": 0, "slug": 1,
+    carriers = await db.carriers.find({"org_id": org}, {"_id": 0, "slug": 1,
                                             "office_claim_max_days": 1}).to_list(500)
     carrier_by_slug = {c["slug"]: c for c in carriers}
 
@@ -143,7 +146,7 @@ async def dropi_import(payload: DropiImportIn):
             continue
 
         # Dedup: match by external_ref OR tracking_number
-        dedup_q = {"$or": []}
+        dedup_q = {"org_id": org, "$or": []}  # duplicado solo dentro del mismo cliente
         if e.get("external_ref"):
             dedup_q["$or"].append({"external_ref": e["external_ref"]})
         if e.get("tracking_number"):
@@ -194,7 +197,9 @@ async def dropi_import(payload: DropiImportIn):
             continue
 
         order = Order(**order_in.model_dump(), status="in_queue")
-        await db.orders.insert_one(order.model_dump())
+        await db.orders.insert_one({**order.model_dump(), "org_id": org})
+        from automation_engine import emit, order_payload
+        await emit(org, "pedido_creado", order_payload(order.model_dump()))
 
         arrival = order_in.office_arrival_date or _today()
         q = QueueItem(
@@ -204,7 +209,7 @@ async def dropi_import(payload: DropiImportIn):
             office_claim_max_days=carrier_by_slug[slug].get("office_claim_max_days"),
             country=order.country,
         )
-        await db.call_queue.insert_one(q.model_dump())
+        await db.call_queue.insert_one({**q.model_dump(), "org_id": org})
         imported.append({"order_key": key, "order_id": order.id,
                          "tracking": order.tracking_number,
                          "recaudo": order.total_amount,

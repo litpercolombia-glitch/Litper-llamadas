@@ -1,11 +1,13 @@
 """Iteration 6 — Final launch round tests: products+promotions, VIP funnel, order prompt vars."""
+from _live import require_live  # pruebas contra servidor vivo: se saltan sin entorno
+require_live()
 import os
 import io
 import pytest
 import requests
 
-BASE = os.environ["REACT_APP_BACKEND_URL"].rstrip("/") if os.environ.get("REACT_APP_BACKEND_URL") else "https://litper-hub.preview.emergentagent.com"
-API_KEY = "litper_hub_pk_2026_prod_ChangeMe_9x2Kf7bQvE4mLnT8sZ3H"
+BASE = os.environ["REACT_APP_BACKEND_URL"].rstrip("/") if os.environ.get("REACT_APP_BACKEND_URL") else ""
+API_KEY = os.environ.get("PUBLIC_API_KEY", "")
 
 HDR = {"X-API-Key": API_KEY, "Content-Type": "application/json"}
 PUB = {"Content-Type": "application/json"}

@@ -21,8 +21,9 @@ router = APIRouter(prefix="/config", tags=["config"],
 
 
 def _org_id(request: Request) -> str:
-    # Multi-tenant hook: read X-Org-Id header; default to "default" for now.
-    return (request.headers.get("X-Org-Id") or DEFAULT_ORG).strip() or DEFAULT_ORG
+    # Cliente = claim "org" del JWT de sesión (aislamiento real por cliente).
+    from tenant import org_from_request
+    return org_from_request(request)
 
 
 class CredentialsIn(BaseModel):
@@ -120,17 +121,33 @@ async def test_credentials(provider: str, request: Request):
         except Exception as e:
             return {"ok": False, "detail": str(e)}
 
-    if provider in {"groq", "gemini", "mistral", "cerebras", "claude"}:
+    if provider in {"openrouter", "groq", "gemini", "mistral", "cerebras", "claude"}:
         api_key = creds.get("api_key") or ""
         if not api_key:
             return {"ok": False, "detail": "API key vacía."}
-        # Round-trip through the LLM router (routes/llm has a ping)
-        from agent.router import ping_provider
+        # Prueba REAL: un mensaje de ida y vuelta con la llave de ESTE cliente.
+        from agent.router import ping
         try:
-            r = await ping_provider(provider)
-            return {"ok": bool(r.get("ok")), "detail": r.get("detail") or r.get("error")}
+            r = await ping(provider, org_id)
+            detail = (f"OK · modelo {r.get('model')}" if r.get("ok")
+                      else (r.get("error") or "falló"))
+            return {"ok": bool(r.get("ok")), "detail": detail}
         except Exception as e:
             return {"ok": False, "detail": str(e)}
+
+    if provider == "retell":
+        import httpx
+        api_key = creds.get("api_key") or ""
+        if not api_key:
+            return {"ok": False, "detail": "API key vacía."}
+        try:
+            async with httpx.AsyncClient(timeout=10) as x:
+                r = await x.get("https://api.retellai.com/list-agents",
+                                headers={"Authorization": f"Bearer {api_key}"})
+            return {"ok": r.status_code < 400,
+                    "detail": "auth OK" if r.status_code < 400 else f"HTTP {r.status_code}"}
+        except Exception as e:  # noqa: BLE001
+            return {"ok": False, "detail": type(e).__name__}
 
     if provider == "twilio":
         sid = creds.get("account_sid") or ""
@@ -139,6 +156,42 @@ async def test_credentials(provider: str, request: Request):
             return {"ok": False, "detail": "Falta account_sid o auth_token."}
         return {"ok": True, "detail": "Credenciales presentes (no se hizo llamada externa)."}
 
+    if provider == "dropi":
+        import httpx
+        token   = creds.get("api_token") or ""
+        base    = (creds.get("base_url") or "https://api.dropi.co").rstrip("/")
+        country = (creds.get("country")  or "CO").upper()
+        if not token:
+            return {"ok": False, "detail": "Falta API Token de Dropi."}
+        try:
+            async with httpx.AsyncClient(timeout=10) as x:
+                # Dropi's public API returns a session/user echo on /me for a valid token.
+                r = await x.get(f"{base}/api/{country.lower()}/me",
+                                headers={"Authorization": f"Bearer {token}"})
+                if r.status_code < 400:
+                    return {"ok": True, "detail": f"Dropi {country}: token OK"}
+                return {"ok": False, "detail": f"HTTP {r.status_code} — revisa el token/país."}
+        except Exception as e:
+            return {"ok": False, "detail": str(e)}
+
+    if provider == "shopify":
+        import httpx
+        token = creds.get("access_token") or ""
+        store = (creds.get("store_url") or "").strip().replace("https://", "").replace("http://", "")
+        store = store.rstrip("/")
+        if not token or not store:
+            return {"ok": False, "detail": "Falta access_token o store_url."}
+        try:
+            async with httpx.AsyncClient(timeout=10) as x:
+                r = await x.get(f"https://{store}/admin/api/2024-07/shop.json",
+                                headers={"X-Shopify-Access-Token": token})
+                if r.status_code == 200:
+                    name = (r.json().get("shop") or {}).get("name", "")
+                    return {"ok": True, "detail": f"Tienda: {name}"}
+                return {"ok": False, "detail": f"HTTP {r.status_code}"}
+        except Exception as e:
+            return {"ok": False, "detail": str(e)}
+
     return {"ok": False, "detail": "Test no implementado para este provider."}
 
 
@@ -146,7 +199,7 @@ async def test_credentials(provider: str, request: Request):
 # Onboarding progress — helper for the guided wizard.
 # ---------------------------------------------------------------------------
 REQUIRED_TO_OPERATE = ["chatea_pro"]      # must have at least these to send WA
-LLM_PROVIDERS       = ["groq", "gemini", "mistral", "cerebras", "claude"]
+LLM_PROVIDERS       = ["openrouter", "groq", "gemini", "mistral", "cerebras", "claude"]
 
 _ONBOARDING_STEPS = [
     {"key": "chatea_pro", "label": "Chatea Pro · WhatsApp",
@@ -161,9 +214,9 @@ _ONBOARDING_STEPS = [
     {"key": "dropi", "label": "Dropi · Fuente de pedidos",
      "doc": "https://dropi.co/",
      "instructions": "No necesita llave — solo exporta 'Reclamos en Oficina' desde tu panel Dropi."},
-    {"key": "llm", "label": "Motor de IA (Groq / Gemini / Claude / Mistral / Cerebras)",
-     "doc": "https://console.groq.com/keys",
-     "instructions": "Con uno basta. Groq es gratis y muy rápido — ideal para empezar."},
+    {"key": "llm", "label": "Motor de IA (OpenRouter recomendado)",
+     "doc": "https://openrouter.ai/keys",
+     "instructions": "Crea tu llave en openrouter.ai/keys, recarga saldo en openrouter.ai/credits y pégala aquí. Una sola llave abre cientos de modelos."},
 ]
 
 

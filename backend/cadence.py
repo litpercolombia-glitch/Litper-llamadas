@@ -30,12 +30,19 @@ from data import WINDOWS, HOLIDAYS_CO_2026, COUNTRY_TIMEZONES
 WINDOW_ORDER = ["manana", "mediodia", "tarde", "noche"]
 
 
-def _tz_for(country: str) -> ZoneInfo:
-    return ZoneInfo(COUNTRY_TIMEZONES.get(country, "America/Bogota"))
+def _tz_for(country: str | None, tz_name: str | None = None) -> ZoneInfo:
+    """Zona del país del pedido si se conoce; si no, la del perfil del cliente
+    (`tz_name`); último recurso America/Bogota (comportamiento histórico)."""
+    name = COUNTRY_TIMEZONES.get(country or "") or tz_name or "America/Bogota"
+    try:
+        return ZoneInfo(name)
+    except Exception:  # noqa: BLE001 — zona inválida en el perfil: no romper
+        return ZoneInfo("America/Bogota")
 
 
-def _is_holiday(d: date) -> bool:
-    return d in HOLIDAYS_CO_2026
+def _is_holiday(d: date, country: str | None = "CO") -> bool:
+    """Solo tenemos el calendario de festivos de Colombia."""
+    return country == "CO" and d in HOLIDAYS_CO_2026
 
 
 def _next_business_day(d: date) -> date:
@@ -50,10 +57,15 @@ def _window_time(day: date, window: str, tz: ZoneInfo, offset_min: int = 0) -> d
     return datetime.combine(day, time(hour=start_h, minute=offset_min), tzinfo=tz)
 
 
-def build_plan(*, country: str, start_date: date,
-               office_claim_max_days: int | None) -> list[dict]:
-    """Return a list of 5 attempt dicts: {attempt_number, channel, window, scheduled_at (UTC ISO)}."""
-    tz = _tz_for(country)
+def build_plan(*, country: str | None, start_date: date,
+               office_claim_max_days: int | None,
+               tz_name: str | None = None) -> list[dict]:
+    """Return a list of 5 attempt dicts: {attempt_number, channel, window, scheduled_at (UTC ISO)}.
+
+    `tz_name` = zona horaria del perfil del cliente (se usa cuando el país del
+    pedido no tiene zona conocida). Festivos: solo se saltan si country == "CO".
+    """
+    tz = _tz_for(country, tz_name)
     total_attempts = 5
 
     # Determine cadence layout: (day_offset, window) tuples of length 5.
@@ -79,7 +91,7 @@ def build_plan(*, country: str, start_date: date,
     prev_key: tuple[date, str] | None = None
     for i, (day_off, window) in enumerate(layout):
         target_day = start_date + timedelta(days=day_off)
-        while _is_holiday(target_day):
+        while _is_holiday(target_day, country):
             target_day += timedelta(days=1)
 
         # Never schedule past the office claim deadline (if defined).
@@ -117,11 +129,11 @@ def _validate_no_back_to_back(layout: Iterable[tuple[int, str]]) -> None:
 
 
 def days_left(office_arrival_date: str, office_claim_max_days: int | None,
-              now: datetime | None = None) -> int | None:
+              now: datetime | None = None, tz_name: str | None = None) -> int | None:
     """Days remaining until the office claim deadline (never negative)."""
     if office_claim_max_days is None:
         return None
     arrival = date.fromisoformat(office_arrival_date[:10])
     deadline = arrival + timedelta(days=office_claim_max_days)
-    today = (now or datetime.now(ZoneInfo("America/Bogota"))).date()
+    today = (now or datetime.now(_tz_for(None, tz_name))).date()
     return max(0, (deadline - today).days)

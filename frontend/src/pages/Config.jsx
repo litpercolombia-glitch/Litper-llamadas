@@ -12,14 +12,14 @@ import {
 
 const PROVIDER_META = {
   chatea_pro: {
-    label: "Chatea Pro · WhatsApp",
+    label: "WhatsApp · con tu cuenta de Chatea Pro",
     doc: "https://chateapro.app/settings#/api",
     hint: "Obtén el token en Chatea Pro → Configuración → API tokens.",
   },
   telnyx: {
     label: "Telnyx · SIP (primario)",
     doc: "https://portal.telnyx.com",
-    hint: "Compra un número CO, crea una Voice/SIP Connection y guarda API Key + Connection ID.",
+    hint: "Compra un número de tu país, crea una Voice/SIP Connection y guarda API Key + Connection ID.",
   },
   elevenlabs: {
     label: "ElevenLabs · Voz IA",
@@ -31,7 +31,8 @@ const PROVIDER_META = {
     doc: "https://console.twilio.com/",
     hint: "Account SID + Auth Token desde Twilio Console.",
   },
-  groq:     { label: "Groq · LLM primario",  doc: "https://console.groq.com/keys", hint: "" },
+  openrouter: { label: "OpenRouter · IA principal (recomendado)", doc: "https://openrouter.ai/keys", hint: "Una sola llave abre cientos de modelos. Recarga saldo en openrouter.ai/credits." },
+  groq:     { label: "Groq · respaldo",  doc: "https://console.groq.com/keys", hint: "" },
   gemini:   { label: "Gemini · Análisis",    doc: "https://aistudio.google.com/apikey", hint: "" },
   mistral:  { label: "Mistral · Alternativa", doc: "https://console.mistral.ai/api-keys/", hint: "" },
   cerebras: { label: "Cerebras · Alta velocidad", doc: "https://cloud.cerebras.ai/", hint: "" },
@@ -104,7 +105,7 @@ export default function ConfigPage() {
 
   return (
     <Layout
-      title="Configuración · Credenciales"
+      title="Credenciales"
       subtitle="Cada organización guarda sus propias llaves — encriptadas en el servidor. NUNCA se muestran en el navegador."
     >
       <div className="mb-4 rounded-lg border border-emerald-500/25 bg-emerald-500/5 backdrop-blur-md p-3 text-xs text-emerald-200 flex gap-2 items-start"

@@ -1,7 +1,8 @@
-"""Litper Connect Hub — FastAPI entry-point.
+"""Zynex OS — FastAPI entry-point.
 
-Public REST API for a COD e-commerce call-center orchestrator (LATAM).
-Every business endpoint is protected by X-API-Key. OpenAPI at /docs & /redoc.
+API multi-cliente: cada dato de negocio pertenece a un org (ver tenant.py y
+deps.get_org). Every business endpoint is protected (JWT de sesión o
+X-API-Key). OpenAPI at /docs & /redoc.
 """
 import os
 import logging
@@ -17,7 +18,6 @@ load_dotenv(ROOT_DIR / ".env")
 
 # Import after loading .env so os.environ is populated
 from db import get_db, close as close_db  # noqa: E402
-from data import CARRIERS_SEED, NOVEDADES_SEED  # noqa: E402
 import scheduler  # noqa: E402
 
 from routes.health import router as health_router  # noqa: E402
@@ -42,128 +42,139 @@ from routes.products import router as products_router  # noqa: E402
 from routes.prompts import router as prompts_router  # noqa: E402
 from routes.vip import public_router as vip_public_router, admin_router as vip_admin_router  # noqa: E402
 from routes.config import router as config_router  # noqa: E402
+from routes.auth import router as auth_router  # noqa: E402
+from routes.agents import router as agents_router  # noqa: E402
 from routes.llm import router as llm_router  # noqa: E402
+from routes.feedback import router as feedback_router  # noqa: E402
+from routes.custom_agents import router as custom_agents_router  # noqa: E402
+from routes.calls import router as calls_router  # noqa: E402
+from routes.agent_tools import router as agent_tools_router  # noqa: E402
+from routes.org_profile import router as org_profile_router  # noqa: E402
+from routes.packs import router as packs_router  # noqa: E402
+from routes.mcp_servers import router as mcp_servers_router  # noqa: E402
+from routes.kb import router as kb_router  # noqa: E402
+from routes.automations import router as automations_router  # noqa: E402
 
 logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
-log = logging.getLogger("litper.main")
+log = logging.getLogger("zynex.main")
 
 
-async def _ensure_seed():
-    """Upsert carriers + connectors on boot (idempotent)."""
+async def _index(coll, keys, **kw) -> None:
+    """Crea un índice sin tumbar el arranque (p. ej. si ya existe otro con el
+    mismo nombre/opciones distintas, o hay datos viejos que chocan)."""
+    try:
+        await coll.create_index(keys, **kw)
+    except Exception as e:  # noqa: BLE001
+        log.warning("índice %s %s no creado: %s", coll.name, keys, e)
+
+
+async def _drop_index(coll, name: str) -> None:
+    """Quita un índice único GLOBAL antiguo (si existe) para reemplazarlo por
+    el compuesto con org_id. Tolerante: si no existe, no pasa nada."""
+    try:
+        await coll.drop_index(name)
+        log.info("índice antiguo %s.%s eliminado", coll.name, name)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+# Colecciones con datos de cliente que se listan por fecha → (org_id, created_at).
+_ORG_LISTED = ["orders", "call_queue", "call_schedules", "customer_tasks", "message_log",
+               "voice_profiles", "connected_numbers", "uploaded_files", "catalog_products",
+               "prompts", "whatsapp_rules", "vip_leads", "dropi_previews",
+               "webhook_events", "copilot_skills", "feedback"]
+
+
+async def _ensure_indexes():
+    """Arranque: SOLO índices. No se siembra ningún dato de negocio — un cliente
+    nuevo empieza vacío. Transportadoras, novedades, skills, voces, prompts de
+    Sofía y reglas de WhatsApp son el paquete opcional "cod_colombia"
+    (backend/packs.py · POST /api/packs/cod_colombia/install). El catálogo de
+    conectores es estático (routes/connectors.py) y su estado es por cliente.
+    """
     db = get_db()
-    for c in CARRIERS_SEED:
-        await db.carriers.update_one({"slug": c["slug"]}, {"$set": c}, upsert=True)
-    for c in [("chatea_pro", "Chatea Pro (WhatsApp)"),
-              ("dropi", "Dropi (Fulfillment)"),
-              ("whatsapp_business", "WhatsApp Business (Meta Cloud)"),
-              ("supabase", "Supabase Postgres"),
-              ("elevenlabs", "ElevenLabs (Voz IA)"),
-              ("twilio", "Twilio (Caller ID)")]:
-        await db.integration_connectors.update_one(
-            {"key": c[0]},
-            {"$setOnInsert": {"key": c[0], "name": c[1], "status": "unconfigured",
-                              "metadata": {}}},
-            upsert=True,
-        )
-    # Ensure indexes
-    await db.orders.create_index("id", unique=True)
-    await db.orders.create_index("external_ref")
-    await db.call_queue.create_index("id", unique=True)
-    await db.call_queue.create_index("order_id")
-    await db.call_schedules.create_index("queue_id", unique=True)
-    await db.customer_tasks.create_index("id", unique=True)
-    await db.message_log.create_index("created_at")
-    await db.voice_profiles.create_index("id", unique=True)
-    await db.connected_numbers.create_index("phone_number", unique=True)
-    await db.carrier_novedades.create_index([("carrier", 1), ("estatus_carrier", 1)],
-                                            unique=True)
-    await db.chat_threads.create_index("id", unique=True)
-    await db.chat_messages.create_index([("thread_id", 1), ("created_at", 1)])
-    await db.copilot_skills.create_index("id", unique=True)
-    await db.uploaded_files.create_index("id", unique=True)
-    await db.catalog_products.create_index("id", unique=True)
-    await db.vip_leads.create_index("id", unique=True)
-    await db.vip_leads.create_index("whatsapp")
-    await db.prompts.create_index("id", unique=True)
-    await db.whatsapp_rules.create_index("id", unique=True)
-    await db.org_credentials.create_index([("org_id", 1), ("provider", 1)], unique=True)
-    await db.whatsapp_contacts.create_index("phone", unique=True)
+    # --- Identificadores propios (UUID): únicos globales, no chocan entre clientes.
+    for coll in ("orders", "call_queue", "customer_tasks", "voice_profiles",
+                 "chat_threads", "copilot_skills", "uploaded_files",
+                 "catalog_products", "vip_leads", "prompts", "whatsapp_rules",
+                 "orgs", "custom_agents"):
+        await _index(db[coll], "id", unique=True)
+    await _index(db.call_schedules, "queue_id", unique=True)
+    await _index(db.calls, "call_id", unique=True)
+    await _index(db.users, "email", unique=True)
+    await _index(db.org_credentials, [("org_id", 1), ("provider", 1)], unique=True)
+    await _index(db.org_profiles, "org_id", unique=True)
+    await _index(db.org_packs, [("org_id", 1), ("pack", 1)], unique=True)
+    # Conectores MCP por cliente y acciones del asistente que esperan confirmación.
+    await _index(db.mcp_servers, "id", unique=True)
+    await _index(db.mcp_servers, [("org_id", 1), ("nombre", 1)], unique=True)
+    await _index(db.pending_actions, "id", unique=True)
+    await _index(db.pending_actions, [("org_id", 1), ("thread_id", 1), ("status", 1)])
+    await _index(db.call_launches, [("org_id", 1), ("created_at", -1)])
+    # TTL: Mongo borra sola una acción pendiente 24 h después de vencer
+    # (`expires_dt` es fecha real; `expires_at` sigue siendo el ISO que lee la app).
+    await _index(db.pending_actions, "expires_dt", expireAfterSeconds=24 * 3600)
+    # Token de webhooks por cliente (webhook_tokens.py).
+    await _index(db.org_webhook_tokens, "org_id", unique=True)
+    await _index(db.org_webhook_tokens, "token", unique=True)
+    await _index(db.custom_agents, "tool_token", unique=True, sparse=True)
+    await _index(db.agent_call_results, [("org_id", 1), ("created_at", -1)])
+    # Base de conocimiento (una por cliente) y automatizaciones.
+    await _index(db.org_kb, "org_id", unique=True)
+    await _index(db.automations, "id", unique=True)
+    await _index(db.automations, [("org_id", 1), ("trigger.tipo", 1), ("activa", 1)])
+    await _index(db.automation_runs, [("org_id", 1), ("created_at", -1)])
+    await _index(db.automation_runs, [("org_id", 1), ("rule_id", 1), ("created_at", -1)])
+    # Contadores atómicos (límite diario por regla, tope por destinatario, eventos
+    # repetidos): el índice ÚNICO es lo que hace atómica la reserva. Se borran
+    # solos 3 días después de su último uso.
+    await _index(db.automation_counters, [("org_id", 1), ("key", 1), ("day", 1)], unique=True)
+    await _index(db.automation_counters, "exp", expireAfterSeconds=3 * 24 * 3600)
+    await _index(db.message_log, [("org_id", 1), ("phone_digits", 1), ("created_at", -1)], sparse=True)
+    # Intentos fallidos de login/registro: Mongo los borra solos a los 15 min.
+    await _index(db.auth_attempts, "at", expireAfterSeconds=15 * 60)
+    await _index(db.auth_attempts, [("key", 1), ("at", -1)])
 
-    # Seed novedades (idempotent by carrier+estatus_carrier)
-    for n in NOVEDADES_SEED:
-        await db.carrier_novedades.update_one(
-            {"carrier": n["carrier"], "estatus_carrier": n["estatus_carrier"]},
-            {"$set": n},
-            upsert=True,
-        )
+    # --- Únicos por DATO DE NEGOCIO: antes eran globales (dos clientes no podían
+    # tener el mismo teléfono/estatus/clave). Ahora compuestos con org_id.
+    await _drop_index(db.connected_numbers, "phone_number_1")
+    await _index(db.connected_numbers,
+                 [("org_id", 1), ("phone_number", 1), ("provider", 1)], unique=True)
+    await _drop_index(db.whatsapp_contacts, "phone_1")
+    await _index(db.whatsapp_contacts, [("org_id", 1), ("phone", 1)], unique=True)
+    await _drop_index(db.rto_blacklist, "phone_1")
+    await _index(db.rto_blacklist, [("org_id", 1), ("phone", 1)], unique=True)
+    await _drop_index(db.carrier_novedades, "carrier_1_estatus_carrier_1")
+    await _index(db.carrier_novedades,
+                 [("org_id", 1), ("carrier", 1), ("estatus_carrier", 1)], unique=True)
+    await _index(db.carriers, [("org_id", 1), ("slug", 1)], unique=True)
+    await _drop_index(db.ceo_reports, "id_1")
+    await _index(db.ceo_reports, [("org_id", 1), ("id", 1)], unique=True)
+    await _drop_index(db.settings, "key_1")
+    await _index(db.settings, [("org_id", 1), ("key", 1)], unique=True)
+    await _index(db.integration_connectors, [("org_id", 1), ("key", 1)])
 
-    # Seed copilot skills (idempotent by trigger)
-    from data import SKILLS_SEED, VOICES_SEED
-    for s in SKILLS_SEED:
-        await db.copilot_skills.update_one(
-            {"trigger": s["trigger"]},
-            {"$setOnInsert": {**s, "is_seed": True}},
-            upsert=True,
-        )
-    # Seed the 6 preferred ElevenLabs voices (idempotent by voice_id)
-    for v in VOICES_SEED:
-        await db.voice_profiles.update_one(
-            {"elevenlabs_voice_id": v["elevenlabs_voice_id"]},
-            {"$setOnInsert": v},
-            upsert=True,
-        )
-
-    # Seed catalog products with promotions (idempotent by nombre)
-    from data import PRODUCTS_SEED
-    for p in PRODUCTS_SEED:
-        await db.catalog_products.update_one(
-            {"nombre": p["nombre"]},
-            {"$setOnInsert": p},
-            upsert=True,
-        )
-
-    # Seed the default Sofía global prompt (LIT-LOG-RO flow — 6-block ElevenLabs).
-    # Force-overwrite if the existing doc is from a legacy structure so upgrades
-    # roll out cleanly without a manual migration.
-    from data import PROMPTS_SEED, WHATSAPP_RULES_SEED
-    for pr in PROMPTS_SEED:
-        existing = await db.prompts.find_one(
-            {"name": pr["name"], "scope": pr["scope"], "country": pr.get("country")},
-            {"_id": 0, "system_prompt": 1})
-        needs_upgrade = (
-            existing
-            and (not (existing.get("system_prompt") or "").lstrip().startswith("# Personalidad")
-                 or "impermeable" in (existing.get("system_prompt") or "").lower())
-        )
-        if existing and needs_upgrade:
-            await db.prompts.update_one(
-                {"name": pr["name"], "scope": pr["scope"], "country": pr.get("country")},
-                {"$set": {"system_prompt": pr["system_prompt"],
-                          "first_message": pr["first_message"],
-                          "variables":     pr["variables"],
-                          "updated_at":    pr["updated_at"]}})
-        elif not existing:
-            await db.prompts.insert_one(pr)
-    for rule in WHATSAPP_RULES_SEED:
-        # Force-migrate legacy template names to the real approved ones.
-        await db.whatsapp_rules.update_one(
-            {"rule_key": rule["rule_key"]},
-            {"$setOnInsert": {"id": rule["id"], "created_at": rule["created_at"]},
-             "$set": {"template_name":     rule["template_name"],
-                      "template_language": rule["template_language"],
-                      "days_min":          rule["days_min"],
-                      "days_max":          rule["days_max"],
-                      "updated_at":        rule["updated_at"]}},
-            upsert=True,
-        )
+    # --- Listados por cliente.
+    for coll in _ORG_LISTED:
+        await _index(db[coll], [("org_id", 1), ("created_at", -1)])
+    await _index(db.custom_agents, [("org_id", 1), ("created_at", -1)])
+    await _index(db.calls, [("org_id", 1), ("created_at", -1)])
+    await _index(db.agent_tool_calls, [("org_id", 1), ("created_at", -1)])
+    await _index(db.chat_threads, [("org_id", 1), ("updated_at", -1)])
+    await _index(db.chat_messages, [("org_id", 1), ("thread_id", 1), ("created_at", 1)])
+    await _index(db.novedades_ticks, [("org_id", 1), ("ts", -1)])
+    await _index(db.orders, [("org_id", 1), ("external_ref", 1)])
+    await _index(db.orders, [("org_id", 1), ("customer_phone", 1)])
+    await _index(db.call_queue, [("org_id", 1), ("order_id", 1)])
+    await _index(db.vip_leads, "whatsapp")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await _ensure_seed()
+    await _ensure_indexes()
     scheduler.start()
-    log.info("Litper Connect Hub ready.")
+    log.info("Zynex OS API ready.")
     try:
         yield
     finally:
@@ -172,24 +183,33 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Litper Connect Hub API",
+    # Documentación de la API cerrada en producción (mapa gratis para atacantes/copiones).
+    docs_url=None if os.environ.get("EXPOSE_DOCS") != "1" else "/docs",
+    redoc_url=None if os.environ.get("EXPOSE_DOCS") != "1" else "/redoc",
+    openapi_url=None if os.environ.get("EXPOSE_DOCS") != "1" else "/openapi.json",
+    title="Zynex OS API",
     description=(
-        "Integration hub + public API for COD e-commerce call-center operations "
-        "in LATAM. Orchestrates AI phone calls (VAPI) and WhatsApp (Chatea Pro) to "
-        "confirm COD orders sitting at carrier offices before they get returned.\n\n"
-        "Auth: every business endpoint requires header `X-API-Key: <PUBLIC_API_KEY>`.\n"
-        "Webhooks (/api/webhooks/*) are unauthenticated by design."
+        "Zynex OS — plataforma multi-cliente de agentes de IA (copiloto, voz y "
+        "WhatsApp) para operar cualquier negocio. Cada cliente (org) ve y opera "
+        "solo sus propios datos.\n\n"
+        "Auth: sesión JWT (cookie o `Authorization: Bearer`) o cabecera "
+        "`X-API-Key: <PUBLIC_API_KEY>` (+ `X-Org-Id` servidor-a-servidor).\n"
+        "Los webhooks de proveedores no llevan sesión: cada cliente usa su URL "
+        "con token (`GET /api/org/webhook-urls`); sin token solo se aceptan con "
+        "firma válida. Fallan cerrado."
     ),
     version="1.0.0",
     lifespan=lifespan,
-    docs_url="/docs",
-    redoc_url="/redoc",
 )
 
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=os.environ.get("CORS_ORIGINS", "*").split(","),
+    allow_origins=[o for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip()],
+    # Por defecto solo localhost. Otros orígenes por patrón (p. ej. previews)
+    # se habilitan explícitamente con CORS_ORIGIN_REGEX; los fijos, con CORS_ORIGINS.
+    allow_origin_regex=os.environ.get("CORS_ORIGIN_REGEX", "").strip()
+    or r"http://localhost:\d+",
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -212,7 +232,6 @@ api.include_router(translate_router)
 api.include_router(connectors_router)
 api.include_router(voices_router)
 api.include_router(numbers_router)
-api.include_router(novedades_router)
 api.include_router(copilot_router)
 api.include_router(skills_router)
 api.include_router(files_router)
@@ -222,12 +241,23 @@ api.include_router(prompts_router)
 api.include_router(vip_public_router)
 api.include_router(vip_admin_router)
 api.include_router(config_router)
+api.include_router(auth_router)
+api.include_router(agents_router)
 api.include_router(llm_router)
+api.include_router(feedback_router)
+api.include_router(custom_agents_router)
+api.include_router(calls_router)
+api.include_router(agent_tools_router)
+api.include_router(org_profile_router)
+api.include_router(packs_router)
+api.include_router(mcp_servers_router)
+api.include_router(kb_router)
+api.include_router(automations_router)
 
 
 @api.get("/", tags=["health"], summary="Root health.")
 async def api_root():
-    return {"name": "Litper Connect Hub", "version": "1.0.0",
+    return {"name": "Zynex OS API", "version": "1.0.0",
             "docs": "/docs", "redoc": "/redoc"}
 
 

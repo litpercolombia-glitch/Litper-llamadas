@@ -37,7 +37,7 @@ function WhatsappRulesPanel() {
       else toast.error(d.detail || "Faltan plantillas por aprobar.");
       load();
     } catch (e) {
-      toast.error(e.response?.data?.detail || "Error consultando Chatea Pro.");
+      toast.error(e.response?.data?.detail || "No se pudo consultar a tu proveedor de WhatsApp.");
     } finally { setSyncing(false); }
   };
 
@@ -54,8 +54,8 @@ function WhatsappRulesPanel() {
         <h3 className="text-sm font-semibold text-white">Reglas de plantillas WhatsApp</h3>
         <span className="text-[10px] font-mono text-zinc-500 ml-auto mr-2">
           {templates.length > 0
-            ? `${templates.length} plantillas Chatea Pro detectadas`
-            : "Chatea Pro no configurado o sin plantillas"}
+            ? `${templates.length} plantillas detectadas en tu proveedor de WhatsApp`
+            : "Proveedor de WhatsApp sin conectar o sin plantillas"}
         </span>
         <Button size="sm" variant="outline" onClick={syncTemplates} disabled={syncing}
           data-testid="wa-templates-sync">
@@ -64,7 +64,7 @@ function WhatsappRulesPanel() {
       </div>
       <div className="text-xs text-zinc-400 mb-3">
         <Warning size={11} className="inline text-amber-400 mr-1" />
-        La regla se aplica automáticamente al enviar el fallback WhatsApp según <b>días restantes en oficina</b>.
+        La regla se aplica automáticamente al enviar el mensaje de respaldo por WhatsApp según los <b>días que quedan</b> para atender al cliente.
       </div>
       <div className="space-y-2">
         {loading && <div className="text-xs text-zinc-500">Cargando reglas…</div>}
@@ -78,7 +78,7 @@ function WhatsappRulesPanel() {
               </div>
             </div>
             <div>
-              <label className="text-[10px] uppercase text-zinc-500 font-mono">Plantilla Chatea Pro</label>
+              <label className="text-[10px] uppercase text-zinc-500 font-mono">Plantilla de WhatsApp</label>
               {templates.length > 0 ? (
                 <select
                   className="w-full bg-zinc-950 border border-zinc-800 rounded text-xs px-2 py-1.5 text-white"
@@ -86,7 +86,7 @@ function WhatsappRulesPanel() {
                   onChange={(e) => patch(r.id, { template_name: e.target.value })}
                   data-testid={`wa-rule-template-${r.rule_key}`}>
                   {!templates.includes(r.template_name) && (
-                    <option value={r.template_name}>{r.template_name} (no en Chatea)</option>
+                    <option value={r.template_name}>{r.template_name} (no está en tu proveedor)</option>
                   )}
                   {templates.map((t) => <option key={t} value={t}>{t}</option>)}
                 </select>
@@ -136,7 +136,7 @@ export default function MessagesPage() {
   };
 
   return (
-    <Layout title="Bitácora de Mensajes" subtitle={`${msgs.length} mensajes WhatsApp (Chatea Pro)`}
+    <Layout helpKey="messages" title="Bitácora de Mensajes" subtitle={`${msgs.length} mensajes con tus clientes`}
       actions={
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={load} className="border-zinc-700 rounded-sm bg-transparent">

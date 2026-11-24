@@ -14,7 +14,7 @@ export default function CarriersPage() {
   }, []);
 
   return (
-    <Layout title="Transportadoras" subtitle="12 carriers colombianas con reglas de reclamo en oficina">
+    <Layout title="Transportadoras" subtitle="Empresas de envío del paquete Contra entrega y sus reglas de reclamo en oficina.">
       <div className="border border-zinc-800 bg-zinc-900/40 overflow-x-auto">
         <table className="w-full text-sm">
           <thead>

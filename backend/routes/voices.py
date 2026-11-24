@@ -6,9 +6,9 @@ from typing import List
 from pydantic import BaseModel
 
 from db import get_db
-from deps import require_api_key
+from deps import get_org, require_api_key
 from models import VoiceProfile, VoiceProfileIn, VoiceProfileUpdate
-from elevenlabs_client import get_client as get_eleven
+from elevenlabs_client import client_for as eleven_for
 
 router = APIRouter(prefix="/voices", tags=["voices"],
                    dependencies=[Depends(require_api_key)])
@@ -22,44 +22,46 @@ def _now():
 
 @router.get("", response_model=List[VoiceProfile],
             summary="List registered voice profiles (max 6).")
-async def list_voices():
-    docs = await get_db().voice_profiles.find({}, {"_id": 0}) \
+async def list_voices(org: str = Depends(get_org)):
+    docs = await get_db().voice_profiles.find({"org_id": org}, {"_id": 0}) \
         .sort("created_at", 1).to_list(50)
     return docs
 
 
 @router.post("", response_model=VoiceProfile, status_code=201,
              summary="Register a new voice profile. Max 6 per org.")
-async def create_voice(payload: VoiceProfileIn):
+async def create_voice(payload: VoiceProfileIn, org: str = Depends(get_org)):
     db = get_db()
-    count = await db.voice_profiles.count_documents({})
+    count = await db.voice_profiles.count_documents({"org_id": org})
     if count >= MAX_VOICES:
         raise HTTPException(400, f"Máximo {MAX_VOICES} voces permitidas.")
     voice = VoiceProfile(**payload.model_dump())
     if voice.is_default:
         await db.voice_profiles.update_many(
-            {"country": voice.country},
+            {"org_id": org, "country": voice.country},
             {"$set": {"is_default": False, "updated_at": _now()}},
         )
-    await db.voice_profiles.insert_one(voice.model_dump())
+    await db.voice_profiles.insert_one({**voice.model_dump(), "org_id": org})
     return voice
 
 
 @router.put("/{voice_id}", response_model=VoiceProfile,
             summary="Update a voice profile.")
-async def update_voice(voice_id: str, payload: VoiceProfileUpdate):
+async def update_voice(voice_id: str, payload: VoiceProfileUpdate, org: str = Depends(get_org)):
     db = get_db()
     upd = {k: v for k, v in payload.model_dump().items() if v is not None}
     upd["updated_at"] = _now()
     if upd.get("is_default") is True:
-        cur = await db.voice_profiles.find_one({"id": voice_id}, {"_id": 0, "country": 1})
+        cur = await db.voice_profiles.find_one({"id": voice_id, "org_id": org},
+                                               {"_id": 0, "country": 1})
         if cur:
             country = upd.get("country") or cur.get("country")
             await db.voice_profiles.update_many(
-                {"country": country, "id": {"$ne": voice_id}},
+                {"org_id": org, "country": country, "id": {"$ne": voice_id}},
                 {"$set": {"is_default": False, "updated_at": _now()}})
     r = await db.voice_profiles.find_one_and_update(
-        {"id": voice_id}, {"$set": upd}, return_document=True, projection={"_id": 0})
+        {"id": voice_id, "org_id": org}, {"$set": upd},
+        return_document=True, projection={"_id": 0})
     if not r:
         raise HTTPException(404, "Voz no encontrada")
     return r
@@ -67,8 +69,8 @@ async def update_voice(voice_id: str, payload: VoiceProfileUpdate):
 
 @router.delete("/{voice_id}",
                summary="Delete a voice profile.")
-async def delete_voice(voice_id: str):
-    r = await get_db().voice_profiles.delete_one({"id": voice_id})
+async def delete_voice(voice_id: str, org: str = Depends(get_org)):
+    r = await get_db().voice_profiles.delete_one({"id": voice_id, "org_id": org})
     if r.deleted_count == 0:
         raise HTTPException(404, "Voz no encontrada")
     return {"ok": True, "id": voice_id}
@@ -76,14 +78,14 @@ async def delete_voice(voice_id: str):
 
 @router.get("/default/{country}",
             summary="Return the default voice for a country (or first available).")
-async def default_for_country(country: str):
+async def default_for_country(country: str, org: str = Depends(get_org)):
     db = get_db()
-    doc = await db.voice_profiles.find_one({"country": country, "is_default": True},
-                                           {"_id": 0})
+    doc = await db.voice_profiles.find_one(
+        {"org_id": org, "country": country, "is_default": True}, {"_id": 0})
     if not doc:
-        doc = await db.voice_profiles.find_one({"country": country}, {"_id": 0})
+        doc = await db.voice_profiles.find_one({"org_id": org, "country": country}, {"_id": 0})
     if not doc:
-        doc = await db.voice_profiles.find_one({}, {"_id": 0})
+        doc = await db.voice_profiles.find_one({"org_id": org}, {"_id": 0})
     if not doc:
         raise HTTPException(404, "No hay voces registradas")
     return doc
@@ -91,20 +93,20 @@ async def default_for_country(country: str):
 
 @router.get("/elevenlabs/available",
             summary="List voices available in the connected ElevenLabs account.")
-async def elevenlabs_available():
-    return await get_eleven().list_voices()
+async def elevenlabs_available(org: str = Depends(get_org)):
+    return await (await eleven_for(org)).list_voices()
 
 
 class PreviewIn(BaseModel):
     voice_id: str
-    text: str = "Hola, le llamo de Litper. ¿Puede confirmar la recogida de su pedido en oficina?"
+    text: str = "Hola, le llamo para confirmar su pedido. ¿Tiene un momento?"
 
 
 @router.post("/preview",
              summary="Synthesize a sample line with ElevenLabs and return the audio (audio/mpeg).",
              responses={200: {"content": {"audio/mpeg": {}}}})
-async def preview(payload: PreviewIn):
-    audio, err = await get_eleven().synthesize(payload.voice_id, payload.text)
+async def preview(payload: PreviewIn, org: str = Depends(get_org)):
+    audio, err = await (await eleven_for(org)).synthesize(payload.voice_id, payload.text)
     if err:
         raise HTTPException(502, detail=err)
     return Response(content=audio, media_type="audio/mpeg",

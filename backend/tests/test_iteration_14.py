@@ -5,12 +5,14 @@
 - POST /whatsapp/templates/sync schema
 - Regression: prompts, credentials, wa window
 """
+from _live import require_live  # pruebas contra servidor vivo: se saltan sin entorno
+require_live()
 import os
 import pytest
 import requests
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://litper-hub.preview.emergentagent.com").rstrip("/")
-API_KEY = "litper_hub_pk_2026_prod_ChangeMe_9x2Kf7bQvE4mLnT8sZ3H"
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
+API_KEY = os.environ.get("PUBLIC_API_KEY", "")
 VIP_URL = "https://chat.whatsapp.com/Gb9z8fWAiOwJ36dFp4FBDN?mode=gi_t"
 
 REQUIRED_TEMPLATES = {"reclamo_oficina_whatsaap", "oficina_7_dias", "no__oficina__"}

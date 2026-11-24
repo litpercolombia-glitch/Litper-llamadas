@@ -1,8 +1,8 @@
-"""Routes: /products — catalog of Litper products with promotion matching.
+"""Routes: /products — catálogo de productos del cliente con promociones.
 
 Promotions have `sku_pattern` matched against an order's SKUs / product name
-so calls & WhatsApp render the pretty offer name (e.g. "Protector Antifluido
-Premium + 2 Fundas") and price, not the technical SKU.
+so calls & WhatsApp render the pretty offer name (e.g. "Kit Premium + 2
+Regalos") and price, not the technical SKU. Todo filtrado por org_id.
 """
 from __future__ import annotations
 import re
@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from db import get_db
-from deps import require_api_key
+from deps import get_org, require_api_key
 from models import ProductCatalog, ProductIn, ProductUpdate, Promotion
 
 router = APIRouter(prefix="/products", tags=["products"],
@@ -41,22 +41,22 @@ def _promo_matches(pattern: str, haystack: str) -> bool:
 
 @router.get("", response_model=list[ProductCatalog],
             summary="List catalog products.")
-async def list_products():
-    return await get_db().catalog_products.find({}, {"_id": 0}) \
+async def list_products(org: str = Depends(get_org)):
+    return await get_db().catalog_products.find({"org_id": org}, {"_id": 0}) \
         .sort("created_at", -1).to_list(500)
 
 
 @router.post("", response_model=ProductCatalog, status_code=201,
              summary="Create a catalog product with optional promotions.")
-async def create_product(p: ProductIn):
+async def create_product(p: ProductIn, org: str = Depends(get_org)):
     doc = ProductCatalog(**p.model_dump())
-    await get_db().catalog_products.insert_one(doc.model_dump())
+    await get_db().catalog_products.insert_one({**doc.model_dump(), "org_id": org})
     return doc
 
 
 @router.get("/{product_id}", response_model=ProductCatalog)
-async def get_product(product_id: str):
-    doc = await get_db().catalog_products.find_one({"id": product_id}, {"_id": 0})
+async def get_product(product_id: str, org: str = Depends(get_org)):
+    doc = await get_db().catalog_products.find_one({"id": product_id, "org_id": org}, {"_id": 0})
     if not doc:
         raise HTTPException(404, "Product not found")
     return doc
@@ -64,23 +64,23 @@ async def get_product(product_id: str):
 
 @router.patch("/{product_id}", response_model=ProductCatalog,
               summary="Update a product / its promotions.")
-async def update_product(product_id: str, patch: ProductUpdate):
+async def update_product(product_id: str, patch: ProductUpdate, org: str = Depends(get_org)):
     db = get_db()
-    doc = await db.catalog_products.find_one({"id": product_id}, {"_id": 0})
+    doc = await db.catalog_products.find_one({"id": product_id, "org_id": org}, {"_id": 0})
     if not doc:
         raise HTTPException(404, "Product not found")
     upd = {k: v for k, v in patch.model_dump().items() if v is not None}
     upd["updated_at"] = _iso()
     if "promotions" in upd:
         upd["promotions"] = [Promotion(**pr).model_dump() for pr in upd["promotions"]]
-    await db.catalog_products.update_one({"id": product_id}, {"$set": upd})
-    doc = await db.catalog_products.find_one({"id": product_id}, {"_id": 0})
+    await db.catalog_products.update_one({"id": product_id, "org_id": org}, {"$set": upd})
+    doc = await db.catalog_products.find_one({"id": product_id, "org_id": org}, {"_id": 0})
     return doc
 
 
 @router.delete("/{product_id}", summary="Delete a product.")
-async def delete_product(product_id: str):
-    r = await get_db().catalog_products.delete_one({"id": product_id})
+async def delete_product(product_id: str, org: str = Depends(get_org)):
+    r = await get_db().catalog_products.delete_one({"id": product_id, "org_id": org})
     if r.deleted_count == 0:
         raise HTTPException(404, "Product not found")
     return {"ok": True}
@@ -96,7 +96,7 @@ class MatchIn(BaseModel):
 
 
 @router.post("/match", summary="Find the promotion that best matches a given SKU / product name / items.")
-async def match_promotion(payload: MatchIn):
+async def match_promotion(payload: MatchIn, org: str = Depends(get_org)):
     db = get_db()
     haystack_parts: list[str] = []
     if payload.sku:
@@ -112,7 +112,7 @@ async def match_promotion(payload: MatchIn):
 
     best_promo = None
     best_product = None
-    async for prod in db.catalog_products.find({"activo": {"$ne": False}}, {"_id": 0}):
+    async for prod in db.catalog_products.find({"org_id": org, "activo": {"$ne": False}}, {"_id": 0}):
         for promo in prod.get("promotions") or []:
             if not promo.get("activa", True):
                 continue

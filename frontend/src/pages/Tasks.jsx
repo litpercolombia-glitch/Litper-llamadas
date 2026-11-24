@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import Layout from "../components/Layout";
+import EmptyState from "../components/EmptyState";
 import { api, formatDateTime } from "../lib/api";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -8,14 +9,15 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "../components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
-import { Plus, Check, ArrowsClockwise } from "@phosphor-icons/react";
+import { Plus, Check, ArrowsClockwise, ListChecks } from "@phosphor-icons/react";
 import { toast } from "sonner";
+import { usePacks } from "../lib/packs";
 
 const TASK_TYPES = [
-  { v: "cambio_direccion", label: "Cambio de dirección" },
+  { v: "cambio_direccion", label: "Cambio de dirección o de datos" },
   { v: "factura",          label: "Factura" },
-  { v: "mas_dias",         label: "Más días" },
-  { v: "cambio_oficina",   label: "Cambio de oficina" },
+  { v: "mas_dias",         label: "Pide más plazo" },
+  { v: "cambio_oficina",   label: "Cambio de oficina de envío", pack: "cod_colombia" },
   { v: "otro",             label: "Otro" },
 ];
 
@@ -25,6 +27,8 @@ export default function TasksPage() {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
+  const { has } = usePacks();
+  const taskTypes = TASK_TYPES.filter((t) => !t.pack || has(t.pack));
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ type: "otro", description: "", assigned_to: "" });
 
@@ -58,7 +62,7 @@ export default function TasksPage() {
   const filtered = tasks.filter(t => filter === "all" || t.status === filter);
 
   return (
-    <Layout title="Tickets de Cliente" subtitle={`${filtered.length} tickets`}
+    <Layout title="Tickets" subtitle={`${filtered.length} tickets`}
       actions={
         <div className="flex items-center gap-2">
           <Select value={filter} onValueChange={setFilter}>
@@ -89,7 +93,7 @@ export default function TasksPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-zinc-950 border-zinc-800">
-                      {TASK_TYPES.map(t => <SelectItem key={t.v} value={t.v}>{t.label}</SelectItem>)}
+                      {taskTypes.map(t => <SelectItem key={t.v} value={t.v}>{t.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -107,7 +111,7 @@ export default function TasksPage() {
                     className="bg-zinc-900 border-zinc-800 rounded-sm"
                     value={form.assigned_to}
                     onChange={(e) => setForm(f => ({ ...f, assigned_to: e.target.value }))}
-                    placeholder="Ej. agente@litper.com" />
+                    placeholder="Ej. persona@tuempresa.com" />
                 </div>
                 <Button onClick={create} data-testid="tasks-form-submit"
                   className="w-full bg-white text-black hover:bg-zinc-200 rounded-sm">Crear</Button>
@@ -133,7 +137,21 @@ export default function TasksPage() {
           <tbody>
             {loading && <tr><td colSpan={7} className="py-6 text-center text-zinc-500 font-mono text-xs">Cargando…</td></tr>}
             {!loading && filtered.length === 0 && (
-              <tr><td colSpan={7} className="py-8 text-center text-zinc-500 text-sm">Sin tickets.</td></tr>
+              <tr><td colSpan={7} className="p-4">
+                {tasks.length > 0 ? (
+                  <div className="py-4 text-center text-zinc-500 text-sm">Sin tickets con ese filtro.</div>
+                ) : (
+                  <EmptyState
+                    icon={ListChecks}
+                    testId="tasks-empty"
+                    compact
+                    title="Aún no hay tickets"
+                    description="Un ticket es un caso que necesita a una persona de tu equipo: una duda, un reclamo o algo que el agente no pudo resolver solo."
+                    action={{ label: "Crear ticket", onClick: () => setOpen(true) }}
+                    prompt="Crea un ticket para devolverle la llamada a un cliente mañana a primera hora."
+                  />
+                )}
+              </td></tr>
             )}
             {filtered.map(t => (
               <tr key={t.id} className="data-row" data-testid={`task-row-${t.id}`}>

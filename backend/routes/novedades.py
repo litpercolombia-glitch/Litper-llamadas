@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, Query
 from typing import List, Optional
 
 from db import get_db
-from deps import require_api_key
+from deps import get_org, require_api_key
 from models import Novedad
 
 router = APIRouter(prefix="/carriers/novedades", tags=["carriers"],
@@ -14,8 +14,9 @@ router = APIRouter(prefix="/carriers/novedades", tags=["carriers"],
             summary="List carrier-status novedades (reference table).")
 async def list_novedades(carrier: Optional[str] = None,
                         categoria: Optional[str] = None,
-                        limit: int = Query(500, le=1000)):
-    q: dict = {}
+                        limit: int = Query(500, le=1000),
+                        org: str = Depends(get_org)):
+    q: dict = {"org_id": org}  # tabla de referencia del paquete instalado por el cliente
     if carrier:
         q["carrier"] = carrier
     if categoria:

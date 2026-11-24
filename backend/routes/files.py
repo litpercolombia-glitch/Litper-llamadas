@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, Form
 from typing import List, Optional
 
 from db import get_db
-from deps import require_api_key
+from deps import get_org, require_api_key
 from models import UploadedFile
 
 router = APIRouter(prefix="/files", tags=["copilot"],
@@ -53,7 +53,8 @@ def _parse_xlsx(data: bytes) -> tuple[list[dict], list[str], int]:
 @router.post("", response_model=UploadedFile, status_code=201,
              summary="Upload a file (CSV/XLSX parsed automatically). Attaches to a thread if thread_id passed.")
 async def upload(file: UploadFile = File(...),
-                 thread_id: Optional[str] = Form(None)):
+                 thread_id: Optional[str] = Form(None),
+                 org: str = Depends(get_org)):
     data = await file.read()
     kind = _detect_kind(file.filename or "", file.content_type or "")
     columns: list[str] = []
@@ -83,14 +84,17 @@ async def upload(file: UploadFile = File(...),
         thread_id=thread_id,
         created_at=_now(),
     )
-    await get_db().uploaded_files.insert_one(doc.model_dump())
+    await get_db().uploaded_files.insert_one({**doc.model_dump(), "org_id": org})
     return doc
 
 
 @router.get("", response_model=List[UploadedFile],
             summary="List uploaded files.")
-async def list_files(thread_id: Optional[str] = None, limit: int = 50):
-    q = {"thread_id": thread_id} if thread_id else {}
+async def list_files(thread_id: Optional[str] = None, limit: int = 50,
+                     org: str = Depends(get_org)):
+    q = {"org_id": org}
+    if thread_id:
+        q["thread_id"] = thread_id
     docs = await get_db().uploaded_files.find(q,
         {"_id": 0, "rows_preview": 0}).sort("created_at", -1).limit(limit).to_list(limit)
     # rows_preview stripped to keep responses small; use GET /files/{id} for full
@@ -99,16 +103,16 @@ async def list_files(thread_id: Optional[str] = None, limit: int = 50):
 
 @router.get("/{file_id}", response_model=UploadedFile,
             summary="Get one file including preview rows.")
-async def get_file(file_id: str):
-    doc = await get_db().uploaded_files.find_one({"id": file_id}, {"_id": 0})
+async def get_file(file_id: str, org: str = Depends(get_org)):
+    doc = await get_db().uploaded_files.find_one({"id": file_id, "org_id": org}, {"_id": 0})
     if not doc:
         raise HTTPException(404, "File not found")
     return doc
 
 
 @router.delete("/{file_id}", summary="Delete a file.")
-async def delete_file(file_id: str):
-    r = await get_db().uploaded_files.delete_one({"id": file_id})
+async def delete_file(file_id: str, org: str = Depends(get_org)):
+    r = await get_db().uploaded_files.delete_one({"id": file_id, "org_id": org})
     if r.deleted_count == 0:
         raise HTTPException(404, "File not found")
     return {"ok": True}

@@ -1,10 +1,12 @@
 """Iteration 12 tests — BYOK pricing pivot + /api/config/onboarding endpoint."""
+from _live import require_live  # pruebas contra servidor vivo: se saltan sin entorno
+require_live()
 import os
 import pytest
 import requests
 
-BASE = os.environ.get("REACT_APP_BACKEND_URL", "https://litper-hub.preview.emergentagent.com").rstrip("/")
-KEY = os.environ.get("PUBLIC_API_KEY", "litper_hub_pk_2026_prod_ChangeMe_9x2Kf7bQvE4mLnT8sZ3H")
+BASE = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
+KEY = os.environ.get("PUBLIC_API_KEY", os.environ.get("PUBLIC_API_KEY", ""))
 H = {"X-API-Key": KEY, "Content-Type": "application/json"}
 LLM_PROVIDERS = ["groq", "gemini", "mistral", "cerebras", "claude"]
 EXPECTED_STEP_KEYS = ["chatea_pro", "elevenlabs", "telnyx", "dropi", "llm"]

@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Layout from "../components/Layout";
 import Semaforo from "../components/Semaforo";
+import EmptyState from "../components/EmptyState";
 import { api, formatCOP, formatDateTime, statusStyles } from "../lib/api";
 import { MagnifyingGlass, ArrowRight, Funnel } from "@phosphor-icons/react";
 import { Button } from "../components/ui/button";
+import { usePacks } from "../lib/packs";
 import { Input } from "../components/ui/input";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -16,6 +18,7 @@ export default function QueuePage() {
   const [q, setQ] = useState("");
   const [sem, setSem] = useState("all");
   const [status, setStatus] = useState("all");
+  const { hasCod } = usePacks();
 
   useEffect(() => {
     (async () => {
@@ -40,7 +43,7 @@ export default function QueuePage() {
     });
 
   return (
-    <Layout title="Cola de Llamadas a Oficina" subtitle={`${filtered.length} de ${rows.length} pedidos`}
+    <Layout title="Cola de pendientes" subtitle={`${filtered.length} de ${rows.length} pendientes`}
       actions={
         <div className="flex items-center gap-2">
           <div className="relative">
@@ -90,9 +93,9 @@ export default function QueuePage() {
               <th className="text-left py-3 px-4">Cliente</th>
               <th className="text-left py-3 px-4">Teléfono</th>
               <th className="text-left py-3 px-4">Ciudad</th>
-              <th className="text-left py-3 px-4">Transportadora</th>
-              <th className="text-right py-3 px-4">Recaudo</th>
-              <th className="text-right py-3 px-4">Días Restantes</th>
+              {hasCod && <th className="text-left py-3 px-4">Transportadora</th>}
+              <th className="text-right py-3 px-4">Valor</th>
+              <th className="text-right py-3 px-4">Días restantes</th>
               <th className="text-left py-3 px-4">Estado</th>
               <th className="text-left py-3 px-4">Próximo</th>
               <th className="py-3 px-4"></th>
@@ -102,8 +105,22 @@ export default function QueuePage() {
             {loading && (
               <tr><td colSpan={10} className="py-6 text-center text-zinc-500 font-mono text-xs">Cargando…</td></tr>
             )}
-            {!loading && filtered.length === 0 && (
-              <tr><td colSpan={10} className="py-8 text-center text-zinc-500 text-sm">Sin resultados.</td></tr>
+            {!loading && rows.length === 0 && (
+              <tr><td colSpan={10} className="p-4">
+                <EmptyState
+                  icon={Funnel}
+                  testId="queue-empty"
+                  title="Aún no hay pendientes"
+                  description="Esta es la lista de lo que tienes pendiente con tus clientes, ordenada por urgencia. Se llena cuando tus agentes empiezan a trabajar o cuando conectas tu sistema."
+                  action={hasCod
+                    ? { label: "Importar un archivo", to: "/app/pedidos?tab=importar" }
+                    : { label: "Crear un agente", to: "/app/ajustes?tab=agentes" }}
+                  prompt="Quiero cargar mis clientes o pendientes. Dime cómo hacerlo paso a paso."
+                />
+              </td></tr>
+            )}
+            {!loading && rows.length > 0 && filtered.length === 0 && (
+              <tr><td colSpan={10} className="py-8 text-center text-zinc-500 text-sm">Sin resultados con esos filtros.</td></tr>
             )}
             {filtered.map((r) => (
               <tr key={r.id} className="data-row" data-testid={`queue-row-${r.id}`}>
@@ -111,7 +128,7 @@ export default function QueuePage() {
                 <td className="py-2.5 px-4 text-zinc-200">{r.customer_name || "-"}</td>
                 <td className="py-2.5 px-4 font-mono text-zinc-400 text-xs">{r.customer_phone || "-"}</td>
                 <td className="py-2.5 px-4 text-zinc-400">{r.city || "-"}</td>
-                <td className="py-2.5 px-4 text-zinc-200">{r.carrier_name || r.carrier_slug}</td>
+                {hasCod && <td className="py-2.5 px-4 text-zinc-200">{r.carrier_name || r.carrier_slug}</td>}
                 <td className="py-2.5 px-4 font-mono text-right text-zinc-200">{formatCOP(r.total_amount, r.currency)}</td>
                 <td className="py-2.5 px-4 font-mono text-right text-zinc-300">
                   {r.days_left ?? "—"}
@@ -123,12 +140,14 @@ export default function QueuePage() {
                 </td>
                 <td className="py-2.5 px-4 font-mono text-xs text-zinc-400">{formatDateTime(r.next_attempt_at)}</td>
                 <td className="py-2.5 px-4 text-right">
-                  <Link to={`/cadence?q=${r.id}`}>
-                    <Button variant="ghost" size="sm" className="text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-sm h-7"
-                      data-testid={`queue-open-cadence-${r.id}`}>
-                      Ver <ArrowRight size={14} className="ml-1" />
-                    </Button>
-                  </Link>
+                  {hasCod && (
+                    <Link to={`/app/ajustes?tab=cadencia&q=${r.id}`}>
+                      <Button variant="ghost" size="sm" className="text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-sm h-7"
+                        data-testid={`queue-open-cadence-${r.id}`}>
+                        Ver <ArrowRight size={14} className="ml-1" />
+                      </Button>
+                    </Link>
+                  )}
                 </td>
               </tr>
             ))}

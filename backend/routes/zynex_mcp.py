@@ -1,0 +1,152 @@
+"""Conector de Claude (MCP remoto, JSON-RPC por HTTP) — uno por cliente.
+
+Cada cliente genera su URL en Conexiones → «Conectar Claude» y la pega en
+Claude → Conectores. Así Claude hace de puente con Dropi (que no tiene API):
+lee pedidos con el conector de Dropi del usuario y los sube aquí; luego lee los
+resultados de las llamadas para actualizar Dropi.
+"""
+from __future__ import annotations
+
+import json
+from typing import Any
+
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import JSONResponse, Response
+
+from db import get_db
+from routes import zynex_call as zc
+
+router = APIRouter(prefix="/mcp", tags=["claude-mcp"])
+PROTO = "2025-06-18"
+
+TOOLS = [
+    {"name": "zynex_estado",
+     "description": "Estado de Zynex Call del negocio: conexiones, modo, cola y métricas de llamadas.",
+     "inputSchema": {"type": "object", "properties": {}}},
+    {"name": "zynex_subir_pedidos",
+     "description": ("Sube pedidos leídos de Dropi para que los agentes de voz llamen según el estado "
+                     "(PENDIENTE CONFIRMACION, NOVEDAD, EN OFICINA/PARA RECLAMAR EN OFICINA, EN REPARTO, DEVOLUCION). "
+                     "Cada pedido: dropi_order_id, estado_dropi, cliente, telefono, valor, producto, direccion, ciudad, "
+                     "transportadora, guia, novedad. Máximo 500 por llamada."),
+     "inputSchema": {"type": "object", "required": ["pedidos"], "properties": {"pedidos": {
+         "type": "array", "items": {"type": "object", "properties": {k: {"type": "string"} for k in (
+             "dropi_order_id", "estado_dropi", "cliente", "telefono", "valor", "producto", "direccion",
+             "ciudad", "transportadora", "guia", "novedad")}, "required": ["dropi_order_id", "estado_dropi"]}}}}},
+    {"name": "zynex_cola",
+     "description": "Llamadas en cola o bloqueadas (y por qué), para revisar antes de despachar.",
+     "inputSchema": {"type": "object", "properties": {"limite": {"type": "integer", "default": 50}}}},
+    {"name": "zynex_despachar",
+     "description": "Despacha ya las llamadas pendientes dentro de la ventana (respeta modo prueba).",
+     "inputSchema": {"type": "object", "properties": {}}},
+    {"name": "zynex_resultados",
+     "description": ("Resultados de llamadas que aún no se han escrito en Dropi (sync_dropi=pendiente): "
+                     "dropi_order_id, resultado, nota, dirección corregida. Úsalos para actualizar Dropi."),
+     "inputSchema": {"type": "object", "properties": {"limite": {"type": "integer", "default": 50}}}},
+    {"name": "zynex_marcar_dropi",
+     "description": "Marca llamadas como ya actualizadas en Dropi después de que Claude hizo el cambio.",
+     "inputSchema": {"type": "object", "required": ["ids"], "properties": {
+         "ids": {"type": "array", "items": {"type": "string"}}, "nota": {"type": "string"}}}},
+]
+
+
+def _txt(obj: Any) -> dict:
+    return {"content": [{"type": "text", "text": json.dumps(obj, ensure_ascii=False, default=str)}]}
+
+
+async def _call(org: str, name: str, args: dict) -> dict:
+    db = get_db()
+    if name == "zynex_estado":
+        cfg = await zc.asegurar(org)
+        n = {e: await db.zc_llamadas.count_documents({"org_id": org, "estado": e})
+             for e in ("en_cola", "bloqueada", "llamando", "terminada")}
+        pend = await db.zc_llamadas.count_documents({"org_id": org, "sync_dropi": "pendiente"})
+        return _txt({"modo": cfg.get("modo"), "ventana": f"{cfg.get('ventana_ini')}–{cfg.get('ventana_fin')}",
+                     "ventana_ahora": zc.en_ventana(cfg), "llamadas": n, "pendientes_dropi": pend,
+                     "elevenlabs": bool(await zc._llave(org, "elevenlabs")),
+                     "chatea": bool(await zc._llave(org, "chatea_pro")), "numero": bool(cfg.get("phone_number_id"))})
+    if name == "zynex_subir_pedidos":
+        pedidos = args.get("pedidos") or []
+        if not isinstance(pedidos, list):
+            raise ValueError("pedidos debe ser una lista")
+        return _txt(await zc.subir_pedidos(org, pedidos))
+    if name == "zynex_cola":
+        lim = max(1, min(200, int(args.get("limite") or 50)))
+        filas = [x async for x in db.zc_llamadas.find(
+            {"org_id": org, "estado": {"$in": ["en_cola", "bloqueada"]}},
+            {"_id": 0, "id": 1, "agente": 1, "dropi_order_id": 1, "estado": 1, "motivo_estado": 1,
+             "proxima_llamada": 1, "intentos": 1}).sort("creado", -1).limit(lim)]
+        return _txt(filas)
+    if name == "zynex_despachar":
+        return _txt(await zc.despachar(org))
+    if name == "zynex_resultados":
+        lim = max(1, min(200, int(args.get("limite") or 50)))
+        filas = [x async for x in db.zc_llamadas.find(
+            {"org_id": org, "sync_dropi": "pendiente"},
+            {"_id": 0, "id": 1, "agente": 1, "dropi_order_id": 1, "resultado": 1, "nota": 1,
+             "direccion_corregida": 1, "actualizado": 1}).sort("actualizado", -1).limit(lim)]
+        return _txt(filas)
+    if name == "zynex_marcar_dropi":
+        ids = [str(i) for i in (args.get("ids") or [])][:500]
+        r = await db.zc_llamadas.update_many({"org_id": org, "id": {"$in": ids}},
+                                             {"$set": {"sync_dropi": "ok", "nota_dropi": (args.get("nota") or "")[:200],
+                                                       "actualizado": zc._iso()}})
+        await zc.evento(org, "claude_marcar_dropi", {"n": r.modified_count})
+        return _txt({"marcadas": r.modified_count})
+    raise ValueError(f"Herramienta desconocida: {name}")
+
+
+def _rpc(id_: Any, result: Any = None, error: dict | None = None) -> dict:
+    out: dict = {"jsonrpc": "2.0", "id": id_}
+    if error:
+        out["error"] = error
+    else:
+        out["result"] = result
+    return out
+
+
+@router.get("/{token}", summary="Info del conector (para comprobar la URL).")
+async def mcp_get(token: str):
+    if not await zc.org_por_token_mcp(token):
+        raise HTTPException(401, "Token no válido. Genera uno nuevo en Conexiones → Conectar Claude.")
+    return {"ok": True, "servidor": "Zynex OS", "protocolo": PROTO, "herramientas": [t["name"] for t in TOOLS]}
+
+
+@router.post("/{token}", summary="Endpoint MCP (JSON-RPC 2.0, streamable HTTP sin sesión).")
+async def mcp_post(token: str, request: Request):
+    org = await zc.org_por_token_mcp(token)
+    if not org:
+        return JSONResponse(_rpc(None, error={"code": -32001, "message": "Token no válido"}), status_code=401)
+    try:
+        body = await request.json()
+    except ValueError:
+        return JSONResponse(_rpc(None, error={"code": -32700, "message": "JSON inválido"}), status_code=400)
+    msgs = body if isinstance(body, list) else [body]
+    out = []
+    for m in msgs:
+        mid, method, params = m.get("id"), m.get("method"), m.get("params") or {}
+        if mid is None:  # notificación (p. ej. notifications/initialized)
+            continue
+        try:
+            if method == "initialize":
+                res = {"protocolVersion": params.get("protocolVersion") or PROTO,
+                       "capabilities": {"tools": {"listChanged": False}},
+                       "serverInfo": {"name": "zynex-os", "version": "1.0.0"},
+                       "instructions": ("Zynex OS: llamadas de voz por estado de Dropi. Flujo: lee pedidos con el "
+                                        "conector de Dropi → zynex_subir_pedidos → zynex_despachar → "
+                                        "zynex_resultados → actualiza Dropi → zynex_marcar_dropi.")}
+            elif method == "ping":
+                res = {}
+            elif method == "tools/list":
+                res = {"tools": TOOLS}
+            elif method == "tools/call":
+                res = await _call(org, params.get("name", ""), params.get("arguments") or {})
+            else:
+                out.append(_rpc(mid, error={"code": -32601, "message": f"Método no soportado: {method}"}))
+                continue
+            out.append(_rpc(mid, res))
+        except (ValueError, HTTPException) as e:
+            msg = e.detail if isinstance(e, HTTPException) else str(e)
+            out.append(_rpc(mid, {"content": [{"type": "text", "text": f"Error: {msg}"}], "isError": True}))
+    if not out:
+        return Response(status_code=202)
+    return JSONResponse(out if isinstance(body, list) else out[0])

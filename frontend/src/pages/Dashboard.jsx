@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import Layout from "../components/Layout";
 import { api, formatDateTime } from "../lib/api";
+import { formatMoney, useOrgProfile } from "../lib/assistant";
+import { usePacks } from "../lib/packs";
+import SupuestosList, { EstimadoBadge, findSupuestos, declaredCurrency } from "../components/Supuestos";
 import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
 import {
@@ -22,16 +25,12 @@ const STATUS_TONE = {
   gris:   "border-zinc-700 bg-zinc-900/50 text-zinc-400",
 };
 
-function fmtCOP(v) {
-  if (v == null) return "—";
-  return `$${Math.round(v).toLocaleString("es-CO")}`;
-}
 function fmtNum(v, digits = 0) {
   if (v == null || Number.isNaN(v)) return "—";
   return Number(v).toLocaleString("es-CO", { maximumFractionDigits: digits });
 }
 
-function Kpi({ label, value, unit, status = "gris", target, targetMax, sub, icon: Icon, testId, big = false }) {
+function Kpi({ label, value, unit, status = "gris", target, targetMax, sub, icon: Icon, testId, big = false, estimado = false, children }) {
   const tone = STATUS_TONE[status] || STATUS_TONE.gris;
   return (
     <div data-testid={testId}
@@ -44,7 +43,10 @@ function Kpi({ label, value, unit, status = "gris", target, targetMax, sub, icon
       }}>
       <div className="flex items-center justify-between mb-3">
         <div className="text-[10px] uppercase tracking-[0.18em] font-mono text-zinc-500">{label}</div>
-        {Icon && <Icon size={16} weight="duotone" className="text-zinc-500" />}
+        <div className="flex items-center gap-2">
+          {estimado && <EstimadoBadge />}
+          {Icon && <Icon size={16} weight="duotone" className="text-zinc-500" />}
+        </div>
       </div>
       <div className="flex items-baseline gap-2 mb-2">
         <div className={`${big ? "text-4xl" : "text-3xl"} font-semibold font-mono ${tone.split(" ").pop()}`}>{value}</div>
@@ -52,10 +54,11 @@ function Kpi({ label, value, unit, status = "gris", target, targetMax, sub, icon
       </div>
       {(target || targetMax) && (
         <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">
-          ref: {target ? `≥${target}${unit || "%"}` : `≤${targetMax}${unit === "COP" ? " COP" : unit || "%"}`}
+          ref: {target ? `≥${target}${unit || "%"}` : `≤${targetMax}${unit ? ` ${unit}` : "%"}`}
         </div>
       )}
       {sub && <div className="text-xs text-zinc-400 font-mono mt-1">{sub}</div>}
+      {children}
     </div>
   );
 }
@@ -75,15 +78,16 @@ function SectionHeader({ letter, title, subtitle }) {
 }
 
 const SEM_COLORS = { rojo: "#ef4444", amarillo: "#eab308", verde: "#22c55e", gris: "#71717a" };
-const COST_COLORS = { twilio_cop: "#3b82f6", elevenlabs_cop: "#a855f7",
-                     whatsapp_cop: "#22c55e", llm_cop: "#f59e0b" };
-const COST_LABEL = { twilio_cop: "Twilio", elevenlabs_cop: "ElevenLabs",
-                    whatsapp_cop: "WhatsApp", llm_cop: "LLM" };
+// Canales genéricos (claves neutras de /metrics): sin marcas de proveedor.
+const COST_COLORS = { llamadas: "#3b82f6", whatsapp: "#22c55e", ia: "#f59e0b" };
+const COST_LABEL = { llamadas: "Llamadas", whatsapp: "WhatsApp", ia: "IA" };
 
 export default function DashboardPage() {
   const [m, setM] = useState(null);
   const [err, setErr] = useState(null);
   const [carriers, setCarriers] = useState([]);
+  const { hasCod } = usePacks();
+  const profile = useOrgProfile();
   const today = new Date().toISOString().slice(0, 10);
   const monthAgo = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
   const [filters, setFilters] = useState({ date_from: monthAgo, date_to: today, country: "all", carrier_slug: "all" });
@@ -99,10 +103,24 @@ export default function DashboardPage() {
     } catch (e) { setErr(e.message); }
   };
 
-  useEffect(() => { (async () => {
-    const r = await api.get("/carriers");
-    setCarriers(r.data || []);
-  })(); }, []);
+  // Transportadoras: solo existen con el paquete de contra entrega.
+  useEffect(() => {
+    if (!hasCod) return;
+    (async () => {
+      try {
+        const r = await api.get("/carriers");
+        setCarriers(r.data || []);
+      } catch { setCarriers([]); }
+    })();
+  }, [hasCod]);
+
+  // Cifras estimadas (retorno, devoluciones evitadas): solo con supuestos declarados por la API.
+  const supuestos = findSupuestos(m);
+  const currency = declaredCurrency(m) || profile?.moneda || "";
+  const fmtCOP = (v) => formatMoney(v, currency);
+  const cpr = m?.norte?.cpr || {};
+  const roi = m?.norte?.roi || {};
+  const costTotals = m?.costos?.totals || {};
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [filters]);
 
@@ -116,8 +134,9 @@ export default function DashboardPage() {
 
   return (
     <Layout
-      title="Métricas Operativas"
-      subtitle="KPIs de la operación COD · llamadas a oficina"
+      helpKey="dashboard"
+      title="Resumen"
+      subtitle="Cómo va tu operación: contactos, mensajes, pendientes y costos."
       actions={
         <div className="flex items-center gap-2">
           <Input type="date" value={filters.date_from}
@@ -129,6 +148,7 @@ export default function DashboardPage() {
             data-testid="metrics-date-to"
             onChange={(e) => setFilters(f => ({ ...f, date_to: e.target.value }))}
             className="w-40 bg-zinc-900 border-zinc-800 rounded-sm text-xs font-mono" />
+          {hasCod && (<>
           <Select value={filters.country}
             onValueChange={(v) => setFilters(f => ({ ...f, country: v }))}>
             <SelectTrigger data-testid="metrics-country" className="w-28 bg-zinc-900 border-zinc-800 rounded-sm text-xs">
@@ -151,6 +171,7 @@ export default function DashboardPage() {
               {carriers.map(c => <SelectItem key={c.slug} value={c.slug}>{c.name}</SelectItem>)}
             </SelectContent>
           </Select>
+          </>)}
           <Button variant="outline" onClick={load} className="border-zinc-700 rounded-sm bg-transparent">
             <ArrowsClockwise size={14} />
           </Button>
@@ -162,23 +183,37 @@ export default function DashboardPage() {
       {m && (
         <>
           {/* ---------- GROUP A · NORTE ---------- */}
-          <SectionHeader letter="A" title="NORTE" subtitle="KPIs de negocio" />
+          <SectionHeader letter="A" title="Resultado" subtitle="Lo más importante del periodo" />
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Kpi label="Tasa de Recuperación" value={`${m.norte.recovery_rate.value}%`}
+            <Kpi label={hasCod ? "Tasa de recuperación" : "Tasa de resolución"} value={`${m.norte.recovery_rate.value}%`}
               status={m.norte.recovery_rate.status} target={m.norte.recovery_rate.target}
-              icon={TrendUp} sub={`${m.queue_total} pedidos en rango`} testId="kpi-recovery" big />
-            <Kpi label="RTO Evitado" value={`${m.norte.rto_reduction.value}%`}
-              status={m.norte.rto_reduction.status} target={15}
-              icon={TrendDown} sub={`baseline ${m.norte.rto_reduction.baseline}% → actual ${m.norte.rto_reduction.current}%`}
-              testId="kpi-rto" big />
-            <Kpi label="Costo por Recuperado" value={fmtCOP(m.norte.cpr_cop.value)} unit="COP"
-              status={m.norte.cpr_cop.status} targetMax={5000}
+              icon={TrendUp} sub={`${m.queue_total} pendientes en el rango`} testId="kpi-recovery" big />
+            {hasCod && supuestos && (
+              <Kpi label="Devoluciones evitadas" value={`${m.norte.rto_reduction.value}%`} estimado
+                status={m.norte.rto_reduction.status}
+                icon={TrendDown} sub={`tasa base ${m.norte.rto_reduction.baseline}% → actual ${m.norte.rto_reduction.current}%`}
+                testId="kpi-rto" big>
+                <SupuestosList rows={supuestos} testId="kpi-rto-supuestos" />
+              </Kpi>
+            )}
+            <Kpi label={hasCod ? "Costo por recuperado" : "Costo por caso resuelto"} value={fmtCOP(cpr.value)} estimado
+              status={cpr.status}
               icon={CurrencyDollar}
-              sub={`Costo total: ${fmtCOP(m.norte.roi_cop.total_cost_cop)}`} testId="kpi-cpr" big />
-            <Kpi label="ROI / Margen Neto" value={fmtCOP(m.norte.roi_cop.value)} unit="COP"
-              status={m.norte.roi_cop.status}
-              icon={Package}
-              sub={`Recuperado: ${fmtCOP(m.norte.roi_cop.recovered_value_cop)}`} testId="kpi-roi" big />
+              sub={`Costo total estimado: ${fmtCOP(roi.total_cost)}`} testId="kpi-cpr" big />
+            {supuestos ? (
+              <Kpi label="Retorno" value={fmtCOP(roi.value)} estimado
+                status={roi.status}
+                icon={Package}
+                sub={`Valor recuperado: ${fmtCOP(roi.recovered_value)}`} testId="kpi-roi" big>
+                <SupuestosList rows={supuestos} testId="kpi-roi-supuestos" />
+              </Kpi>
+            ) : (
+              <div className="border border-zinc-800 bg-zinc-900/40 p-5 rounded-sm text-xs text-zinc-500 leading-relaxed"
+                   data-testid="kpi-roi-oculto">
+                El retorno no se muestra: es una cifra estimada y el servidor no envió los supuestos
+                (margen, tasa base, tipo de cambio) con los que se calcula.
+              </div>
+            )}
           </div>
 
           {/* Trend 14 días */}
@@ -199,7 +234,7 @@ export default function DashboardPage() {
             </div>
             <div className="border border-zinc-800 bg-zinc-900/40 p-5 rounded-sm" data-testid="chart-cpr-trend">
               <div className="text-[10px] uppercase tracking-widest font-mono text-zinc-500 mb-3">
-                Costo por recuperado (COP) · últimos 14 días
+                {hasCod ? "Costo por recuperado" : "Costo por caso resuelto"} · últimos 14 días
               </div>
               <ResponsiveContainer width="100%" height={180}>
                 <LineChart data={m.trend.cpr_14d}>
@@ -214,7 +249,7 @@ export default function DashboardPage() {
           </div>
 
           {/* ---------- GROUP B · EMBUDO ---------- */}
-          <SectionHeader letter="B" title="Embudo de Contacto" subtitle="Programados → Marcados → Contactados → Confirmados → Recogidos" />
+          <SectionHeader letter="B" title="Embudo de Contacto" subtitle="De los contactos programados a los resueltos" />
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="lg:col-span-2 border border-zinc-800 bg-zinc-900/40 p-5 rounded-sm" data-testid="chart-funnel">
               <ResponsiveContainer width="100%" height={220}>
@@ -230,9 +265,9 @@ export default function DashboardPage() {
               </ResponsiveContainer>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <Kpi label="Connect Rate" value={`${m.funnel.connect_rate.value}%`}
+              <Kpi label="Llamadas contestadas" value={`${m.funnel.connect_rate.value}%`}
                 status={m.funnel.connect_rate.status} target={25} icon={Phone} testId="kpi-connect" />
-              <Kpi label="Right Party" value={`${m.funnel.right_party.value}%`}
+              <Kpi label="Persona correcta" value={`${m.funnel.right_party.value}%`}
                 status={m.funnel.right_party.status} target={60} testId="kpi-rpc" />
               <Kpi label="Confirmación" value={`${m.funnel.confirmation_rate.value}%`}
                 status={m.funnel.confirmation_rate.status} target={40} testId="kpi-confirm" />
@@ -246,26 +281,26 @@ export default function DashboardPage() {
           </div>
 
           {/* ---------- GROUP C · WHATSAPP ---------- */}
-          <SectionHeader letter="C" title="WhatsApp Fallback" subtitle="Chatea Pro · outbound + inbound" />
+          <SectionHeader letter="C" title="WhatsApp" subtitle="Mensajes enviados y respuestas recibidas" />
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             <Kpi label="Enviados" value={fmtNum(m.whatsapp.sent)} icon={ChatCircleDots} testId="kpi-wa-sent" />
             <Kpi label="Entregados" value={fmtNum(m.whatsapp.delivered)} testId="kpi-wa-delivered" />
-            <Kpi label="Read Rate" value={`${m.whatsapp.read_rate.value}%`}
+            <Kpi label="Leídos" value={`${m.whatsapp.read_rate.value}%`}
               status={m.whatsapp.read_rate.status} target={80} testId="kpi-wa-read" />
-            <Kpi label="Response Rate" value={`${m.whatsapp.response_rate.value}%`}
+            <Kpi label="Respondidos" value={`${m.whatsapp.response_rate.value}%`}
               status={m.whatsapp.response_rate.status} target={15} testId="kpi-wa-response" />
             <Kpi label="→ Confirmación" value={`${m.whatsapp.conversion_to_confirmation.value}%`}
               status={m.whatsapp.conversion_to_confirmation.status} target={30} testId="kpi-wa-conv" />
             <Kpi label="Resp. promedio" value={fmtNum(m.whatsapp.avg_response_min.value, 1)} unit="min"
-              status={m.whatsapp.avg_response_min.status} targetMax={5}
-              sub="<5min = 21x conv." testId="kpi-wa-time" />
+              status={m.whatsapp.avg_response_min.status}
+              testId="kpi-wa-time" />
           </div>
 
           {/* ---------- GROUP D · OPERACIÓN / URGENCIA ---------- */}
           <SectionHeader letter="D" title="Operación / Urgencia" subtitle="Estado actual de la cola" />
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="border border-zinc-800 bg-zinc-900/40 p-5 rounded-sm">
-              <div className="text-[10px] uppercase tracking-widest font-mono text-zinc-500 mb-3">Pedidos por semáforo</div>
+              <div className="text-[10px] uppercase tracking-widest font-mono text-zinc-500 mb-3">Pendientes por semáforo</div>
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={m.operacion.by_semaphore}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
@@ -329,16 +364,22 @@ export default function DashboardPage() {
           </div>
 
           {/* ---------- GROUP E · COSTOS ---------- */}
-          <SectionHeader letter="E" title="Costos por Canal" subtitle="Barras apiladas por día · totales del rango" />
+          <SectionHeader letter="E" title="Costos por Canal"
+                         subtitle="Estimado · barras apiladas por día · totales del rango" />
+          <p className="text-xs text-zinc-500 -mt-2 mb-3 flex flex-wrap items-center gap-2" data-testid="costos-estimado-nota">
+            <EstimadoBadge />
+            Calculado con costos unitarios supuestos (ver «Supuestos de este cálculo»); no es la factura de tus proveedores.
+          </p>
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
             <div className="grid grid-cols-1 gap-3">
-              <Kpi label="Total del rango" value={fmtCOP(m.costos.totals.total_cop)} unit="COP" testId="kpi-cost-total" big />
-              <Kpi label="Twilio" value={fmtCOP(m.costos.totals.twilio_cop)} unit="COP"
-                sub={`${fmtNum(m.costos.totals.minutes, 1)} min`} testId="kpi-cost-twilio" />
-              <Kpi label="ElevenLabs" value={fmtCOP(m.costos.totals.elevenlabs_cop)} unit="COP" testId="kpi-cost-eleven" />
-              <Kpi label="WhatsApp" value={fmtCOP(m.costos.totals.whatsapp_cop)} unit="COP"
-                sub={`${fmtNum(m.costos.totals.messages)} mensajes`} testId="kpi-cost-wa" />
-              <Kpi label="LLM" value={fmtCOP(m.costos.totals.llm_cop)} unit="COP" testId="kpi-cost-llm" />
+              <Kpi label="Total del rango" value={fmtCOP(costTotals.total)} estimado testId="kpi-cost-total" big />
+              <Kpi label="Llamadas" value={fmtCOP(costTotals.llamadas)} estimado
+                sub={`${fmtNum(costTotals.minutes, 1)} min · telefonía ${fmtCOP(costTotals.telefonia)} + voz ${fmtCOP(costTotals.voz)}`}
+                testId="kpi-cost-llamadas" />
+              <Kpi label="WhatsApp" value={fmtCOP(costTotals.whatsapp)} estimado
+                sub={`${fmtNum(costTotals.messages)} mensajes`} testId="kpi-cost-wa" />
+              <Kpi label="IA" value={fmtCOP(costTotals.ia)} estimado
+                sub="Inteligencia artificial (texto)" testId="kpi-cost-ia" />
             </div>
             <div className="lg:col-span-3 border border-zinc-800 bg-zinc-900/40 p-5 rounded-sm">
               <ResponsiveContainer width="100%" height={280}>

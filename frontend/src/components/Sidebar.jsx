@@ -1,73 +1,220 @@
-import { NavLink } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
-  ChartBar, Queue, ClockCountdown, ChatCircleDots, ListChecks,
-  Plugs, Truck, House, Microphone, PhoneCall, Warning, Robot, Sparkle,
-  FileXls, Package, UsersThree, ChatText, Key, Rocket,
+  Package, PlugsConnected, ChartLineUp, Gear, House, Plus, TrashSimple,
+  Envelope, WhatsappLogo, List, X, PhoneCall,
 } from "@phosphor-icons/react";
+import { api } from "../lib/api";
+import { useAssistantName } from "../lib/assistant";
+import { usePacks } from "../lib/packs";
 
 const NAV = [
-  { to: "/app",             label: "Copilot",       icon: Robot,           testId: "sidebar-nav-copilot", exact: true },
-  { to: "/app/onboarding",  label: "Onboarding",    icon: Rocket,          testId: "sidebar-nav-onboarding" },
-  { to: "/app/skills",     label: "Habilidades",   icon: Sparkle,         testId: "sidebar-nav-skills" },
-  { to: "/app/metrics",    label: "Métricas",      icon: ChartBar,        testId: "sidebar-nav-metrics" },
-  { to: "/app/queue",      label: "Cola",          icon: Queue,           testId: "sidebar-nav-queue" },
-  { to: "/app/import",     label: "Importar",      icon: FileXls,         testId: "sidebar-nav-import" },
-  { to: "/app/products",   label: "Productos",     icon: Package,         testId: "sidebar-nav-products" },
-  { to: "/app/prompts",    label: "Prompts",       icon: ChatText,        testId: "sidebar-nav-prompts" },
-  { to: "/app/cadence",    label: "Cadencia",      icon: ClockCountdown,  testId: "sidebar-nav-cadence" },
-  { to: "/app/tasks",      label: "Tickets",       icon: ListChecks,      testId: "sidebar-nav-tasks" },
-  { to: "/app/messages",   label: "Mensajes",      icon: ChatCircleDots,  testId: "sidebar-nav-messages" },
-  { to: "/app/voices",     label: "Voces",         icon: Microphone,      testId: "sidebar-nav-voices" },
-  { to: "/app/numbers",    label: "Números",       icon: PhoneCall,       testId: "sidebar-nav-numbers" },
-  { to: "/app/carriers",   label: "Transportadoras", icon: Truck,         testId: "sidebar-nav-carriers" },
-  { to: "/app/novedades",  label: "Novedades",     icon: Warning,         testId: "sidebar-nav-novedades" },
-  { to: "/app/vip-leads",  label: "Leads VIP",     icon: UsersThree,      testId: "sidebar-nav-vip" },
-  { to: "/app/connectors", label: "Conexiones",    icon: Plugs,           testId: "sidebar-nav-connectors" },
-  { to: "/app/config",     label: "Credenciales",  icon: Key,             testId: "sidebar-nav-config" },
+  { to: "/app",            label: "Lyan",       lyan: true,   testId: "nav-copilot",    exact: true,
+    hint: "Pídele lo que necesites" },
+  { to: "/app/pedidos",    label: "Pendientes", icon: Package,        testId: "nav-pedidos",
+    hint: "Cola · Tickets", hintCod: "Cola · Importar · Novedades · Tickets" },
+  { to: "/app/llamadas",   label: "Llamadas",   icon: PhoneCall,      testId: "nav-llamadas",
+    hint: "Agentes de voz por estado de Dropi" },
+  { to: "/app/conexiones", label: "Conexiones", icon: PlugsConnected, testId: "nav-conexiones",
+    hint: "Claude · Conectores · MCP · Voces · Números" },
+  { to: "/app/metricas",   label: "Métricas",   icon: ChartLineUp,    testId: "nav-metricas",
+    hint: "Resultados de tu operación" },
+  { to: "/app/ajustes",    label: "Ajustes",    icon: Gear,           testId: "nav-ajustes",
+    hint: "Perfil · Agentes · Productos · más" },
 ];
 
-export default function Sidebar() {
+const THREADS_CHANGED = "zynex-threads-changed";
+
+export function notifyThreadsChanged() {
+  window.dispatchEvent(new Event(THREADS_CHANGED));
+}
+
+/** Botón de menú (solo en pantallas pequeñas) que abre el menú lateral. */
+export function MenuButton({ onClick, className = "" }) {
   return (
-    <aside className="w-60 shrink-0 border-r border-zinc-800 bg-zinc-950 h-screen sticky top-0 flex flex-col">
-      <div className="px-5 py-6 border-b border-zinc-800">
+    <button type="button" onClick={onClick} aria-label="Abrir menú" data-testid="mobile-menu-open"
+            className={`md:hidden shrink-0 h-10 w-10 grid place-items-center rounded-sm border border-zinc-700 bg-zinc-900 text-zinc-200 hover:bg-zinc-800 ${className}`}>
+      <List size={20} />
+    </button>
+  );
+}
+
+/**
+ * Menú lateral. En escritorio (md+) es una columna fija. En celular es un
+ * cajón: oculto por defecto, se abre con <MenuButton> (`open`) y se cierra al
+ * tocar fuera, con la X, con Escape o al cambiar de pantalla (`onClose`).
+ */
+export default function Sidebar({ open = false, onClose }) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const showChats = location.pathname === "/app";
+  const asistente = useAssistantName();
+  const { hasCod } = usePacks();
+  const [threads, setThreads] = useState([]);
+  const activeId = new URLSearchParams(location.search).get("thread");
+
+  const loadThreads = async () => {
+    try {
+      const r = await api.get("/threads");
+      setThreads(r.data || []);
+    } catch { setThreads([]); }
+  };
+  useEffect(() => {
+    if (showChats) loadThreads();
+    const on = () => showChats && loadThreads();
+    window.addEventListener(THREADS_CHANGED, on);
+    return () => window.removeEventListener(THREADS_CHANGED, on);
+  }, [showChats]);
+
+  const newThread = async () => {
+    try {
+      const r = await api.post("/threads", {});
+      navigate(`/app?thread=${r.data.id}`);
+      await loadThreads();
+    } catch {}
+  };
+  const selectThread = (id) => navigate(`/app?thread=${id}`);
+  const deleteThread = async (id, e) => {
+    e?.stopPropagation?.();
+    if (!window.confirm("¿Borrar esta conversación?")) return;
+    try {
+      await api.delete(`/threads/${id}`);
+      if (activeId === id) navigate("/app");
+      await loadThreads();
+    } catch {}
+  };
+
+  // En celular el cajón se cierra al navegar y con Escape.
+  useEffect(() => { onClose?.(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ },
+            [location.pathname, location.search]);
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (e) => { if (e.key === "Escape") onClose?.(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  return (
+    <>
+    {open && (
+      <div className="fixed inset-0 z-40 bg-black/60 md:hidden" onClick={onClose}
+           data-testid="mobile-menu-backdrop" aria-hidden="true" />
+    )}
+    <aside data-testid="sidebar" data-open={open ? "true" : "false"}
+           className={`w-64 max-w-[85vw] shrink-0 border-r border-zinc-800 bg-zinc-950 h-screen flex flex-col
+             fixed inset-y-0 left-0 z-50 transform transition-transform duration-200
+             ${open ? "translate-x-0" : "-translate-x-full"}
+             md:sticky md:top-0 md:z-auto md:translate-x-0 md:transition-none`}>
+      {/* brand */}
+      <div className="px-5 py-6 border-b border-zinc-800 relative">
+        <button type="button" onClick={onClose} aria-label="Cerrar menú" data-testid="mobile-menu-close"
+                className="md:hidden absolute top-4 right-3 h-9 w-9 grid place-items-center rounded-sm text-zinc-400 hover:text-white hover:bg-zinc-800">
+          <X size={18} />
+        </button>
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-md neon-glow grid place-items-center bg-gradient-to-br from-white/25 to-white/5 border border-white/25">
             <House size={14} weight="fill" className="text-white" />
           </div>
-          <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-zinc-500">Litper</span>
+          <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-zinc-500">Zynex</span>
         </div>
-        <h1 className="text-lg font-semibold text-white mt-1">Connect Hub</h1>
-        <p className="text-[11px] font-mono text-zinc-500 mt-1">COD · LATAM · v1.2</p>
+        <h1 className="text-lg font-semibold text-white mt-1">Zynex OS</h1>
+        <p className="text-[11px] font-mono text-zinc-500 mt-1">Agentes para tu negocio</p>
       </div>
 
-      <div className="px-5 pt-4 pb-1 text-[10px] uppercase tracking-[0.2em] font-mono text-zinc-500">
-        Navegación
-      </div>
-      <nav className="flex-1 py-1 overflow-y-auto">
-        {NAV.map(({ to, label, icon: Icon, testId, exact }) => (
+      {/* nav — 5 top-level */}
+      <nav className="py-3">
+        {NAV.map(({ to, label, icon: Icon, lyan, testId, exact, hint, hintCod }) => (
           <NavLink
             key={to}
             to={to}
             end={exact}
             data-testid={testId}
             className={({ isActive }) =>
-              `flex items-center gap-3 px-5 py-2.5 text-sm transition-colors duration-150 border-l-2 ${
+              `block px-5 py-2.5 border-l-2 transition-colors duration-150 ${
                 isActive
                   ? "bg-zinc-800 text-white border-white active-nav"
                   : "text-zinc-400 border-transparent hover:text-white hover:bg-zinc-800/50"
               }`
             }
           >
-            <Icon size={18} weight="duotone" />
-            <span>{label}</span>
+            <div className="flex items-center gap-3">
+              {lyan ? (
+                <img src="/lyan.webp" alt={asistente}
+                     className="w-6 h-6 rounded-full object-cover ring-1 ring-cyan-400/40"
+                     data-testid="sidebar-lyan-avatar" />
+              ) : (
+                <Icon size={18} weight="duotone" />
+              )}
+              <span className="text-sm font-medium">{lyan ? asistente : label}</span>
+            </div>
+            <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mt-0.5 ml-9">
+              {hasCod && hintCod ? hintCod : hint}
+            </div>
           </NavLink>
         ))}
       </nav>
 
-      <div className="border-t border-zinc-800 px-5 py-4">
-        <div className="text-[10px] uppercase tracking-widest text-zinc-500 font-mono mb-1">Región</div>
-        <div className="text-sm text-zinc-300">Colombia · Ecuador · Chile</div>
+      {/* Chats (Claude-style) — only on /app */}
+      {showChats && (
+        <div className="flex-1 flex flex-col min-h-0 border-t border-zinc-800"
+             data-testid="sidebar-chats">
+          <div className="px-4 pt-3 pb-2">
+            <button
+              onClick={newThread}
+              data-testid="sidebar-new-chat"
+              className="w-full btn-cta-grad rounded-sm h-9 text-sm font-medium text-white inline-flex items-center justify-center gap-1">
+              <Plus size={14} /> Nueva conversación
+            </button>
+          </div>
+          <div className="px-5 pb-1 pt-2 text-[10px] uppercase tracking-widest font-mono text-zinc-500">
+            Conversaciones · {threads.length}
+          </div>
+          <div className="flex-1 overflow-y-auto">
+            {threads.length === 0 && (
+              <div className="px-5 py-6 text-xs text-zinc-500 text-center font-mono">
+                Sin conversaciones aún.
+              </div>
+            )}
+            {threads.map((t) => (
+              <div key={t.id}
+                onClick={() => selectThread(t.id)}
+                data-testid={`sidebar-thread-${t.id}`}
+                className={`group px-5 py-2 border-l-2 cursor-pointer transition-colors flex items-center gap-2 ${
+                  activeId === t.id
+                    ? "bg-zinc-800/60 border-white"
+                    : "border-transparent hover:bg-zinc-800/30 hover:border-zinc-600"
+                }`}>
+                <span className="text-sm text-zinc-200 truncate flex-1">{t.title || "Sin título"}</span>
+                <button onClick={(e) => deleteThread(t.id, e)}
+                  className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-red-400 transition"
+                  aria-label="Borrar conversación">
+                  <TrashSimple size={12} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Filler on non-chat pages so the footer sticks to the bottom */}
+      {!showChats && <div className="flex-1" />}
+
+      {/* Support footer — visible on every page */}
+      <div className="border-t border-zinc-800 px-5 py-3 text-[11px] text-zinc-400 space-y-1"
+           data-testid="sidebar-support">
+        <div className="text-[10px] uppercase tracking-widest font-mono text-zinc-500">Soporte</div>
+        <a href="mailto:zynexproai@gmail.com"
+           className="flex items-center gap-1.5 hover:text-white transition"
+           data-testid="support-email">
+          <Envelope size={11} weight="fill" /> zynexproai@gmail.com
+        </a>
+        <a href="https://wa.me/573144644054" target="_blank" rel="noreferrer"
+           className="flex items-center gap-1.5 hover:text-white transition"
+           data-testid="support-whatsapp">
+          <WhatsappLogo size={11} weight="fill" className="text-emerald-400" /> WhatsApp 314 464 4054
+        </a>
       </div>
     </aside>
+    </>
   );
 }

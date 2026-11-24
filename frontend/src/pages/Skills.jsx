@@ -7,6 +7,7 @@ import { Textarea } from "../components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
 import { Sparkle, Plus, TrashSimple, Lock } from "@phosphor-icons/react";
 import { toast } from "sonner";
+import { useAssistantName } from "../lib/assistant";
 
 const EMPTY = { name: "", trigger: "", description: "", instructions: "", steps: [] };
 
@@ -14,6 +15,7 @@ export default function SkillsPage() {
   const [skills, setSkills] = useState([]);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(EMPTY);
+  const asistente = useAssistantName();
 
   const load = async () => {
     const r = await api.get("/skills");
@@ -38,7 +40,7 @@ export default function SkillsPage() {
   };
 
   return (
-    <Layout title="Habilidades del Copilot" subtitle={`${skills.length} skills reutilizables para Marcus`}
+    <Layout title="Habilidades del Copilot" subtitle={`${skills.length} habilidades reutilizables para ${asistente}`}
       actions={
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
@@ -70,7 +72,7 @@ export default function SkillsPage() {
                   value={form.description} onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))} />
               </div>
               <div>
-                <label className="text-[10px] uppercase font-mono tracking-widest text-zinc-500 block mb-1">Instrucciones para Marcus</label>
+                <label className="text-[10px] uppercase font-mono tracking-widest text-zinc-500 block mb-1">Instrucciones para {asistente}</label>
                 <Textarea data-testid="skill-form-instructions"
                   className="bg-zinc-900 border-zinc-800 rounded-sm min-h-32"
                   placeholder="Explica paso a paso qué hacer, qué tools llamar, qué reportar…"

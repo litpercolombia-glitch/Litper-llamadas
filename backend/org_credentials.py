@@ -4,7 +4,7 @@ Multi-tenant credentials store — encrypted at rest with Fernet (AES-128-CBC + 
 Each org owns its own set of provider keys (Chatea, Telnyx, ElevenLabs, LLMs).
 Secrets are encrypted using ENCRYPTION_KEY from backend/.env. The frontend
 NEVER receives the plaintext — only status ("connected"/"not_configured") and a
-short masked hint like "sk_…9f2c".
+short masked hint (solo los últimos 4: "…9f2c").
 
 Design:
 - Collection `org_credentials`: { org_id, provider, is_configured, hint,
@@ -49,6 +49,10 @@ PROVIDER_SCHEMAS: dict[str, dict[str, dict[str, str]]] = {
         "agent_id":         {"env": "ELEVENLABS_AGENT_ID",        "label": "Agent ID"},
         "default_voice_id": {"env": "ELEVENLABS_DEFAULT_VOICE_ID","label": "Voice ID por defecto"},
     },
+    "openrouter": {
+        "api_key": {"env": "OPENROUTER_API_KEY", "label": "API Key (openrouter.ai/keys)"},
+        "model":   {"env": "OPENROUTER_MODEL_DEFAULT", "label": "Modelo por defecto (opcional, ej. google/gemini-2.5-flash)"},
+    },
     "groq":     {"api_key": {"env": "GROQ_API_KEY",     "label": "API Key"}},
     "gemini":   {"api_key": {"env": "GEMINI_API_KEY",   "label": "API Key"}},
     "mistral":  {"api_key": {"env": "MISTRAL_API_KEY",  "label": "API Key"}},
@@ -58,9 +62,46 @@ PROVIDER_SCHEMAS: dict[str, dict[str, dict[str, str]]] = {
         "account_sid": {"env": "TWILIO_ACCOUNT_SID", "label": "Account SID"},
         "auth_token":  {"env": "TWILIO_AUTH_TOKEN",  "label": "Auth Token"},
     },
+    "retell": {
+        "api_key": {"env": "RETELL_API_KEY", "label": "API Key (Retell — llamadas de voz)"},
+    },
+    "dropi": {
+        "api_token": {"env": "DROPI_API_TOKEN", "label": "API Token"},
+        "country":   {"env": "DROPI_COUNTRY",   "label": "País (CO / EC / CL / MX / PE)"},
+        "base_url":  {"env": "DROPI_BASE_URL",  "label": "URL panel (ej. app.dropi.co)"},
+    },
+    "shopify": {
+        "access_token": {"env": "SHOPIFY_ACCESS_TOKEN", "label": "Admin API access token"},
+        "store_url":    {"env": "SHOPIFY_STORE_URL",    "label": "URL de tu tienda (xxx.myshopify.com)"},
+    },
 }
 
-_SECRET_FIELDS = {"api_key", "auth_token", "sip_password", "connection_id"}
+_LLM_PROVIDERS = {"openrouter", "groq", "gemini", "mistral", "cerebras", "claude"}
+
+_SECRET_FIELDS = {"api_key", "auth_token", "sip_password", "connection_id",
+                  "api_token", "access_token"}
+
+
+import logging as _logging
+if os.environ.get("PLATFORM_KEYS_ORGS") is None:
+    _logging.getLogger("org_credentials").warning(
+        "PLATFORM_KEYS_ORGS no definida: NINGÚN cliente usa las llaves de plataforma "
+        "(.env); cada uno debe conectar las suyas (BYOK). Para permitirlas define "
+        "PLATFORM_KEYS_ORGS=\"org1,org2\" (o \"*\" solo para uso interno).")
+
+
+def platform_keys_allowed(org_id: str) -> bool:
+    """¿Puede este cliente usar las llaves de PLATAFORMA del servidor (.env)?
+
+    PLATFORM_KEYS_ORGS (POR DEFECTO CERRADO):
+      - sin definir / "" -> nadie: cada cliente trae su propia llave (BYOK puro).
+      - "org1,org2"      -> solo esos clientes (la org interna + clientes en trial).
+      - "*"              -> todos (solo para uso interno / un solo cliente)."""
+    raw = os.environ.get("PLATFORM_KEYS_ORGS")
+    if raw is None:
+        return False
+    allowed = {o.strip() for o in raw.split(",") if o.strip()}
+    return "*" in allowed or org_id in allowed
 
 
 def _fernet() -> Fernet:
@@ -78,19 +119,23 @@ def _mask(value: str) -> str:
     if not value:
         return ""
     v = str(value)
-    if len(v) <= 6:
-        return "…" + v[-2:]
-    return v[:4] + "…" + v[-4:]
+    if len(v) <= 8:            # demasiado corta: no se revela nada
+        return "…"
+    return "…" + v[-4:]       # solo los últimos 4
 
 
 # ---------------------------------------------------------------------------
 # Public API — used by both /config routes AND by every provider client.
 # ---------------------------------------------------------------------------
-async def get_credentials(provider: str, org_id: str = DEFAULT_ORG) -> dict[str, str]:
+async def get_credentials(provider: str, org_id: str = DEFAULT_ORG,
+                          allow_env: bool | None = None) -> dict[str, str]:
     """Return the effective plaintext credentials for a provider.
 
-    Precedence: org-stored value → backend/.env fallback → empty string.
+    Precedence: org-stored value → backend/.env fallback (solo si el cliente
+    tiene permiso de llaves de plataforma) → empty string.
     NEVER expose the returned dict outside the backend."""
+    if allow_env is None:
+        allow_env = platform_keys_allowed(org_id)
     if provider not in PROVIDER_SCHEMAS:
         raise ValueError(f"unknown provider: {provider}")
     schema = PROVIDER_SCHEMAS[provider]
@@ -110,7 +155,9 @@ async def get_credentials(provider: str, org_id: str = DEFAULT_ORG) -> dict[str,
             # bad ciphertext — treat as empty; fall back to env
             pass
 
-    # Fill remaining fields from env
+    # Fill remaining fields from env (solo clientes con permiso de plataforma)
+    if not allow_env:
+        return out
     for field, spec in schema.items():
         if out[field]:
             continue
@@ -175,8 +222,12 @@ async def status(org_id: str = DEFAULT_ORG) -> list[dict[str, Any]]:
     for provider, schema in PROVIDER_SCHEMAS.items():
         doc = stored.get(provider)
         creds = await get_credentials(provider, org_id)
-        # Configured = at least one field has a value (from org OR env)
-        configured = any(creds.values())
+        # Configured = al menos un campo con valor (org o env). Para motores de
+        # IA exige api_key (guardar solo el "model" NO cuenta como conectado).
+        if "api_key" in schema and provider in _LLM_PROVIDERS:
+            configured = bool(creds.get("api_key"))
+        else:
+            configured = any(creds.values())
         # Origin: org > env > none
         if doc and doc.get("is_configured"):
             origin = "org"
@@ -184,11 +235,9 @@ async def status(org_id: str = DEFAULT_ORG) -> list[dict[str, Any]]:
             origin = "env"
         else:
             origin = "none"
-        hint = (doc or {}).get("hint") or ""
-        if not hint and configured:
-            for f in ("api_key", "auth_token", "sip_password"):
-                if creds.get(f):
-                    hint = _mask(creds[f]); break
+        # Pista enmascarada SOLO de llaves propias del cliente; nunca de las
+        # llaves de plataforma (.env).
+        hint = ((doc or {}).get("hint") or "") if origin == "org" else ""
         out.append({
             "provider": provider,
             "fields": [

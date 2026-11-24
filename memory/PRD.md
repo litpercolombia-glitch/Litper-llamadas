@@ -23,6 +23,205 @@ Same as v1.0 plus:
   15+ tools mapped to the Hub's own endpoints, seeded skills, and file upload
   → bulk import.
 
+
+### v2.7 (2026-07-31) — Retell voice + 7-tool webhooks + Llamadas
+- **Retell integration** (`backend/retell_service.py`): `upsert_agent` +
+  `place_call` reciben BYOK `RETELL_API_KEY`. El LLM Engine queda
+  bloqueado en **Claude Haiku 4.5 · temp 0.3** (sin modelos de
+  razonamiento — introducen silencios muertos). Lyan (Sonnet) no cambia.
+  Cuando el usuario guarda/publica un custom agent en estado
+  `prueba`/`en_vivo`, el service sincroniza a Retell y almacena
+  `retell_agent_id`. Sin `RETELL_API_KEY` el guardado sigue funcionando en
+  BETA (sin llamar Retell, no falla).
+- **Date helpers backend-only** (`America/Bogota`, UTC-5, sin DST):
+  `consultar_disponibilidad` y `proximo_horario_disponible`. Devuelven ISO
+  ya calculado (`2026-08-03T10:00:00-05:00`). El LLM SOLO lee — nunca
+  computa. Se filtra a franja laboral (Lun-Sáb 08-18).
+- **7 tool webhooks** (`routes/agent_tools.py`) — `reagendar_entrega`,
+  `confirmar_pedido`, `consultar_disponibilidad`, `enviar_whatsapp`,
+  `transferir_a_humano`, `registrar_promesa_pago`, `enviar_link_pago`.
+  Las 2 que tocan plata exigen `human_confirmed:true` explícito o
+  responden `{ok:false, requires_human_confirmation:true}`. Cada tool
+  se persiste en `agent_tool_calls` para auditoría.
+- **Webhook post-llamada** `POST /api/calls/webhook` (público, sin auth
+  porque Retell llama desde fuera). Upsert a `db.calls` con call_id,
+  telefono, duración, recording_url, transcript, resultado.
+- **Pestaña Llamadas** en `Ajustes → Llamadas`: tabla con audio player
+  (recording_url), transcript colapsable, duración, resultado. Empty
+  state "Aún no hay llamadas".
+- **4 prompts especialistas** (`custom_agents.py`): Sofía Rescate, Sofía
+  Confirma, Asistente Citas, Asistente Cobranza — texto verbatim del
+  producto. Todos con guardrail antifluido, máx 2 frases/turno, es-CO,
+  disclosure de cobranza obligatorio, herramientas listadas.
+- **Cero substring 'impermeable'** en ningún template (guardrail
+  reformulado a "nunca uses la palabra prohibida").
+- **Iteration 22 tests**: 14/14 backend + 100% frontend (0 issues).
+
+### v2.6 (2026-07-30) — Sidebar Claude-style · Login sin mascota · Agentes BETA
+- **Sidebar rediseñado estilo Claude**: 5 nav items arriba, divisor,
+  "＋ Nueva conversación", lista de chats abajo (solo en `/app`). Footer
+  con soporte visible en todas las páginas (zynexproai@gmail.com +
+  wa.me/573144754115). `notifyThreadsChanged()` sincroniza sidebar ↔ chat.
+- **Login rediseñado (sin mascota grande)**: hero solo con hook estadístico
+  + 3 beneficios Hormozi. Fondo con gradient Silver Matrix
+  (`.login-hero-bg`) — jamás negro. Layout 2 cols en desktop, apilado en
+  móvil. Footer con línea de soporte (mismo email + WhatsApp).
+- **Copilot empty-state limpio**: solo avatar chico (~36 px) de Lyan.
+  Se eliminó la ilustración grande.
+- **Feature nuevo — Custom Agents (BETA)**: `POST/GET/PATCH/DELETE
+  /api/custom-agents` + `POST /api/custom-agents/{id}/test-call`. Además
+  `/templates` (5 plantillas), `/tools` (6 acciones) y `/voices`
+  (4 ElevenLabs) alimentan el wizard. Colección `custom_agents` con index
+  compuesto `(org_id, created_at desc)`.
+- **UI Wizard de agentes** (`/app/ajustes?tab=agentes`) — 5 pasos
+  (Propósito · Personalidad · Voz · Acciones · Prueba). Empty-state
+  "Aún no tienes agentes · Crea el primero". Plantillas pre-llenan prompt
+  y variables. `test-call` en BETA valida config y responde `beta:true`
+  cuando faltan credenciales Telnyx/ElevenLabs (nunca falla ruido).
+- **POST /api/threads con body opcional** — hardening rápido pedido por
+  el testing agent.
+- **Iteration 21 tests**: 10/10 backend + 100 % frontend, cero issues.
+
+### v2.5 (2026-07-30) — Lyan branding · zero-demo · Perfil · Feedback
+- **Marca**: favicon + apple-touch-icon = `/favicon.webp` + `/lyan.webp`;
+  title de la pestaña = **Zynex OS**.
+- **Rename Copilot → Lyan** con avatar del gato cyber en Sidebar, header del
+  chat, burbujas de Marcus (ahora "Lyan"), placeholder del input y mascota
+  gigante en el empty-state. Los 5 agentes internos no cambian; Lyan es la
+  cara/orquestador.
+- **HowItWorks** (`components/HowItWorks.jsx`) — acordeón reutilizable con
+  disparador de gradiente cyan→violeta animado, respeta
+  `prefers-reduced-motion`. Montado en las 5 pestañas (Copilot · Pedidos ·
+  Conexiones · Métricas · Ajustes).
+- **Login redesign (Hormozi 2 columnas)** — hero con hook "20-40% se
+  devuelven · USD 7-9 por devolución · Zynex los rescata antes", mascota
+  Lyan 3D flotante con glow cyan (respetando reduced-motion) + 3 beneficios
+  orientados a resultado + CTA "Rescatar mis pedidos". Google + email
+  siguen funcionando idénticos.
+- **Perfil de cuenta** (`/app/ajustes?tab=perfil`) — patrón Vercel/Linear:
+  foto (subida con recorte 512x512, ≤2 MB, PNG/JPG/WebP, POST /auth/avatar),
+  nombre + email editables (Google → email lock + badge), contraseña con
+  validación (o "Gestionado por Google" para cuentas OAuth), nombre de la
+  organización, `org_id` visible. Endpoints nuevos:
+  `PUT /api/auth/profile`, `PUT /api/auth/password`, `POST /api/auth/avatar`,
+  `DELETE /api/auth/avatar`, `GET /api/auth/org`.
+- **Feedback FAB** — botón "Sugerir función" flotante en cada ruta
+  autenticada abre un modal (título + descripción + email opcional) que
+  golpea `POST /api/feedback` — persiste a `db.feedback` y hace best-effort
+  SMTP a `FEEDBACK_EMAIL` (default `zynexproai@gmail.com`). Si no hay
+  `SMTP_HOST`, responde `emailed:false` pero garantiza persistencia.
+- **Cero demo data (extendido)**: se limpiaron `catalog_products`,
+  `vip_leads`, `novedades_ticks`, `ceo_reports`, `chat_threads`,
+  `chat_messages`. El seed de `PRODUCTS_SEED` fue eliminado del arranque.
+  Nueva empty-state en Productos: "Aún no tienes productos. Agrega el tuyo".
+- **Iteration 20 tests**: 16/16 backend + 100 % frontend, cero issues.
+
+### v2.4 (2026-07-29) — Verbatim connector onboarding + empty-first UI
+- **Connectors rewritten** (`frontend/src/pages/Connectors.jsx`): 5 cards
+  (Dropi · Chatea Pro · Telnyx · ElevenLabs · Shopify) with the EXACT
+  Spanish 3-4-step onboarding text the product owner dictated, inline
+  credential inputs, official-portal link, `Guardar` and `Probar conexión`
+  buttons. Zero jargon, one flow per card.
+- **New connectors**: `dropi` (api_token / country / base_url) and
+  `shopify` (access_token / store_url). Both are wired into
+  `org_credentials.PROVIDER_SCHEMAS` + `routes/config.test_credentials`
+  (live HTTP probes against `api.dropi.co/{country}/me` and
+  `<store>/admin/api/2024-07/shop.json`).
+- **Empty-first Copilot**: right rail (`copilot-right-rail`) is now
+  rendered ONLY when there is real data (`kpi.total > 0 ||
+  kpi.dinero_cop > 0`). On a fresh install the greeting + 5 agent cards +
+  cascade CTA + chat is all the operator sees — no noisy `$ 0` panel.
+- **Iteration 19 tests**: 7/7 backend + 72/72 required frontend at 100%.
+
+### v2.3 (2026-07-29) — Sidebar 18 → 5 · Hubs · Empty-States (Dapta/n8n vibe)
+- **Radical UX simplification**: sidebar cut from 18 to **5** top items —
+  Copilot · Pedidos · Conexiones · Métricas · Ajustes. Every legacy route
+  redirects into the correct hub tab so bookmarks keep working.
+- **HubContext** (`frontend/src/components/HubContext.js`): a React context
+  flag consumed by `Layout.jsx` to render *bare* when a page is embedded
+  inside a hub tab — no duplicated Sidebar/Header. This lets us reuse
+  every existing page inside the new tabbed hubs with zero rewrites.
+- **Pedidos hub** (Cola · Importar · Novedades · Tickets) — one page, four
+  tabs. Empty state guides: `Importar Excel de Dropi` + `Conectar Dropi`.
+- **Conexiones hub** (Conectores · Credenciales · Voces · Números) —
+  each connector already ships with 3-step howto + envVars badges +
+  official portal link + `Probar` (Dropi now has `Probar → Importar`).
+- **Métricas** trimmed to the North Star (`$ recuperado`, entrega efectiva,
+  devoluciones evitadas + break-down por transportadora/ciudad) with a
+  guiding empty state when `orders_total == 0`.
+- **Ajustes hub** (Productos · Prompts · Cadencia · Transportadoras ·
+  Habilidades · Leads VIP) — advanced config collapsed here, off the main
+  nav.
+- **Onboarding as first-run assistant**: `onboarding-banner` in Copilot
+  only appears when there are 0 configured connectors — never a permanent
+  menu item.
+- **Zero demo data**: purged `orders`, `call_queue`, `call_schedules`,
+  `customer_tasks`, `message_log`, `uploaded_files`, `ceo_reports`,
+  `novedades_ticks`, `chat_threads`, `chat_messages`. Reference data
+  (carriers, novedades reference, agents, prompts, WA rules, voice
+  profiles, catalog products, integration_connectors) preserved.
+- **Iteration 18 tests**: 8/8 backend + 100% required frontend.
+
+### v2.2 (2026-07-29) — CEO Report → WhatsApp (Chatea Pro)
+- **Endpoints**: `GET /api/agents/ceo-report/target`,
+  `PUT /api/agents/ceo-report/target {target}`,
+  `POST /api/agents/ceo-report/send-wa`. Empty target → 400 (fail-fast);
+  send returns the Chatea provider result so the UI can show failure reason.
+- **Daily push**: new APScheduler cron `daily_ceo_report_wa` at 13:15 UTC
+  (08:15 America/Bogotá), 15 min AFTER the snapshot job runs.
+- **Storage**: `db.settings` collection keyed by `key` (unique index) —
+  survives restarts and overrides the `CEO_REPORT_WA_TARGET` env fallback.
+- **UI**: right-rail button `ceo-wa-btn` opens the dialog `ceo-wa-dialog`
+  with `ceo-wa-target` input + `ceo-wa-save` + `ceo-wa-send`. Pretty
+  Spanish snapshot: recuperación %, RTO evitado %, $ recuperado, CPR, ROI
+  neto + queue + orders totals.
+- **Iteration 17 tests**: 10/10 backend + 5/5 frontend at 100%.
+
+### v2.1 (2026-07-29) — Cascade + Unified Auth + 24/7 Cron
+- **Cascade endpoint** `POST /api/agents/cascade` (segments: `red_this_week`,
+  `new_today`, `office_all`, plus bogus-safe fallback). Runs the full 5-agent
+  chain per order up to `limit` and returns `results`, `hitl_required`,
+  `summary`. Frontend adds a hero CTA + right-rail button + segment picker
+  dialog + batch HITL confirmation dialog (24 rojos on the seed dataset).
+- **Unified auth**: `deps.require_api_key` now accepts EITHER a valid
+  `litper_session` JWT cookie/bearer OR the legacy `X-API-Key`. All internal
+  routes (queue, orders, agents, prompts, …) work with just the session
+  cookie — the frontend no longer ships the operator key. External agents
+  keep working with `X-API-Key`.
+- **24/7 APScheduler**: added `novedades_sweep` (every 15 min — recomputes
+  the semaphore for every active queue item and logs bucket counts to
+  `novedades_ticks`) and `daily_ceo_report` (cron 13:00 UTC = 08:00
+  Bogotá — snapshots NORTE KPIs into `ceo_reports`, idempotent by day).
+- **Debug/preview endpoints**: `POST /api/agents/ceo-report/run-now`,
+  `GET /api/agents/ceo-report[?date=YYYY-MM-DD]`, `GET /api/agents/novedades-ticks`.
+- **Iteration 16 tests**: 17/17 backend + 14/14 frontend at 100%.
+
+### v2.0 (2026-07-24) — Real Auth + 5-agent Claude Console (Zynex OS shift)
+- **Backend Auth (email + password)** with bcrypt + JWT stored in an HttpOnly
+  cookie named `litper_session`. Endpoints: `POST /api/auth/register`,
+  `/api/auth/login`, `/api/auth/logout`, `GET /api/auth/me`. Users belong to
+  auto-provisioned orgs (multi-tenant BYOK groundwork).
+- **Emergent-managed Google OAuth** via `POST /api/auth/google/session`. The
+  frontend redirects to `auth.emergentagent.com`, the callback URL fragment
+  `#session_id=...` is exchanged server-side (calls
+  `demobackend.emergentagent.com/auth/v1/env/oauth/session-data`) and the same
+  `litper_session` cookie is issued so both flows share ONE session model.
+- **CORS locked** to `*.preview.emergentagent.com` + explicit list (needed
+  for cookies + credentials).
+- **Frontend Auth**: `withCredentials: true` on the axios client; new
+  `Login.jsx` (email/pass + "Continuar con Google") and `Register.jsx`
+  (org self-serve); `App.js` gains `AuthGate` (server-authoritative
+  `/api/auth/me` probe with checking/authed/guest states) and `AuthRouter`
+  that detects `session_id` in the URL fragment before any routing.
+- **Claude-style Copilot Console**: rebuilt `Copilot.jsx` to feature the
+  five operational agents (Riesgo RTO · Confirmación COD · Novedades ·
+  Rescate Oficina · Analítica Operativa) as executable cards, plus a right
+  rail with live `$ recuperado`, BYOK connectors status, quick-agent list,
+  logged-in user info and Logout. Ads/Copies/Social agents removed.
+- **Human-in-the-loop modal**: when the orchestrator returns
+  `requires_human_confirmation: true` (money/mass actions) the UI opens a
+  `Sí / No` dialog before Marcus is allowed to act.
+
 ## Implementation Status
 
 ### v1.3 (2026-02-21) — Silver Matrix + Real ElevenLabs + Full Metrics
