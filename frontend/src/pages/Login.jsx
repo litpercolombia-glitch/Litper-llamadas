@@ -1,15 +1,17 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Toaster, toast } from "sonner";
 import { api } from "../lib/api";
-import PageHelp from "../components/PageHelp";
 import { GOOGLE_LOGIN_ENABLED, startGoogleLogin } from "../lib/googleLogin";
 import {
   LockKey, Envelope, ArrowRight, GoogleLogo, ShieldCheck, Sparkle,
   WhatsappLogo,
 } from "@phosphor-icons/react";
+
+// La ayuda se descarga aparte para que el login pinte rápido.
+const PageHelp = lazy(() => import("../components/PageHelp"));
 
 const BENEFITS = [
   { title: "Crea un agente con una frase",
@@ -95,7 +97,7 @@ export default function LoginPage() {
             {GOOGLE_LOGIN_ENABLED ? "Entra con tu correo o con tu cuenta de Google." : "Entra con tu correo y tu contraseña."}
           </p>
 
-          <PageHelp helpKey="login" linkAsk={false} />
+          <Suspense fallback={null}><PageHelp helpKey="login" linkAsk={false} /></Suspense>
 
           {GOOGLE_LOGIN_ENABLED && (
             <>

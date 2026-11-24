@@ -5,10 +5,10 @@ import { useTheme } from "@/components/ThemeToggle";
 import { api } from "@/lib/api";
 
 import LoginPage       from "@/pages/Login";
-import AuthCallback    from "@/pages/AuthCallback";
-import FeedbackButton  from "@/components/FeedbackButton";
 
 // Cada pantalla se descarga solo cuando se abre: el login carga liviano.
+const AuthCallback = lazy(() => import("@/pages/AuthCallback"));
+const FeedbackButton = lazy(() => import("@/components/FeedbackButton"));
 const FunnelPage = lazy(() => import("@/pages/Funnel"));
 const RegisterPage = lazy(() => import("@/pages/Register"));
 const CopilotPage = lazy(() => import("@/pages/Copilot"));
@@ -66,7 +66,7 @@ function AuthGate({ children }) {
 
 function AuthRouter() {
   if (typeof window !== "undefined" && window.location.hash?.includes("session_id=")) {
-    return <AuthCallback />;
+    return <Suspense fallback={<Cargando />}><AuthCallback /></Suspense>;
   }
   return (
     <Suspense fallback={<Cargando />}>
