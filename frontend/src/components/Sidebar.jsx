@@ -204,12 +204,12 @@ export default function Sidebar({ open = false, onClose }) {
            data-testid="sidebar-support">
         <div className="text-[10px] uppercase tracking-widest font-mono text-zinc-500">Soporte</div>
         <a href="mailto:zynexproai@gmail.com"
-           className="flex items-center gap-1.5 hover:text-white transition"
+           className="flex items-center gap-1.5 min-h-[24px] hover:text-white transition"
            data-testid="support-email">
           <Envelope size={11} weight="fill" /> zynexproai@gmail.com
         </a>
         <a href="https://wa.me/573144644054" target="_blank" rel="noreferrer"
-           className="flex items-center gap-1.5 hover:text-white transition"
+           className="flex items-center gap-1.5 min-h-[24px] hover:text-white transition"
            data-testid="support-whatsapp">
           <WhatsappLogo size={11} weight="fill" className="text-emerald-400" /> WhatsApp 314 464 4054
         </a>

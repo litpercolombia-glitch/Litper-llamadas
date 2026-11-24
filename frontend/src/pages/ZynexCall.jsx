@@ -59,7 +59,7 @@ function Card({ title, children, actions }) {
     <div className="border border-zinc-800 rounded-sm bg-zinc-900/40 p-5">
       {(title || actions) && (
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-          {title && <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">{title}</div>}
+          {title && <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-400">{title}</div>}
           {actions}
         </div>
       )}
@@ -108,7 +108,7 @@ function Panel({ d, recargar }) {
           ["Contacto", m.tasa_contacto != null ? `${m.tasa_contacto}%` : "—"],
           ["Éxito", m.tasa_exito != null ? `${m.tasa_exito}%` : "—"]].map(([l, v]) => (
           <div key={l} className="border border-zinc-800 rounded-sm bg-zinc-900/40 px-4 py-3">
-            <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">{l}</div>
+            <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-400">{l}</div>
             <div className="text-2xl font-semibold text-white mt-1">{v ?? 0}</div>
           </div>
         ))}
@@ -133,7 +133,7 @@ function Panel({ d, recargar }) {
             <ArrowsClockwise size={14} className="mr-1.5" /> Refrescar
           </Button>
         </div>
-        <p className="text-xs text-zinc-500 mt-3">
+        <p className="text-xs text-zinc-400 mt-3">
           «Traer pedidos» busca en tu Chatea los contactos cuyo estado de Dropi tiene un agente encendido y los pone en cola.
           También puedes pedírselo a tu Claude (Conexiones → Claude). En modo prueba solo se llama a los números del equipo.
         </p>
@@ -142,7 +142,7 @@ function Panel({ d, recargar }) {
 
       <Card title="Un contacto puntual">
         <div className="flex flex-wrap gap-2">
-          <Input value={userNs} onChange={(e) => setUserNs(e.target.value)} placeholder="user_ns del contacto en Chatea (ej. f140677u…)"
+          <Input aria-label="user_ns del contacto" value={userNs} onChange={(e) => setUserNs(e.target.value)} placeholder="user_ns del contacto en Chatea (ej. f140677u…)"
                  className="bg-black/40 border-zinc-700 text-white font-mono text-xs flex-1 min-w-[14rem]" data-testid="zc-userns" />
           <Button variant="outline" onClick={previsualizar} disabled={!userNs.trim() || !!busy} className={btnOut}>
             <MagnifyingGlass size={14} className="mr-1.5" /> {busy === "prev" ? "Leyendo…" : "Ver qué diría el agente"}
@@ -156,7 +156,7 @@ function Panel({ d, recargar }) {
             </div>
             <div className="grid gap-x-6 gap-y-1.5 sm:grid-cols-2">
               {Object.entries(vista.variables || {}).map(([k, v]) => (
-                <div key={k} className="flex gap-2 text-xs"><span className="text-zinc-500 w-36 shrink-0">{VAR_TXT[k] || k}</span><span className="text-zinc-200 break-all">{v || "—"}</span></div>
+                <div key={k} className="flex gap-2 text-xs"><span className="text-zinc-400 w-36 shrink-0">{VAR_TXT[k] || k}</span><span className="text-zinc-200 break-all">{v || "—"}</span></div>
               ))}
             </div>
             {vista.agente && (
@@ -170,7 +170,7 @@ function Panel({ d, recargar }) {
         <div className="flex flex-wrap gap-1">
           {["todas", "en_cola", "bloqueada", "terminada", "cancelada", "error"].map((k) => (
             <button key={k} onClick={() => setFiltro(k)}
-                    className={`text-[11px] px-2.5 py-1 rounded-sm border ${filtro === k ? "border-white text-white" : "border-zinc-800 text-zinc-400 hover:text-white"}`}>
+                    className={`text-[11px] px-2.5 py-1 min-h-[28px] rounded-sm border ${filtro === k ? "border-white text-white" : "border-zinc-800 text-zinc-400 hover:text-white"}`}>
               {k === "todas" ? "Todas" : ESTADO_TXT[k]}
             </button>
           ))}
@@ -182,7 +182,7 @@ function Panel({ d, recargar }) {
           <div className="overflow-x-auto -mx-5 px-5">
             <table className="w-full text-sm min-w-[720px]">
               <thead>
-                <tr className="text-left text-[10px] font-mono uppercase tracking-widest text-zinc-500 border-b border-zinc-800">
+                <tr className="text-left text-[10px] font-mono uppercase tracking-widest text-zinc-400 border-b border-zinc-800">
                   <th className="py-2 pr-3">Cliente</th><th className="py-2 pr-3">Agente</th><th className="py-2 pr-3">Estado</th>
                   <th className="py-2 pr-3">Resultado</th><th className="py-2 pr-3">Valor</th><th className="py-2 pr-3">Próxima / fecha</th><th />
                 </tr>
@@ -192,16 +192,16 @@ function Panel({ d, recargar }) {
                   <tr key={x.id} className="border-b border-zinc-900 align-top">
                     <td className="py-2.5 pr-3">
                       <div className="text-white">{x.cliente || "—"}</div>
-                      <div className="text-[11px] font-mono text-zinc-500">{x.telefono || "sin teléfono"}{x.dropi_order_id ? ` · #${x.dropi_order_id}` : ""}</div>
+                      <div className="text-[11px] font-mono text-zinc-400">{x.telefono || "sin teléfono"}{x.dropi_order_id ? ` · #${x.dropi_order_id}` : ""}</div>
                     </td>
                     <td className="py-2.5 pr-3 text-zinc-300">{x.agente}</td>
                     <td className="py-2.5 pr-3">
                       <span className={`text-[11px] px-2 py-0.5 rounded-sm border ${ESTADO_CLS[x.estado] || ""}`}>{ESTADO_TXT[x.estado] || x.estado}</span>
-                      {x.motivo_estado && <div className="text-[11px] text-zinc-500 mt-1 max-w-[16rem]">{x.motivo_estado}</div>}
+                      {x.motivo_estado && <div className="text-[11px] text-zinc-400 mt-1 max-w-[16rem]">{x.motivo_estado}</div>}
                     </td>
                     <td className="py-2.5 pr-3">
                       <div className="text-zinc-200 text-xs font-mono">{x.resultado || "—"}</div>
-                      {x.nota && <div className="text-[11px] text-zinc-500 mt-1 max-w-[18rem]">{x.nota}</div>}
+                      {x.nota && <div className="text-[11px] text-zinc-400 mt-1 max-w-[18rem]">{x.nota}</div>}
                       {x.direccion_corregida && <div className="text-[11px] text-yellow-200/80 mt-1">Dirección: {x.direccion_corregida}</div>}
                     </td>
                     <td className="py-2.5 pr-3 text-zinc-300">{cop(x.valor)}</td>
@@ -209,7 +209,7 @@ function Panel({ d, recargar }) {
                     <td className="py-2.5 text-right">
                       {["en_cola", "bloqueada"].includes(x.estado) && (
                         <button onClick={() => cancelar(x.id)} aria-label="Cancelar llamada" title="Cancelar"
-                                className="h-8 w-8 grid place-items-center rounded-sm border border-zinc-800 hover:bg-red-500/10 hover:border-red-500/40 text-zinc-500 hover:text-red-300">
+                                className="h-8 w-8 grid place-items-center rounded-sm border border-zinc-800 hover:bg-red-500/10 hover:border-red-500/40 text-zinc-400 hover:text-red-300">
                           <Prohibit size={13} />
                         </button>
                       )}
@@ -280,11 +280,11 @@ function Variables({ d, recargar }) {
               <div key={v} className="py-3 grid gap-2 md:grid-cols-[12rem_1fr_11rem] items-center">
                 <div>
                   <div className="text-sm text-white">{VAR_TXT[v] || v}</div>
-                  <div className="text-[11px] font-mono text-zinc-500">{`{{${v}}}`}</div>
+                  <div className="text-[11px] font-mono text-zinc-400">{`{{${v}}}`}</div>
                 </div>
                 <div className="min-w-0">
                   {campos ? (
-                    <select defaultValue={m?.ref || ""} onChange={(e) => e.target.value && guardar(v, e.target.value, m?.transformacion || "texto")}
+                    <select aria-label={`Campo de Chatea para ${VAR_TXT[v] || v}`} defaultValue={m?.ref || ""} onChange={(e) => e.target.value && guardar(v, e.target.value, m?.transformacion || "texto")}
                             className="w-full bg-black/40 border border-zinc-700 rounded-sm text-xs text-white px-2 h-9">
                       <option value="">— Elegir campo —</option>
                       {v === "telefono" && <option value="phone">Teléfono del contacto</option>}
@@ -293,11 +293,11 @@ function Variables({ d, recargar }) {
                   ) : (
                     <div className="text-xs text-zinc-300 break-words">
                       {m ? m.nombre_campo || m.ref : <span className="text-yellow-200/80">Sin enlazar</span>}
-                      {m?.refs_alt?.length > 0 && <span className="text-zinc-500"> · {m.refs_alt.length} respaldo(s)</span>}
+                      {m?.refs_alt?.length > 0 && <span className="text-zinc-400"> · {m.refs_alt.length} respaldo(s)</span>}
                     </div>
                   )}
                 </div>
-                <select value={m?.transformacion || "texto"} disabled={!m}
+                <select aria-label={`Formato de ${VAR_TXT[v] || v}`} value={m?.transformacion || "texto"} disabled={!m}
                         onChange={(e) => guardar(v, m.ref, e.target.value)}
                         className="bg-black/40 border border-zinc-700 rounded-sm text-xs text-white px-2 h-9 disabled:opacity-40">
                   {(d.transformaciones || []).map((t) => <option key={t} value={t}>{TRANS_TXT[t] || t}</option>)}
@@ -313,7 +313,7 @@ function Variables({ d, recargar }) {
           <ul className="space-y-1.5">{(d.campos_resultado || []).map((c) => <li key={c} className="font-mono text-zinc-300">{c}</li>)}</ul>
           <ul className="space-y-1.5">{(d.etiquetas || []).map((c) => <li key={c} className="font-mono text-zinc-300">{c}</li>)}</ul>
         </div>
-        <p className="text-[11px] text-zinc-500 mt-3">Créalos en tu Chatea con estos nombres exactos para ver el resultado de cada llamada en el chat del cliente.</p>
+        <p className="text-[11px] text-zinc-400 mt-3">Créalos en tu Chatea con estos nombres exactos para ver el resultado de cada llamada en el chat del cliente.</p>
       </Card>
     </div>
   );
@@ -334,8 +334,8 @@ function AgenteRow({ a, recargar }) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="text-sm font-semibold text-white">{a.nombre}</div>
-          <div className="text-[11px] font-mono text-zinc-500 mt-0.5">Dropi: {a.estados_dropi.join(" · ")}</div>
-          <div className="text-[11px] text-zinc-500 mt-1">Necesita: {a.requeridas.map((r) => VAR_TXT[r] || r).join(", ")}</div>
+          <div className="text-[11px] font-mono text-zinc-400 mt-0.5">Dropi: {a.estados_dropi.join(" · ")}</div>
+          <div className="text-[11px] text-zinc-400 mt-1">Necesita: {a.requeridas.map((r) => VAR_TXT[r] || r).join(", ")}</div>
         </div>
         <label className="flex items-center gap-2 text-xs text-zinc-300">
           {a.activo ? "Encendido" : "Apagado"}
@@ -344,7 +344,7 @@ function AgenteRow({ a, recargar }) {
         </label>
       </div>
       <div className="flex flex-wrap gap-2 mt-3">
-        <Input value={aid} onChange={(e) => setAid(e.target.value)} placeholder="ID del agente en ElevenLabs (agent_…)"
+        <Input aria-label={`ID de ElevenLabs para ${a.nombre}`} value={aid} onChange={(e) => setAid(e.target.value)} placeholder="ID del agente en ElevenLabs (agent_…)"
                className="bg-black/40 border-zinc-700 text-white font-mono text-xs flex-1 min-w-[14rem]" />
         <Button variant="outline" disabled={busy || aid === (a.elevenlabs_agent_id || "")}
                 onClick={() => patch({ elevenlabs_agent_id: aid }, "ID guardado.")} className={btnOut}>Guardar</Button>
@@ -409,7 +409,7 @@ function Reglas({ d, recargar }) {
           <Pill ok={d.conexiones?.numero}>Número {c.numero_saliente || ""}</Pill><Pill ok={d.conexiones?.webhook}>Webhook</Pill>
           <Pill ok={d.conexiones?.claude}>Claude</Pill>
         </div>
-        <p className="text-xs text-zinc-500 mt-3">Las llaves de Chatea Pro, ElevenLabs y Twilio se guardan cifradas en Conexiones → Credenciales. Cada negocio usa las suyas.</p>
+        <p className="text-xs text-zinc-400 mt-3">Las llaves de Chatea Pro, ElevenLabs y Twilio se guardan cifradas en Conexiones → Credenciales. Cada negocio usa las suyas.</p>
       </Card>
 
       <Card title="Modo">
@@ -419,7 +419,7 @@ function Reglas({ d, recargar }) {
                     className={`${btnOut} ${c.modo === k ? "!border-white !text-white" : ""}`}>{l}</Button>
           ))}
         </div>
-        <p className="text-xs text-zinc-500 mt-3">Para activar se necesitan ElevenLabs, número y webhook conectados, y escribir ACTIVAR.</p>
+        <p className="text-xs text-zinc-400 mt-3">Para activar se necesitan ElevenLabs, número y webhook conectados, y escribir ACTIVAR.</p>
       </Card>
 
       <Card title="Horario y reintentos" actions={
@@ -436,26 +436,26 @@ function Reglas({ d, recargar }) {
           <label className="flex items-center gap-2"><Switch checked={f.pre_aviso_whatsapp} onCheckedChange={(v) => setF({ ...f, pre_aviso_whatsapp: v })} /> Avisar por WhatsApp antes de llamar</label>
           <label className="flex items-center gap-2"><Switch checked={f.auto_recoger} onCheckedChange={(v) => setF({ ...f, auto_recoger: v })} /> Traer pedidos y llamar solo dentro del horario</label>
         </div>
-        <p className="text-[11px] text-zinc-500 mt-2">Lunes a sábado. Solo se reintenta si fue buzón o el cliente pidió que lo llamaran después.</p>
+        <p className="text-[11px] text-zinc-400 mt-2">Lunes a sábado. Solo se reintenta si fue buzón o el cliente pidió que lo llamaran después.</p>
       </Card>
 
       <Card title="Números del equipo (modo prueba)" actions={
         <Button variant="outline" onClick={guardarEquipo} disabled={!!busy || !equipo.trim()} className={btnOut}>Guardar</Button>}>
-        <Input value={equipo} onChange={(e) => setEquipo(e.target.value)} placeholder="3001234567, 3109876543" className={inp} />
-        <p className="text-[11px] text-zinc-500 mt-2">Guardados: {(c.numeros_equipo || []).join(", ") || "ninguno"}. Al guardar se reemplaza la lista.</p>
+        <Input aria-label="Números del equipo" value={equipo} onChange={(e) => setEquipo(e.target.value)} placeholder="3001234567, 3109876543" className={inp} />
+        <p className="text-[11px] text-zinc-400 mt-2">Guardados: {(c.numeros_equipo || []).join(", ") || "ninguno"}. Al guardar se reemplaza la lista.</p>
       </Card>
 
       <Card title="Número saliente" actions={
         <Button variant="outline" onClick={importar} disabled={!!busy || !num.numero.trim()} className={btnOut}>Conectar número</Button>}>
         <div className="grid gap-3 sm:grid-cols-[10rem_1fr_1fr]">
-          <select value={num.proveedor} onChange={(e) => setNum({ ...num, proveedor: e.target.value })}
+          <select aria-label="Proveedor de telefonía" value={num.proveedor} onChange={(e) => setNum({ ...num, proveedor: e.target.value })}
                   className="bg-black/40 border border-zinc-700 rounded-sm text-xs text-white px-2 h-9">
             <option value="twilio">Twilio</option><option value="sip">SIP trunk</option>
           </select>
-          <Input value={num.numero} onChange={(e) => setNum({ ...num, numero: e.target.value })} placeholder="+57 300 000 0000" className={inp} />
-          {num.proveedor === "sip" && <Input value={num.direccion} onChange={(e) => setNum({ ...num, direccion: e.target.value })} placeholder="sip.tuproveedor.com" className={inp} />}
+          <Input aria-label="Número saliente" value={num.numero} onChange={(e) => setNum({ ...num, numero: e.target.value })} placeholder="+57 300 000 0000" className={inp} />
+          {num.proveedor === "sip" && <Input aria-label="Dirección del trunk SIP" value={num.direccion} onChange={(e) => setNum({ ...num, direccion: e.target.value })} placeholder="sip.tuproveedor.com" className={inp} />}
         </div>
-        <p className="text-[11px] text-zinc-500 mt-2">Se importa a tu propia cuenta de ElevenLabs. Twilio usa el SID y token que guardaste en Credenciales.</p>
+        <p className="text-[11px] text-zinc-400 mt-2">Se importa a tu propia cuenta de ElevenLabs. Twilio usa el SID y token que guardaste en Credenciales.</p>
       </Card>
 
       <Card title="Webhook de resultados" actions={
@@ -471,13 +471,13 @@ function Reglas({ d, recargar }) {
       <Card title="Llamada de prueba" actions={
         <Button onClick={probar} disabled={!!busy || !prueba.telefono.trim()} className="btn-cta-grad rounded-sm h-9 text-sm">Llamar</Button>}>
         <div className="grid gap-3 sm:grid-cols-2">
-          <select value={prueba.agente} onChange={(e) => setPrueba({ ...prueba, agente: e.target.value })}
+          <select aria-label="Agente para la llamada de prueba" value={prueba.agente} onChange={(e) => setPrueba({ ...prueba, agente: e.target.value })}
                   className="bg-black/40 border border-zinc-700 rounded-sm text-xs text-white px-2 h-9">
             {(d.agentes || []).map((a) => <option key={a.agente} value={a.agente}>{a.nombre}</option>)}
           </select>
-          <Input value={prueba.telefono} onChange={(e) => setPrueba({ ...prueba, telefono: e.target.value })} placeholder="Número del equipo" className={inp} />
+          <Input aria-label="Número del equipo para la prueba" value={prueba.telefono} onChange={(e) => setPrueba({ ...prueba, telefono: e.target.value })} placeholder="Número del equipo" className={inp} />
         </div>
-        <p className="text-[11px] text-zinc-500 mt-2 flex items-start gap-1.5"><WarningCircle size={13} className="mt-0.5 shrink-0" />Solo números del equipo guardados arriba. Consume créditos de tu ElevenLabs.</p>
+        <p className="text-[11px] text-zinc-400 mt-2 flex items-start gap-1.5"><WarningCircle size={13} className="mt-0.5 shrink-0" />Solo números del equipo guardados arriba. Consume créditos de tu ElevenLabs.</p>
       </Card>
     </div>
   );
@@ -514,7 +514,7 @@ export default function ZynexCallPage() {
         ))}
       </div>
       {err && <div role="alert" className="text-sm px-3 py-2 rounded-sm border border-red-500/30 bg-red-500/10 text-red-300 mb-4">{err}</div>}
-      {!d && !err && <div className="text-zinc-500 font-mono text-sm">Cargando…</div>}
+      {!d && !err && <div className="text-zinc-400 font-mono text-sm">Cargando…</div>}
       {d && tab === "panel" && <Panel d={d} recargar={recargar} />}
       {d && tab === "variables" && <Variables d={d} recargar={recargar} />}
       {d && tab === "agentes" && <Agentes d={d} recargar={recargar} />}
