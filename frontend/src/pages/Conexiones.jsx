@@ -2,14 +2,16 @@ import { useMemo, useState } from "react";
 import Layout from "../components/Layout";
 import { helpForTab } from "../constants/help";
 import { HubContext } from "../components/HubContext";
-import { PlugsConnected, Key, Microphone, PhoneCall, Plugs } from "@phosphor-icons/react";
+import { PlugsConnected, Key, Microphone, PhoneCall, Plugs, Sparkle } from "@phosphor-icons/react";
 import ConnectorsPage from "./Connectors";
 import ConfigPage     from "./Config";
 import VoicesPage     from "./Voices";
 import NumbersPage    from "./Numbers";
 import McpConnectors  from "../components/McpConnectors";
+import ConectarClaude from "../components/ConectarClaude";
 
 const TABS = [
+  { key: "claude",       label: "Claude",       Icon: Sparkle,        desc: "Opera tu negocio desde tu propio Claude: Dropi, llamadas y resultados." },
   { key: "conectores",   label: "Conectores",   Icon: PlugsConnected, desc: "Mensajería, telefonía, voz y tu sistema de pedidos o citas, con guía paso a paso." },
   { key: "mcp",          label: "Conectores MCP", Icon: Plugs,        desc: "Dale herramientas nuevas al asistente conectando servidores MCP de confianza." },
   { key: "credenciales", label: "Credenciales", Icon: Key,            desc: "Tus llaves, cifradas. Solo tu empresa las usa." },
@@ -46,6 +48,7 @@ export default function ConexionesPage() {
       </div>
 
       <HubContext.Provider value={helpForTab("conexiones", tab) || true}>
+        {tab === "claude"       && <ConectarClaude />}
         {tab === "conectores"   && <ConnectorsPage />}
         {tab === "mcp"          && <McpConnectors />}
         {tab === "credenciales" && <ConfigPage />}

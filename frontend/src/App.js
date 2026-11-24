@@ -8,6 +8,7 @@ import FunnelPage      from "@/pages/Funnel";
 import CopilotPage     from "@/pages/Copilot";
 import PedidosPage     from "@/pages/Pedidos";
 import ConexionesPage  from "@/pages/Conexiones";
+import ZynexCallPage   from "@/pages/ZynexCall";
 import MetricasPage    from "@/pages/Metricas";
 import AjustesPage     from "@/pages/Ajustes";
 import OnboardingPage  from "@/pages/Onboarding";
@@ -69,6 +70,7 @@ function AuthRouter() {
       <Route path="/app"             element={<AuthGate><CopilotPage /></AuthGate>} />
       <Route path="/app/pedidos"     element={<AuthGate><PedidosPage /></AuthGate>} />
       <Route path="/app/conexiones"  element={<AuthGate><ConexionesPage /></AuthGate>} />
+      <Route path="/app/llamadas"    element={<AuthGate><ZynexCallPage /></AuthGate>} />
       <Route path="/app/metricas"    element={<AuthGate><MetricasPage /></AuthGate>} />
       <Route path="/app/ajustes"     element={<AuthGate><AjustesPage /></AuthGate>} />
       <Route path="/app/onboarding"  element={<AuthGate><OnboardingPage /></AuthGate>} />
