@@ -1,6 +1,11 @@
 import axios from "axios";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+// En los dominios publicados la API va por el mismo origen (/api → proxy de
+// Vercel a api.zynexapp.com): sin CORS y con la cookie de sesión propia del
+// sitio, así el login funciona en todos los navegadores (también Safari).
+const SAME_ORIGIN = typeof window !== "undefined"
+  && /(^|\.)zynexapp\.com$|\.vercel\.app$/.test(window.location.hostname);
+const BACKEND_URL = SAME_ORIGIN ? "" : process.env.REACT_APP_BACKEND_URL;
 
 // Zynex OS v2 uses HttpOnly cookie auth (session cookie). No more operator
 // key on the client — internal routes now accept either the JWT cookie OR

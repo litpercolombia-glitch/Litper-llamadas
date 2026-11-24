@@ -23,7 +23,7 @@ const TABS = [
   { key: "conocimiento",   label: "Base de conocimiento", Icon: BookOpenText, desc: "Lo que tu negocio sabe: horarios, catálogo, preguntas frecuentes y políticas." },
   { key: "agentes",        label: "Agentes",         Icon: Robot,          desc: "Crea un agente describiendo tu negocio en una frase." },
   { key: "automatizaciones", label: "Automatizaciones", Icon: Lightning,   desc: "Reglas «cuando pase esto, haz aquello»." },
-  { key: "llamadas",       label: "Llamadas",        Icon: PhoneCall,      desc: "Historial de llamadas con grabación y conversación escrita." },
+  { key: "llamadas",       label: "Historial de voz", Icon: PhoneCall,      desc: "Historial de llamadas con grabación y conversación escrita." },
   { key: "productos",      label: "Productos",       Icon: Package,        desc: "Catálogo con precios y promociones." },
   { key: "prompts",        label: "Guiones",         Icon: ChatText,       desc: "Lo que dicen tus agentes y cómo lo dicen." },
   { key: "cadencia",       label: "Cadencia",        Icon: ClockCountdown, desc: "Plan de intentos de contacto por pedido.", pack: "cod_colombia" },

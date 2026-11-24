@@ -5,9 +5,9 @@ import "@/index.css";
 import App from "@/App";
 
 // Un solo dominio para la app: la sesión (cookie) vive en zynexapp.com y no
-// viaja desde *.vercel.app (otro sitio). Redirigimos conservando la ruta.
+// viaja desde call-zynex.vercel.app (otro sitio). Redirigimos conservando la ruta.
 const CANONICAL = "call.zynexapp.com";
-if (typeof window !== "undefined" && window.location.hostname.endsWith(".vercel.app")) {
+if (typeof window !== "undefined" && window.location.hostname === "call-zynex.vercel.app") {
   window.location.replace(`https://${CANONICAL}${window.location.pathname}${window.location.search}${window.location.hash}`);
 }
 

@@ -95,7 +95,7 @@ export default function ConectarClaude() {
 
       <div className="grid gap-5 md:grid-cols-2">
         <div className="border border-zinc-800 rounded-sm bg-zinc-900/40 p-5">
-          <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-3">Cómo se conecta</div>
+          <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-400 mb-3">Cómo se conecta</div>
           <ol className="space-y-2.5">
             {PASOS.map((p, i) => (
               <li key={i} className="flex gap-3 text-sm text-zinc-300">
@@ -106,7 +106,7 @@ export default function ConectarClaude() {
           </ol>
         </div>
         <div className="border border-zinc-800 rounded-sm bg-zinc-900/40 p-5">
-          <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-3">Lo que Claude puede hacer</div>
+          <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-400 mb-3">Lo que Claude puede hacer</div>
           <ul className="space-y-2.5">
             {HERRAMIENTAS.map(([n, d]) => (
               <li key={n} className="text-sm">
