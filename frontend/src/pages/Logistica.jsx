@@ -91,27 +91,18 @@ function Lista({ clave, titulo, onCerrar, dias }) {
 
 function Panel({ d, recargar }) {
   const [sel, setSel] = useState(null);
-  const [codigo, setCodigo] = useState("");
   const [busy, setBusy] = useState(false);
   if (!d.conectado) {
     return <div className={`${caja} p-5 text-sm text-zinc-300`} data-testid="log-sin-conectar">
       El motor de logística todavía no está conectado en el servidor. Soporte de Zynex lo activa; no tienes que hacer nada aquí.</div>;
   }
   if (!d.vinculado) {
-    const vincular = async () => {
-      setBusy(true);
-      try { const r = await api.post("/zcall/motor/vincular", { codigo }); toast.success(r.data.mensaje); await recargar(); }
-      catch (e) { toast.error(errorText(e)); } finally { setBusy(false); }
-    };
+    const reintentar = async () => { setBusy(true); try { await recargar(); } finally { setBusy(false); } };
     return (
-      <div className={`${caja} p-5 space-y-3`} data-testid="log-vincular">
-        <p className="text-sm text-zinc-300">Pega el código de activación que te dio Zynex para ver tus pedidos aquí. Se usa una sola vez.</p>
-        <div className="flex flex-wrap gap-2">
-          <Input aria-label="Código de activación" value={codigo} onChange={(e) => setCodigo(e.target.value)}
-                 placeholder="Código de activación" className="bg-black/40 border-zinc-700 text-white text-sm max-w-xs" />
-          <Button disabled={busy || codigo.trim().length < 8} onClick={vincular} className="btn-cta-grad rounded-sm h-9 text-sm">
-            {busy ? "Activando…" : "Activar"}</Button>
-        </div>
+      <div className={`${caja} p-5 space-y-3`} data-testid="log-preparando">
+        <p className="text-sm text-zinc-300">Estamos preparando tu espacio. Se crea solo, vacío y solo para tu empresa; no necesitas ningún código.</p>
+        <p className="text-sm text-zinc-400">Si tarda, vuelve a intentar o pídele a tu Claude «Sincroniza mi Zynex».</p>
+        <Button disabled={busy} onClick={reintentar} className="btn-cta-grad rounded-sm h-9 text-sm">{busy ? "Revisando…" : "Volver a intentar"}</Button>
       </div>
     );
   }
@@ -171,7 +162,7 @@ function Metricas() {
   if (d === null) return <p className="text-sm text-zinc-400">Cargando…</p>;
   if (d.error === "pendiente") return <div className={`${caja} p-5 text-sm text-zinc-300`} data-testid="log-metricas-pendiente">Las métricas aún no están activadas en la base de datos. Soporte de Zynex las activa; no tienes que hacer nada aquí.</div>;
   if (d.error) return <div className={`${caja} p-5 text-sm text-zinc-300`}>{d.error}</div>;
-  if (!(d.kpis || []).length) return <p className="text-sm text-zinc-400">Activa tu espacio en la pestaña Panel para ver tus métricas.</p>;
+  if (!(d.kpis || []).length) return <p className="text-sm text-zinc-400">Todavía no hay pedidos. Trae tu operación de 30, 60 o 90 días desde Clientes o pídeselo a tu Claude.</p>;
   return (
     <div className="space-y-5" data-testid="log-metricas">
       <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Periodo">
@@ -245,7 +236,7 @@ function Casillas() {
     } catch (e) { toast.error(errorText(e)); } finally { setBusy(""); }
   };
   if (cas === null) return <p className="text-sm text-zinc-400">Cargando…</p>;
-  if (cas.length === 0) return <p className="text-sm text-zinc-400">Activa tu espacio en la pestaña Panel para configurar tus plantillas.</p>;
+  if (cas.length === 0) return <p className="text-sm text-zinc-400">Tu espacio se está preparando. Abre la pestaña Panel y vuelve aquí.</p>;
   return (
     <div className="space-y-5">
       <p className="text-sm text-zinc-400 max-w-3xl">
@@ -294,7 +285,7 @@ function Secuencia() {
     const g = {}; (pasos || []).forEach((p) => { (g[p.estado_dropi] = g[p.estado_dropi] || []).push(p); }); return Object.entries(g);
   }, [pasos]);
   if (pasos === null) return <p className="text-sm text-zinc-400">Cargando…</p>;
-  if (pasos.length === 0) return <p className="text-sm text-zinc-400">Activa tu espacio en la pestaña Panel para ver la secuencia.</p>;
+  if (pasos.length === 0) return <p className="text-sm text-zinc-400">Tu espacio se está preparando. Abre la pestaña Panel y vuelve aquí.</p>;
   return (
     <div className="grid gap-4 md:grid-cols-2">
       {grupos.map(([estado, ps]) => (

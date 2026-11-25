@@ -6,6 +6,8 @@
 import fs from "fs";
 import path from "path";
 import { HELP, ROUTE_HELP, TAB_HELP, PAGE_HELP, helpForRoute, helpForTab } from "./help";
+// La app carga también las instrucciones de contra entrega (App.js importa helpZynex).
+import "./helpZynex";
 
 const SRC = path.resolve(__dirname, "..");
 const read = (rel) => fs.readFileSync(path.join(SRC, rel), "utf8");
@@ -108,7 +110,8 @@ describe("help.js — instrucciones de todas las pantallas", () => {
   });
 
   test("fuera de las pantallas del paquete no quedan textos de un cliente o sector concreto", () => {
-    const PACK_SCREENS = ["pages/Import.jsx", "pages/Novedades.jsx", "pages/Cadence.jsx", "pages/Carriers.jsx"];
+    // Sidebar nombra a Sofía, la asesora de marca de Zynex en el botón de soporte (decisión de marca).
+    const PACK_SCREENS = ["pages/Import.jsx", "pages/Novedades.jsx", "pages/Cadence.jsx", "pages/Carriers.jsx", "components/Sidebar.jsx"];
     const banned = /litper|antifluido|sof[ií]a|emergent/i;
     const walk = (dir) => fs.readdirSync(path.join(SRC, dir), { withFileTypes: true }).flatMap((d) => {
       const rel = path.posix.join(dir, d.name);
