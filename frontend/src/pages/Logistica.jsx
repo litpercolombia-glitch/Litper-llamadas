@@ -6,8 +6,9 @@ import { toast } from "sonner";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import PendientesChatea from "../components/PendientesChatea";
+import FichaPedido from "../components/FichaPedido";
 import {
-  Package, ArrowsClockwise, ChartBar, ChatText, ChatsCircle, PhoneCall, WhatsappLogo, User, CheckCircle, WarningCircle, X, ListChecks, Path,
+  Package, ArrowsClockwise, ChartBar, MagnifyingGlass, DownloadSimple, ChatText, ChatsCircle, PhoneCall, WhatsappLogo, User, CheckCircle, WarningCircle, X, ListChecks, Path,
 } from "@phosphor-icons/react";
 
 /** Agente de Logística: panel por estado de Dropi (cada número abre su lista),
@@ -42,35 +43,81 @@ function Tarjeta({ titulo, n, sub, activa, onClick, testId }) {
   );
 }
 
+const COLS = [["pedido", "Pedido"], ["estado", "Estado"], ["ciudad", "Ciudad"], ["valor", "Valor"], ["transportadora", "Transportadora"],
+  ["guia", "Guía"], ["dias", "Días"], ["accion_txt", "Qué haría"], ["plantilla", "Plantilla"]];
+
+function descargarCsv(filas, titulo) {
+  const esc = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const csv = [COLS.map(([, h]) => esc(h)).join(","), ...filas.map((f) => COLS.map(([k]) => esc(f[k])).join(","))].join("\n");
+  const url = URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" }));
+  const a = document.createElement("a");
+  a.href = url; a.download = `zynex-${titulo.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.csv`; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 function Lista({ clave, titulo, onCerrar, dias }) {
   const [filas, setFilas] = useState(null);
+  const [q, setQ] = useState("");
+  const [orden, setOrden] = useState({ k: "dias", desc: true });
+  const [abierto, setAbierto] = useState(null);
   useEffect(() => {
-    setFilas(null);
+    setFilas(null); setQ("");
     const metrica = clave.startsWith("m:");
     api.get(metrica ? "/zcall/motor/metricas/lista" : "/zcall/motor/lista", { params: metrica ? { clave, dias } : { clave } })
       .then((r) => setFilas(r.data.filas || []))
       .catch((e) => { toast.error(errorText(e)); setFilas([]); });
   }, [clave, dias]);
+  const vistas = useMemo(() => {
+    const t = q.trim().toLowerCase();
+    const f = (filas || []).filter((x) => !t || COLS.some(([k]) => String(x[k] ?? "").toLowerCase().includes(t)));
+    const { k, desc } = orden;
+    return [...f].sort((a, b) => {
+      const va = a[k], vb = b[k];
+      const r = typeof va === "number" || typeof vb === "number" ? (Number(va) || 0) - (Number(vb) || 0) : String(va ?? "").localeCompare(String(vb ?? ""));
+      return desc ? -r : r;
+    });
+  }, [filas, q, orden]);
+  const ordenar = (k) => setOrden((o) => ({ k, desc: o.k === k ? !o.desc : true }));
   return (
     <div className={`${caja} p-5`} data-testid="log-lista">
-      <div className="flex items-center justify-between gap-3 mb-4">
-        <div className={rotulo}>{titulo}{filas ? ` · ${filas.length}` : ""}</div>
-        <button type="button" onClick={onCerrar} aria-label="Cerrar lista"
-                className="h-9 w-9 grid place-items-center rounded-sm border border-zinc-700 text-zinc-300 hover:bg-zinc-800"><X size={16} /></button>
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div className={rotulo}>{titulo}{filas ? ` · ${vistas.length}${vistas.length !== filas.length ? ` de ${filas.length}` : ""}` : ""}</div>
+        <div className="flex flex-wrap items-center gap-2">
+          {filas && filas.length > 0 && <>
+            <label className="relative">
+              <span className="sr-only">Buscar en la lista</span>
+              <MagnifyingGlass size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+              <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar pedido, ciudad, guía…"
+                     className="h-9 pl-8 w-56 bg-black/40 border-zinc-700 text-white text-sm" />
+            </label>
+            <Button type="button" variant="outline" onClick={() => descargarCsv(vistas, titulo)}
+                    className="h-9 rounded-sm border-zinc-700 bg-zinc-950 hover:bg-zinc-800 text-xs"><DownloadSimple size={14} className="mr-1.5" /> Descargar</Button>
+          </>}
+          <button type="button" onClick={onCerrar} aria-label="Cerrar lista"
+                  className="h-9 w-9 grid place-items-center rounded-sm border border-zinc-700 text-zinc-300 hover:bg-zinc-800"><X size={16} /></button>
+        </div>
       </div>
       {filas === null ? <p className="text-sm text-zinc-400">Cargando…</p>
         : filas.length === 0 ? <p className="text-sm text-zinc-400">No hay pedidos aquí en este momento.</p>
+        : vistas.length === 0 ? <p className="text-sm text-zinc-400">Ningún pedido coincide con «{q}».</p>
         : (
+          <>
+          <p className="text-[11px] text-zinc-400 mb-2">Toca un pedido para ver todo: cliente, teléfono, qué hizo Zynex y acciones.</p>
           <div className="overflow-x-auto relative" tabIndex={0} role="region" aria-label={`Pedidos: ${titulo}`}>
             <table className="w-full text-sm">
               <thead><tr className="text-left text-[11px] text-zinc-400 border-b border-zinc-800">
-                {["Pedido", "Estado", "Ciudad", "Valor", "Transportadora", "Guía", "Días", "Qué haría", "Plantilla"].map((h) =>
-                  <th key={h} scope="col" className="py-2 pr-4 font-normal whitespace-nowrap">{h}</th>)}
+                {COLS.map(([k, h]) =>
+                  <th key={k} scope="col" aria-sort={orden.k === k ? (orden.desc ? "descending" : "ascending") : "none"} className="py-2 pr-4 font-normal whitespace-nowrap">
+                    <button type="button" onClick={() => ordenar(k)} className="hover:text-zinc-100">{h}{orden.k === k ? (orden.desc ? " ↓" : " ↑") : ""}</button>
+                  </th>)}
               </tr></thead>
               <tbody>
-                {filas.map((f) => (
-                  <tr key={`${f.pedido}-${f.estado}`} className="border-b border-zinc-900 text-zinc-200">
-                    <td className="py-2 pr-4 font-mono text-xs">{f.pedido}</td>
+                {vistas.map((f) => (
+                  <tr key={`${f.pedido}-${f.estado}`} onClick={() => setAbierto(f.pedido)} data-testid={`log-fila-${f.pedido}`}
+                      className="border-b border-zinc-900 text-zinc-200 cursor-pointer hover:bg-zinc-900">
+                    <td className="py-2 pr-4 font-mono text-xs">
+                      <button type="button" onClick={(e) => { e.stopPropagation(); setAbierto(f.pedido); }} className="underline decoration-zinc-600 hover:decoration-fuchsia-400">{f.pedido}</button>
+                    </td>
                     <td className="py-2 pr-4 text-xs whitespace-nowrap">{f.estado}</td>
                     <td className="py-2 pr-4 text-xs">{f.ciudad || "—"}</td>
                     <td className="py-2 pr-4 tabular-nums">{cop(f.valor)}</td>
@@ -84,7 +131,9 @@ function Lista({ clave, titulo, onCerrar, dias }) {
               </tbody>
             </table>
           </div>
+          </>
         )}
+      {abierto && <FichaPedido pedido={abierto} onCerrar={() => setAbierto(null)} />}
     </div>
   );
 }
