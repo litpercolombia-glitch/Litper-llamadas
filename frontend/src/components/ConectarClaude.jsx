@@ -25,6 +25,14 @@ const HERRAMIENTAS = [
   ["zynex_estado", "Resumen: conexiones, modo, cola y métricas."],
 ];
 
+// La misma URL sirve en cualquier asistente que acepte conectores MCP remotos.
+const OTRAS_IA = [
+  ["Claude", "Probado", "Configuración → Conectores → Agregar conector personalizado → pega la URL."],
+  ["ChatGPT", "Por probar", "Configuración → Apps y conectores → activa el modo desarrollador → Crear conector → pega la URL."],
+  ["Grok", "Por probar", "Conectores → Agregar conector personalizado → pega la URL."],
+  ["Gemini", "Por probar", "Si tu plan permite apps personalizadas (MCP), agrégala con la URL. Si no, usa Gemini CLI con el mismo enlace."],
+];
+
 export default function ConectarClaude() {
   const [conectado, setConectado] = useState(null);
   const [url, setUrl] = useState("");
@@ -94,6 +102,20 @@ export default function ConectarClaude() {
             </p>
           </div>
         )}
+      </div>
+
+      <div className="border border-zinc-800 rounded-sm bg-zinc-900/40 p-5" data-testid="otras-ia">
+        <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-400 mb-1">También con otras IA</div>
+        <p className="text-sm text-zinc-300 mb-3">Tu conector usa el estándar MCP, el mismo que aceptan otros asistentes. La URL es la misma; solo cambia dónde se pega. Los menús de cada app pueden cambiar de nombre.</p>
+        <ul className="space-y-2.5">
+          {OTRAS_IA.map(([ia, estado, pasos]) => (
+            <li key={ia} className="text-sm text-zinc-200 flex flex-wrap items-baseline gap-x-2">
+              <span className="font-semibold text-white">{ia}</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded-sm border border-zinc-600 bg-zinc-800 text-zinc-100">{estado}</span>
+              <span className="text-zinc-300 basis-full sm:basis-auto">{pasos}</span>
+            </li>
+          ))}
+        </ul>
       </div>
 
       <div className="grid gap-5 md:grid-cols-2">
