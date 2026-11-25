@@ -18,7 +18,7 @@ Object.assign(HELP, {
     pideselo: "Muéstrame los pedidos que llevan más días en oficina.",
   },
   clientes: {
-    titulo: "Clientes · Sofía",
+    titulo: "Clientes",
     intro: "Sirve para conocer a cada cliente y atenderlo bien: junta todos los pedidos de un mismo teléfono en una sola ficha, con sus notas y con la lista de quienes necesitan a una persona.",
     pasos: [
       "Toca un número de arriba para filtrar: quienes necesitan a una persona, quienes ya compraron dos veces o quienes han devuelto.",

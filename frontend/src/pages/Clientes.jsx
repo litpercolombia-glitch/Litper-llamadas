@@ -7,7 +7,7 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { UsersThree, MagnifyingGlass, X, WhatsappLogo, HandPalm, CheckCircle, NotePencil, ArrowsClockwise } from "@phosphor-icons/react";
 
-/** CRM de clientes con Sofía: una ficha por teléfono, con sus pedidos, notas y
+/** CRM de clientes: una ficha por teléfono, con sus pedidos, notas y
  *  la bandeja de quienes necesitan a una persona. Cada número filtra la lista. */
 const FILTROS = [
   { key: "atencion", label: "Necesitan una persona", nota: "Novedad, oficina, intento o marcados por el equipo" },
@@ -145,7 +145,7 @@ export default function ClientesPage() {
       <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-5" data-testid="clientes-page">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold text-white flex items-center gap-2"><UsersThree size={24} weight="duotone" /> Clientes · Sofía</h1>
+            <h1 className="text-2xl font-semibold text-white flex items-center gap-2"><UsersThree size={24} weight="duotone" /> Clientes</h1>
             <p className="text-sm text-zinc-400 mt-1">Una ficha por teléfono con todos sus pedidos. Toca un número para filtrar y un cliente para abrir su ficha.</p>
           </div>
           <Button variant="outline" onClick={cargar} className="h-9 rounded-sm border-zinc-700 bg-zinc-950 hover:bg-zinc-800 text-xs">

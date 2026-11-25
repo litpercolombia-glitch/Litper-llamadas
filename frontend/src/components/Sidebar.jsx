@@ -16,7 +16,7 @@ const NAV = [
   { to: "/app/logistica",  label: "Logística",  icon: Truck,          testId: "nav-logistica",
     hint: "Pedidos por estado · Métricas · Plantillas" },
   { to: "/app/clientes",   label: "Clientes",   icon: UsersThree,     testId: "nav-clientes",
-    hint: "CRM con Sofía · Fichas · Notas" },
+    hint: "Fichas · Notas · Quién necesita ayuda" },
   { to: "/app/llamadas",   label: "Llamadas",   icon: PhoneCall,      testId: "nav-llamadas",
     hint: "Agentes de voz por estado de Dropi" },
   { to: "/app/conexiones", label: "Conexiones", icon: PlugsConnected, testId: "nav-conexiones",
@@ -208,7 +208,7 @@ export default function Sidebar({ open = false, onClose }) {
       {/* Support footer — visible on every page */}
       <div className="border-t border-zinc-800 px-5 py-3 text-[11px] text-zinc-400 space-y-1"
            data-testid="sidebar-support">
-        <div className="text-[10px] uppercase tracking-widest font-mono text-zinc-500">Soporte</div>
+        <div className="text-[10px] uppercase tracking-widest font-mono text-zinc-500">Soporte · tu asesora Sofía</div>
         <a href="mailto:zynexproai@gmail.com"
            className="flex items-center gap-1.5 min-h-[24px] hover:text-white transition"
            data-testid="support-email">
@@ -217,7 +217,7 @@ export default function Sidebar({ open = false, onClose }) {
         <a href="https://wa.me/573144644054" target="_blank" rel="noreferrer"
            className="flex items-center gap-1.5 min-h-[24px] hover:text-white transition"
            data-testid="support-whatsapp">
-          <WhatsappLogo size={11} weight="fill" className="text-emerald-400" /> WhatsApp 314 464 4054
+          <WhatsappLogo size={11} weight="fill" className="text-emerald-400" /> Escríbele a Sofía · 314 464 4054
         </a>
       </div>
     </aside>
