@@ -15,6 +15,7 @@ const rotulo = "text-[10px] font-mono uppercase tracking-widest text-zinc-400";
 const pill = "text-[11px] px-2 py-0.5 rounded-sm border border-zinc-600 bg-zinc-800 text-zinc-100";
 const cop = (v) => (v ? `$${Number(v).toLocaleString("es-CO")}` : "—");
 const fecha = (v) => (v ? new Date(v).toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" }) : "—");
+const fechaHora = (v) => (v ? new Date(v).toLocaleString("es-CO", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : "—");
 const telBonito = (t) => (t && t.length === 10 ? `${t.slice(0, 3)} ${t.slice(3, 6)} ${t.slice(6)}` : t || "—");
 
 async function copiar(texto, que) {
@@ -122,7 +123,7 @@ function TodoDropi({ pedido, dropi }) {
 
 const PASOS = ["Confirmar", "Despacho", "En camino", "Destino", "Última milla", "Final"];
 
-function Seguimiento({ p, dropi }) {
+function Seguimiento({ p, dropi, movimientos }) {
   const grupo = grupoLogistico(p.estado);
   const etapa = ETAPA[grupo];
   const al = alertas(grupo, p.dias);
@@ -148,6 +149,18 @@ function Seguimiento({ p, dropi }) {
         <Dato k="Días en este estado" v={p.dias != null ? String(p.dias) : "—"} />
         {datos.novedad && <Dato k="Novedad" v={String(datos.novedad)} />}
       </div>
+      {(movimientos || []).length > 1 && (
+        <div>
+          <div className={`${rotulo} mb-1`}>Movimientos</div>
+          <ol className="space-y-1">
+            {movimientos.map((m, i) => (
+              <li key={`${m.estado}-${m.cuando}`} className={`text-sm flex flex-wrap gap-x-2 ${i === 0 ? "text-zinc-100" : "text-zinc-400"}`}>
+                <span>{m.estado}</span><span className="text-zinc-400">· {fechaHora(m.cuando)}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
       <div>
         <div className={`${rotulo} mb-1`}>Qué toca hacer</div>
         <p className="text-sm text-zinc-200">{etapa.que}</p>
@@ -252,7 +265,7 @@ export default function FichaPedido({ pedido, onCerrar }) {
               <Dato k="En este estado desde" v={fecha(p.desde)} />
             </section>
 
-            <Seguimiento p={p} dropi={d.dropi} />
+            <Seguimiento p={p} dropi={d.dropi} movimientos={d.movimientos} />
 
             <TodoDropi pedido={p.pedido} dropi={d.dropi} />
 
