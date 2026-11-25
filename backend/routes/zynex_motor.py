@@ -37,18 +37,41 @@ def configurado() -> bool:
     return bool(os.environ.get("SUPABASE_URL") and os.environ.get("SUPABASE_SERVICE_KEY"))
 
 
-async def rpc(fn: str, args: dict[str, Any]) -> Any:
-    if not configurado():
-        raise HTTPException(503, "El motor de logística aún no está conectado en el servidor.")
+# Funciones que, la primera vez que una empresa las usa, le crean su espacio vacío
+# (sin código de activación). La encuesta NO está aquí: sus resultados son del equipo.
+AUTO_ESPACIO = {"zc_api_panel", "zc_api_clientes", "zc_api_metricas", "zc_api_pendientes", "zc_api_casillas",
+                "zc_api_secuencia", "zc_api_solicitudes", "zc_api_solicitud_crear", "zc_api_entregar",
+                "zc_api_pedidos_importar"}
+_CON_ESPACIO: set[str] = set()
+
+
+async def _post(fn: str, args: dict[str, Any]) -> httpx.Response:
     url = os.environ["SUPABASE_URL"].rstrip("/")
     key = os.environ["SUPABASE_SERVICE_KEY"]
     try:
         async with httpx.AsyncClient(timeout=15) as cli:
-            r = await cli.post(f"{url}/rest/v1/rpc/{fn}", json=args,
-                               headers={"apikey": key, "Authorization": f"Bearer {key}"})
+            return await cli.post(f"{url}/rest/v1/rpc/{fn}", json=args,
+                                  headers={"apikey": key, "Authorization": f"Bearer {key}"})
     except httpx.HTTPError as e:  # noqa: BLE001
         log.warning("motor rpc %s: %s", fn, e)
         raise HTTPException(502, "No se pudo leer el motor de logística. Intenta de nuevo.")
+
+
+async def asegurar_espacio(org: str) -> None:
+    """Crea el espacio de la empresa si aún no tiene (una vez por proceso)."""
+    if not org or org in _CON_ESPACIO:
+        return
+    r = await _post("zc_ws_asegurar", {"p_org": org})
+    if r.status_code < 300 and (r.json() or {}).get("ok"):
+        _CON_ESPACIO.add(org)
+
+
+async def rpc(fn: str, args: dict[str, Any]) -> Any:
+    if not configurado():
+        raise HTTPException(503, "El motor de logística aún no está conectado en el servidor.")
+    if fn in AUTO_ESPACIO and args.get("p_org"):
+        await asegurar_espacio(str(args["p_org"]))
+    r = await _post(fn, args)
     if r.status_code == 404:
         raise HTTPException(501, "Esta parte aún no está activada en la base de datos. Soporte de Zynex la activa.")
     if r.status_code >= 300:
