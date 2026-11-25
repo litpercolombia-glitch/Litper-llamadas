@@ -100,7 +100,7 @@ export default function ZynexSetup({ d, recargar }) {
         ) : (
           <div className="flex flex-wrap gap-2 items-center">
             <Input aria-label="Nombre de tu negocio" value={negocio} onChange={(e) => setNegocio(e.target.value)}
-                   placeholder="Nombre de tu negocio, ej. Litper" className={`${inp} max-w-xs`} />
+                   placeholder="Nombre de tu negocio, ej. Hogar Casa Linda" className={`${inp} max-w-xs`} />
             <Button disabled={!!busy || negocio.trim().length < 2 || !c.elevenlabs} className="btn-cta-grad rounded-sm h-9 text-sm"
                     onClick={() => run("ag", () => api.post("/zcall/auto/agentes", { negocio, voice_id: "J4vZAFDEcpenkMp3f3R9" }, { timeout: 90000 }),
                       (r) => toast.success(r.mensaje))}>
