@@ -27,6 +27,7 @@ api.interceptors.response.use(
         && !window.location.pathname.startsWith("/login")
         && !window.location.pathname.startsWith("/register")
         && !window.location.pathname.startsWith("/funnel")
+        && !window.location.pathname.startsWith("/encuesta")
         && window.location.pathname !== "/") {
       localStorage.removeItem("zynex_session_ok");
       window.location.href = "/login";
