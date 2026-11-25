@@ -202,6 +202,22 @@ async def cliente_caso(tel: str, p: CasoIn, request: Request):
     return {"ok": True, "mensaje": "Marcado para que lo atienda una persona." if p.estado == "abierto" else "Caso resuelto."}
 
 
+# ----------------------------------------------------------------- ficha del pedido
+@router.get("/pedidos/{pedido}", dependencies=[Depends(require_api_key)])
+async def pedido(pedido: str, request: Request):
+    """Todo lo de un pedido en una vista: datos, lo que hizo el motor y la ficha del cliente."""
+    if not re.fullmatch(r"\d{1,15}", pedido or ""):
+        raise HTTPException(400, "Número de pedido inválido.")
+    d = await rpc("zc_api_pedido", {"p_org": get_org(request), "p_pedido": int(pedido)})
+    if not d:
+        raise HTTPException(404, "No encontramos ese pedido en tu espacio.")
+    for h in d.get("historial") or []:
+        h["accion_txt"] = ACCION_TXT.get(h.get("accion") or h.get("tarea"), h.get("accion") or "Sin tarea")
+    for p in ((d.get("cliente") or {}).get("pedidos") or []):
+        p["accion_txt"] = ACCION_TXT.get(p.get("accion"), "") if p.get("accion") else ""
+    return d
+
+
 # ----------------------------------------------------------------- métricas
 @router.get("/metricas", dependencies=[Depends(require_api_key)])
 async def metricas(request: Request, dias: int = 30):
