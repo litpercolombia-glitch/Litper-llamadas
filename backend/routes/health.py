@@ -13,6 +13,7 @@ from routes.zynex_auto import router as zynex_auto_router
 from routes.zynex_motor import router as zynex_motor_router, configurado as motor_configurado
 from routes.zynex_encuesta import router as zynex_encuesta_router
 from routes.zynex_pendientes import router as zynex_pendientes_router
+from routes.zynex_importar import router as zynex_importar_router
 
 router = APIRouter(tags=["health"])
 router.include_router(zynex_call_router)
@@ -21,6 +22,7 @@ router.include_router(zynex_auto_router)
 router.include_router(zynex_motor_router)
 router.include_router(zynex_encuesta_router)
 router.include_router(zynex_pendientes_router)
+router.include_router(zynex_importar_router)
 
 
 @router.get("/health", summary="Liveness probe (no auth).")
