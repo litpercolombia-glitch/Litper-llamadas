@@ -138,7 +138,7 @@ export default function PendientesChatea() {
   useEffect(() => { cargar(); }, [cargar]);
   if (reglas === null) return <p className="text-sm text-zinc-400">Cargando…</p>;
   if (reglas.error) return <div className={`${caja} p-5 text-sm text-zinc-300`}>{reglas.error}</div>;
-  if (reglas.length === 0) return <p className="text-sm text-zinc-400">Activa tu espacio en la pestaña Panel para configurar tus pendientes.</p>;
+  if (reglas.length === 0) return <p className="text-sm text-zinc-400">Tu espacio se está preparando. Abre la pestaña Panel y vuelve aquí.</p>;
   return (
     <div className="space-y-5" data-testid="log-pendientes">
       <div className={`${caja} p-5 text-sm text-zinc-300`}>

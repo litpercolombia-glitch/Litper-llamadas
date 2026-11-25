@@ -10,10 +10,13 @@ const PASOS = [
   "En Claude ve a Configuración → Conectores → Agregar conector personalizado.",
   "Ponle de nombre «Zynex OS», pega la URL y guarda.",
   "Conecta también el conector de Dropi en tu Claude: Claude será el puente entre Dropi y Zynex.",
-  "Escríbele a Claude: «Trae mis pedidos de Dropi y súbelos a Zynex» o «Actualiza en Dropi los resultados de las llamadas».",
+  "Escríbele a Claude: «Sincroniza mi Zynex». La primera vez pídele «Trae mi operación de los últimos 90 días». Tu espacio se crea solo: no necesitas código de activación.",
 ];
 
 const HERRAMIENTAS = [
+  ["zynex_logistica_solicitudes", "Lo que Zynex necesita de Dropi ahora: traer operación o refrescar pedidos activos."],
+  ["zynex_logistica_entregar", "Guarda en Zynex los pedidos que Claude leyó en Dropi (hasta 500 por envío)."],
+  ["zynex_logistica_resumen", "Cómo va tu operación: estados, tasa de entrega, plata por rescatar y clientes a atender."],
   ["zynex_subir_pedidos", "Sube pedidos de Dropi a la cola de llamadas según su estado."],
   ["zynex_despachar", "Lanza ya las llamadas pendientes (respeta modo prueba y horario)."],
   ["zynex_cola", "Muestra qué está en cola o bloqueado y por qué."],
