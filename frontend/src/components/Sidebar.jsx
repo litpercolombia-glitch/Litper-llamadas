@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   Package, PlugsConnected, ChartLineUp, Gear, House, Plus, TrashSimple,
-  Envelope, WhatsappLogo, List, X, PhoneCall, Truck, ClipboardText, UsersThree,
+  Envelope, WhatsappLogo, List, X, PhoneCall, Truck, UsersThree,
 } from "@phosphor-icons/react";
 import { api } from "../lib/api";
 import { useAssistantName } from "../lib/assistant";
@@ -14,15 +14,13 @@ const NAV = [
   { to: "/app/pedidos",    label: "Pendientes", icon: Package,        testId: "nav-pedidos",
     hint: "Cola · Tickets", hintCod: "Cola · Importar · Novedades · Tickets" },
   { to: "/app/logistica",  label: "Logística",  icon: Truck,          testId: "nav-logistica",
-    hint: "Pedidos por estado · Métricas · Plantillas" },
+    hint: "Pedidos · Seguimiento · Pendientes · Plantillas" },
   { to: "/app/clientes",   label: "Clientes",   icon: UsersThree,     testId: "nav-clientes",
     hint: "Fichas · Notas · Quién necesita ayuda" },
   { to: "/app/llamadas",   label: "Llamadas",   icon: PhoneCall,      testId: "nav-llamadas",
     hint: "Agentes de voz por estado de Dropi" },
   { to: "/app/conexiones", label: "Conexiones", icon: PlugsConnected, testId: "nav-conexiones",
-    hint: "Claude · Conectores · MCP · Voces · Números" },
-  { to: "/app/encuesta",   label: "Encuesta",   icon: ClipboardText,  testId: "nav-encuesta",
-    hint: "Qué le duele a quien vende con Dropi" },
+    hint: "Claude · Chatea Pro · Voces · Números" },
   { to: "/app/metricas",   label: "Métricas",   icon: ChartLineUp,    testId: "nav-metricas",
     hint: "Resultados de tu operación" },
   { to: "/app/ajustes",    label: "Ajustes",    icon: Gear,           testId: "nav-ajustes",

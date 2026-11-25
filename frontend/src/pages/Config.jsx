@@ -12,7 +12,7 @@ import {
 
 const PROVIDER_META = {
   chatea_pro: {
-    label: "WhatsApp · con tu cuenta de Chatea Pro",
+    label: "Chatea Pro",
     doc: "https://chateapro.app/settings#/api",
     hint: "Obtén el token en Chatea Pro → Configuración → API tokens.",
   },
@@ -39,7 +39,11 @@ const PROVIDER_META = {
   claude:   { label: "Claude · Redacción", doc: "https://console.anthropic.com/", hint: "" },
 };
 
+// Lo que casi todas las tiendas necesitan. Lo demás es opcional y queda plegado.
+const ESENCIALES = ["chatea_pro", "elevenlabs"];
+
 export default function ConfigPage() {
+  const [verOpcionales, setVerOpcionales] = useState(false);
   const [providers, setProviders] = useState([]);
   const [schema, setSchema] = useState([]);
   const [drafts, setDrafts] = useState({}); // { provider: { field: value } }
@@ -118,7 +122,7 @@ export default function ConfigPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {providers.map((p) => {
+        {providers.filter((p) => verOpcionales || ESENCIALES.includes(p.provider) || p.origin === "org").map((p) => {
           const meta = PROVIDER_META[p.provider] || { label: p.provider, doc: "", hint: "" };
           const fields = schemaOf(p.provider);
           const draft = drafts[p.provider] || {};
@@ -212,6 +216,16 @@ export default function ConfigPage() {
           );
         })}
       </div>
+
+      {providers.some((p) => !ESENCIALES.includes(p.provider) && p.origin !== "org") && (
+        <div className="mt-4 text-sm text-zinc-300" data-testid="config-opcionales">
+          <p className="mb-2">Para empezar solo necesitas Chatea Pro y, si vas a llamar, ElevenLabs. Lo demás es opcional.</p>
+          <Button size="sm" variant="outline" onClick={() => setVerOpcionales((v) => !v)} aria-expanded={verOpcionales}
+                  className="border-zinc-700 bg-zinc-950 hover:bg-zinc-800 text-zinc-100">
+            {verOpcionales ? "Ocultar conexiones opcionales" : "Ver conexiones opcionales (telefonía propia y otros modelos de IA)"}
+          </Button>
+        </div>
+      )}
 
       {loading && <div className="text-zinc-400 text-sm mt-4">Cargando…</div>}
     </Layout>
