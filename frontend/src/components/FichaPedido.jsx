@@ -4,7 +4,7 @@ import { api } from "../lib/api";
 import { errorText } from "../lib/assistant";
 import { toast } from "sonner";
 import { Button } from "./ui/button";
-import { Copy, HandPalm, CheckCircle, WhatsappLogo, X, NotePencil, ClockCounterClockwise } from "@phosphor-icons/react";
+import { Copy, HandPalm, CheckCircle, WhatsappLogo, X, NotePencil, ClockCounterClockwise, Package } from "@phosphor-icons/react";
 
 /** Ficha del pedido: se abre al tocar cualquier fila. Muestra todo el pedido, lo que hizo
  *  Zynex con él y la ficha del cliente, con las acciones a la mano (copiar, WhatsApp,
@@ -34,6 +34,88 @@ function BotonIcono({ onClick, label, children }) {
   return (
     <button type="button" onClick={onClick} aria-label={label} title={label}
             className="h-8 w-8 grid place-items-center rounded-sm border border-zinc-700 text-zinc-300 hover:bg-zinc-800">{children}</button>
+  );
+}
+
+const ETIQUETA = {
+  direccion: "Dirección", departamento: "Departamento", documento: "Documento", metodo_pago: "Método de pago",
+  tipo_envio: "Tipo de envío", novedad: "Novedad", notas: "Notas", actualizado: "Última actualización en Dropi",
+  fecha_guia: "Fecha de la guía", vendedor: "Vendedor", tienda: "Tienda",
+};
+const FUENTE = { claude: "tu Claude", archivo_dropi: "el reporte de Dropi", importado: "una carga" };
+
+function TodoDropi({ pedido, dropi }) {
+  const [verTodo, setVerTodo] = useState(false);
+  const datos = dropi?.datos || {};
+  const productos = Array.isArray(datos.productos) ? datos.productos : [];
+  const otros = datos.otros && typeof datos.otros === "object" ? Object.entries(datos.otros) : [];
+  const campos = Object.entries(datos).filter(([k, v]) => !["productos", "otros"].includes(k) && v !== null && typeof v !== "object");
+  const prompt = `Trae a Zynex el detalle completo del pedido ${pedido} de Dropi (usa get_order y zynex_logistica_entregar con dirección, productos y pago).`;
+  if (!campos.length && !productos.length && !otros.length) {
+    return (
+      <section className={`${caja} p-4 space-y-2`} aria-labelledby="ficha-dropi-t">
+        <div id="ficha-dropi-t" className={`${rotulo} flex items-center gap-1.5`}><Package size={13} /> Todo lo que dice Dropi</div>
+        <p className="text-sm text-zinc-300">Este pedido llegó solo con los datos básicos. Para ver dirección, productos, pago y lo demás, pídeselo a tu Claude:</p>
+        <div className="flex items-start gap-2">
+          <code className="flex-1 min-w-0 text-xs text-zinc-200 bg-black/40 border border-zinc-800 rounded-sm p-2 break-words">{prompt}</code>
+          <BotonIcono onClick={() => copiar(prompt, "Mensaje")} label="Copiar mensaje para Claude"><Copy size={14} /></BotonIcono>
+        </div>
+        <p className="text-[11px] text-zinc-400">También llega completo si subes el reporte de Dropi en Clientes → Traer mi operación.</p>
+      </section>
+    );
+  }
+  return (
+    <section className={`${caja} p-4 space-y-4`} aria-labelledby="ficha-dropi-t">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div id="ficha-dropi-t" className={`${rotulo} flex items-center gap-1.5`}><Package size={13} /> Todo lo que dice Dropi</div>
+        {dropi?.fuente && <span className="text-[11px] text-zinc-400">Llegó por {FUENTE[dropi.fuente] || dropi.fuente} · {fecha(dropi.recibido)}</span>}
+      </div>
+      {campos.length > 0 && (
+        <div className="grid gap-4 grid-cols-2">
+          {campos.map(([k, v]) => (
+            <Dato key={k} k={ETIQUETA[k] || k.replace(/_/g, " ")} v={String(v)}>
+              {k === "direccion" && <BotonIcono onClick={() => copiar(v, "Dirección")} label="Copiar dirección"><Copy size={14} /></BotonIcono>}
+            </Dato>
+          ))}
+        </div>
+      )}
+      {productos.length > 0 && (
+        <div>
+          <div className={`${rotulo} mb-2`}>Productos · {productos.length}</div>
+          <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Productos del pedido">
+            <table className="w-full text-sm">
+              <thead><tr className="text-left text-[11px] text-zinc-400 border-b border-zinc-800">
+                {["Producto", "Cant.", "Precio", "Subtotal"].map((h) => <th key={h} scope="col" className="py-1.5 pr-3 font-normal">{h}</th>)}
+              </tr></thead>
+              <tbody>
+                {productos.map((it, i) => (
+                  <tr key={i} className="border-b border-zinc-900 text-zinc-200">
+                    <td className="py-1.5 pr-3">{it.producto || it.product_name || "—"}{it.variacion ? ` (${it.variacion})` : ""}</td>
+                    <td className="py-1.5 pr-3 tabular-nums">{it.cantidad ?? it.qty ?? "—"}</td>
+                    <td className="py-1.5 pr-3 tabular-nums">{cop(it.precio ?? it.unit_price)}</td>
+                    <td className="py-1.5 pr-3 tabular-nums">{cop(it.subtotal)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+      {otros.length > 0 && (
+        <div>
+          <button type="button" onClick={() => setVerTodo((x) => !x)} aria-expanded={verTodo}
+                  className="text-sm text-zinc-200 underline decoration-zinc-600 hover:decoration-fuchsia-400">
+            {verTodo ? "Ocultar" : "Ver"} todas las columnas de Dropi ({otros.length})</button>
+          {verTodo && (
+            <dl className="mt-3 grid gap-x-4 gap-y-2 grid-cols-1 sm:grid-cols-2">
+              {otros.map(([k, v]) => (
+                <div key={k} className="min-w-0"><dt className={rotulo}>{k}</dt><dd className="text-sm text-zinc-100 break-words">{String(v)}</dd></div>
+              ))}
+            </dl>
+          )}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -116,6 +198,8 @@ export default function FichaPedido({ pedido, onCerrar }) {
               <Dato k="Creado" v={fecha(p.creado)} />
               <Dato k="En este estado desde" v={fecha(p.desde)} />
             </section>
+
+            <TodoDropi pedido={p.pedido} dropi={d.dropi} />
 
             <section className={`${caja} p-4`} aria-labelledby="ficha-hist-t">
               <div id="ficha-hist-t" className={`${rotulo} mb-3 flex items-center gap-1.5`}><ClockCounterClockwise size={13} /> Qué ha hecho Zynex con este pedido</div>
