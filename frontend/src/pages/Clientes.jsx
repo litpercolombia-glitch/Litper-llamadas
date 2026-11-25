@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import TraerOperacion from "../components/TraerOperacion";
+import FichaPedido from "../components/FichaPedido";
 import { UsersThree, MagnifyingGlass, X, WhatsappLogo, HandPalm, CheckCircle, NotePencil, ArrowsClockwise } from "@phosphor-icons/react";
 
 /** CRM de clientes: una ficha por teléfono, con sus pedidos, notas y
@@ -25,6 +26,7 @@ const fecha = (d) => (d ? new Date(d).toLocaleDateString("es-CO", { day: "2-digi
 const tel = (t) => (t ? `${t.slice(0, 3)} ${t.slice(3, 6)} ${t.slice(6)}` : "—");
 
 function Ficha({ telefono, onCerrar, onCambio }) {
+  const [pedidoAbierto, setPedidoAbierto] = useState(null);
   const [d, setD] = useState(null);
   const [nota, setNota] = useState("");
   const [busy, setBusy] = useState(false);
@@ -100,7 +102,8 @@ function Ficha({ telefono, onCerrar, onCambio }) {
           </div>
 
           <div>
-            <div className={`${rotulo} mb-2`}>Sus pedidos · {(d.pedidos || []).length}</div>
+            <div className={`${rotulo} mb-2`}>Sus pedidos · {(d.pedidos || []).length} · toca uno para ver todo</div>
+            {pedidoAbierto && <FichaPedido pedido={pedidoAbierto} onCerrar={() => setPedidoAbierto(null)} />}
             <div className="overflow-x-auto relative" tabIndex={0} role="region" aria-label="Pedidos del cliente">
               <table className="w-full text-sm">
                 <thead><tr className="text-left text-[11px] text-zinc-400 border-b border-zinc-800">
@@ -110,7 +113,7 @@ function Ficha({ telefono, onCerrar, onCambio }) {
                   {(d.pedidos || []).map((p) => (
                     <tr key={p.pedido} className="border-b border-zinc-900 text-zinc-200">
                       <td className="py-2 pr-4 text-xs whitespace-nowrap">{fecha(p.creado)}</td>
-                      <td className="py-2 pr-4 font-mono text-xs">{p.pedido}</td>
+                      <td className="py-2 pr-4 font-mono text-xs"><button type="button" onClick={() => setPedidoAbierto(p.pedido)} className="underline decoration-zinc-600 hover:decoration-fuchsia-400">{p.pedido}</button></td>
                       <td className="py-2 pr-4 text-xs whitespace-nowrap">{p.estado}</td>
                       <td className="py-2 pr-4 tabular-nums">{cop(p.valor)}</td>
                       <td className="py-2 pr-4 text-xs">{p.transportadora || "—"}</td>
@@ -156,7 +159,7 @@ export default function ClientesPage() {
         {d === null ? <p className="text-sm text-zinc-400">Cargando…</p>
           : d.error === "pendiente" ? <div className={`${caja} p-5 text-sm text-zinc-300`} data-testid="crm-pendiente">Esta pantalla aún no está activada en la base de datos. Soporte de Zynex la activa; no tienes que hacer nada aquí.</div>
           : d.error ? <div className={`${caja} p-5 text-sm text-zinc-300`}>{d.error}</div>
-          : !d.vinculado && filas.length === 0 && !res.todos ? <div className={`${caja} p-5 text-sm text-zinc-300`}>Activa tu espacio en Logística para ver tus clientes aquí.</div>
+          : !d.vinculado && filas.length === 0 && !res.todos ? <div className={`${caja} p-5 text-sm text-zinc-300`}>Tu espacio se está preparando. Abre Logística y vuelve aquí.</div>
           : (
             <>
               <div className="grid gap-3 grid-cols-2 md:grid-cols-5">
