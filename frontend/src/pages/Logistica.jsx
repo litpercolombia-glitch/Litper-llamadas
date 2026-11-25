@@ -6,13 +6,14 @@ import { toast } from "sonner";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import {
-  Package, ArrowsClockwise, ChatText, PhoneCall, WhatsappLogo, User, CheckCircle, WarningCircle, X, ListChecks, Path,
+  Package, ArrowsClockwise, ChartBar, ChatText, PhoneCall, WhatsappLogo, User, CheckCircle, WarningCircle, X, ListChecks, Path,
 } from "@phosphor-icons/react";
 
 /** Agente de Logística: panel por estado de Dropi (cada número abre su lista),
  *  casillas de plantilla del cliente y la secuencia mensaje → llamada → WhatsApp. */
 const TABS = [
   { key: "panel",     label: "Panel",      Icon: Package,    desc: "Pedidos por estado de Dropi. Toca un número para ver los pedidos." },
+  { key: "metricas",  label: "Métricas",   Icon: ChartBar,   desc: "Cómo va tu operación. Toca un número para ver los pedidos que lo forman." },
   { key: "casillas",  label: "Plantillas", Icon: ListChecks, desc: "Pon en cada casilla la plantilla de WhatsApp que tú quieras usar." },
   { key: "secuencia", label: "Secuencia",  Icon: Path,       desc: "Qué se hace con cada estado: mensaje, llamada y WhatsApp de seguimiento." },
 ];
@@ -30,23 +31,24 @@ const rotulo = "text-[10px] font-mono uppercase tracking-widest text-zinc-400";
 function Tarjeta({ titulo, n, sub, activa, onClick, testId }) {
   return (
     <button type="button" onClick={onClick} data-testid={testId} aria-pressed={activa}
-            className={`text-left p-4 rounded-sm border transition-colors min-h-[88px] ${
+            className={`text-left p-4 rounded-sm border transition-colors min-h-[88px] min-w-0 ${
               activa ? "border-fuchsia-400/70 bg-fuchsia-500/10" : "border-zinc-800 bg-zinc-900/40 hover:border-zinc-600"}`}>
-      <div className="text-3xl font-semibold text-white tabular-nums">{n}</div>
+      <div className="text-2xl sm:text-3xl font-semibold text-white tabular-nums break-words">{n}</div>
       <div className="text-xs text-zinc-200 mt-1">{titulo}</div>
       {sub && <div className="text-[11px] text-zinc-400 mt-0.5">{sub}</div>}
     </button>
   );
 }
 
-function Lista({ clave, titulo, onCerrar }) {
+function Lista({ clave, titulo, onCerrar, dias }) {
   const [filas, setFilas] = useState(null);
   useEffect(() => {
     setFilas(null);
-    api.get("/zcall/motor/lista", { params: { clave } })
+    const metrica = clave.startsWith("m:");
+    api.get(metrica ? "/zcall/motor/metricas/lista" : "/zcall/motor/lista", { params: metrica ? { clave, dias } : { clave } })
       .then((r) => setFilas(r.data.filas || []))
       .catch((e) => { toast.error(errorText(e)); setFilas([]); });
-  }, [clave]);
+  }, [clave, dias]);
   return (
     <div className={`${caja} p-5`} data-testid="log-lista">
       <div className="flex items-center justify-between gap-3 mb-4">
@@ -57,7 +59,7 @@ function Lista({ clave, titulo, onCerrar }) {
       {filas === null ? <p className="text-sm text-zinc-400">Cargando…</p>
         : filas.length === 0 ? <p className="text-sm text-zinc-400">No hay pedidos aquí en este momento.</p>
         : (
-          <div className="overflow-x-auto" tabIndex={0} role="region" aria-label={`Pedidos: ${titulo}`}>
+          <div className="overflow-x-auto relative" tabIndex={0} role="region" aria-label={`Pedidos: ${titulo}`}>
             <table className="w-full text-sm">
               <thead><tr className="text-left text-[11px] text-zinc-400 border-b border-zinc-800">
                 {["Pedido", "Estado", "Ciudad", "Valor", "Transportadora", "Guía", "Días", "Qué haría", "Plantilla"].map((h) =>
@@ -147,6 +149,75 @@ function Panel({ d, recargar }) {
         </div>
       </div>
       {sel && <Lista clave={sel.clave} titulo={sel.titulo} onCerrar={() => setSel(null)} />}
+    </div>
+  );
+}
+
+const PERIODOS = [7, 30, 90];
+const copCorto = (v) => (Number(v) >= 1e6 ? `$${(Number(v) / 1e6).toLocaleString("es-CO", { maximumFractionDigits: 1 })} M` : cop(v));
+const valorKpi = (k) => (k.valor == null ? "—" : k.tipo === "cop" ? copCorto(k.valor) : k.tipo === "pct" ? `${k.valor} %` : Number(k.valor).toLocaleString("es-CO"));
+
+function Metricas() {
+  const [dias, setDias] = useState(30);
+  const [d, setD] = useState(null);
+  const [sel, setSel] = useState(null);
+  useEffect(() => {
+    setD(null); setSel(null);
+    api.get("/zcall/motor/metricas", { params: { dias } }).then((r) => setD(r.data))
+      .catch((e) => setD({ error: e?.response?.status === 501 ? "pendiente" : errorText(e) }));
+  }, [dias]);
+  if (d === null) return <p className="text-sm text-zinc-400">Cargando…</p>;
+  if (d.error === "pendiente") return <div className={`${caja} p-5 text-sm text-zinc-300`} data-testid="log-metricas-pendiente">Las métricas aún no están activadas en la base de datos. Soporte de Zynex las activa; no tienes que hacer nada aquí.</div>;
+  if (d.error) return <div className={`${caja} p-5 text-sm text-zinc-300`}>{d.error}</div>;
+  if (!(d.kpis || []).length) return <p className="text-sm text-zinc-400">Activa tu espacio en la pestaña Panel para ver tus métricas.</p>;
+  return (
+    <div className="space-y-5" data-testid="log-metricas">
+      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Periodo">
+        <span className={rotulo}>Periodo</span>
+        {PERIODOS.map((p) => (
+          <button key={p} type="button" aria-pressed={dias === p} onClick={() => setDias(p)}
+                  className={`h-9 px-3 rounded-sm border text-sm ${dias === p ? "border-fuchsia-400/70 bg-fuchsia-500/10 text-white" : "border-zinc-800 text-zinc-300 hover:bg-zinc-900"}`}>
+            Últimos {p} días</button>
+        ))}
+      </div>
+      <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
+        {d.kpis.map((k) => (k.clave ? (
+          <Tarjeta key={k.titulo} titulo={k.titulo} n={valorKpi(k)} sub={k.nota} activa={sel?.clave === k.clave}
+                   testId={`log-kpi-${k.clave}`} onClick={() => setSel(sel?.clave === k.clave ? null : k)} />
+        ) : (
+          <div key={k.titulo} className="p-4 rounded-sm border border-zinc-800 bg-zinc-900/40 min-h-[88px] min-w-0">
+            <div className="text-2xl sm:text-3xl font-semibold text-white tabular-nums break-words">{valorKpi(k)}</div>
+            <div className="text-xs text-zinc-200 mt-1">{k.titulo}</div>
+            <div className="text-[11px] text-zinc-400 mt-0.5">{k.nota}</div>
+          </div>
+        )))}
+      </div>
+      {sel && <Lista clave={sel.clave} titulo={sel.titulo} dias={dias} onCerrar={() => setSel(null)} />}
+      {(d.transportadoras || []).length > 0 && (
+        <div className={`${caja} p-5`}>
+          <div className={`${rotulo} mb-3`}>Entrega por transportadora · pedidos ya cerrados</div>
+          <div className="overflow-x-auto relative" tabIndex={0} role="region" aria-label="Entrega por transportadora">
+            <table className="w-full text-sm">
+              <thead><tr className="text-left text-[11px] text-zinc-400 border-b border-zinc-800">
+                {["Transportadora", "Entregados", "Devueltos", "Tasa de entrega"].map((h) => <th key={h} scope="col" className="py-2 pr-4 font-normal whitespace-nowrap">{h}</th>)}
+              </tr></thead>
+              <tbody>
+                {d.transportadoras.map((t) => (
+                  <tr key={t.nombre} className="border-b border-zinc-900 text-zinc-200">
+                    <td className="py-2 pr-4 text-xs">{t.nombre}</td>
+                    <td className="py-2 pr-4 tabular-nums">{t.entregados}</td>
+                    <td className="py-2 pr-4 tabular-nums">{t.devueltos}</td>
+                    <td className="py-2 pr-4">
+                      <div className="flex items-center gap-2"><span className="tabular-nums w-14">{t.tasa} %</span>
+                        <span className="h-2 flex-1 min-w-[80px] rounded-sm bg-zinc-800"><span className="block h-2 rounded-sm bg-fuchsia-400" style={{ width: `${t.tasa}%` }} /></span></div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -276,6 +347,7 @@ export default function LogisticaPage() {
           ))}
         </div>
         {tab === "panel" && (d === null ? <p className="text-sm text-zinc-400">Cargando…</p> : <Panel d={d} recargar={cargar} />)}
+        {tab === "metricas" && <Metricas />}
         {tab === "casillas" && <Casillas />}
         {tab === "secuencia" && <Secuencia />}
       </div>
