@@ -262,3 +262,7 @@ async def api_root():
 
 
 app.include_router(api)
+
+# Inicio de sesión del conector de Claude (rutas en la raíz: /.well-known, /register, /authorize, /token).
+from routes.zynex_oauth import router as zynex_oauth_router  # noqa: E402
+app.include_router(zynex_oauth_router)

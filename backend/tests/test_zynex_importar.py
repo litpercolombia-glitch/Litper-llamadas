@@ -59,3 +59,37 @@ def test_importar_rechaza(monkeypatch):
     _patch(monkeypatch, ll, {"ok": False, "error": "espacio no vinculado"})
     with pytest.raises(HTTPException) as e: run(zi.importar(Req(), Archivo(_excel([_fila(1, 2)])), dias=30))
     assert "Activa tu espacio" in e.value.detail
+
+
+def test_pedir_y_solicitudes(monkeypatch):
+    ll = []; _patch(monkeypatch, ll, {"ok": True, "id": 7})
+    with pytest.raises(HTTPException): run(zi.pedir(zi.PedirIn(dias=45), Req()))
+    r = run(zi.pedir(zi.PedirIn(dias=60), Req()))
+    assert r["ok"] and r["id"] == 7 and ll[-1] == ("zc_api_solicitud_crear", {"p_org": "org-i", "p_tipo": "traer_operacion", "p_params": {"dias": 60}, "p_origen": "app"})
+    _patch(monkeypatch, ll, {"solicitudes": [{"solicitud_id": 7}]})
+    assert run(zi.solicitudes(Req()))["solicitudes"][0]["solicitud_id"] == 7 and ll[-1][1]["p_generar"] is False
+
+def test_mcp_logistica_ida_y_vuelta(monkeypatch):
+    from routes import zynex_mcp as zm
+    ll = []
+    async def rpc(fn, args):
+        ll.append((fn, args))
+        return {"zc_api_solicitudes": {"solicitudes": [{"solicitud_id": 3, "tipo": "traer_operacion"}]},
+                "zc_api_entregar": {"ok": True, "guardados": 1},
+                "zc_api_panel": {"vinculado": True, "modo": "sombra", "por_estado": [{"titulo": "NOVEDAD", "n": 4}]},
+                "zc_api_metricas": {"kpis": [{"titulo": "Tasa de entrega", "valor": 88}], "transportadoras": []},
+                "zc_api_clientes": {"resumen": {"atencion": 2}}}[fn]
+    async def evento(org, tipo, datos): ll.append(("evento", tipo))
+    monkeypatch.setattr(zm.zynex_motor, "rpc", rpc); monkeypatch.setattr(zm.zc, "evento", evento)
+    import json
+    sol = json.loads(run(zm._call("org-m", "zynex_logistica_solicitudes", {}))["content"][0]["text"])
+    assert sol["solicitudes"][0]["solicitud_id"] == 3 and ll[-1][1] == {"p_org": "org-m", "p_generar": True}
+    run(zm._call("org-m", "zynex_logistica_entregar", {"pedidos": [{"pedido": 55, "estado": "NOVEDAD", "otro": "x"}], "solicitud_id": 3, "final": True}))
+    fn, args = [x for x in ll if x[0] == "zc_api_entregar"][-1]
+    assert args["p_org"] == "org-m" and args["p_solicitud"] == 3 and args["p_final"] is True
+    assert args["p_filas"][0]["pedido"] == "55" and "otro" not in args["p_filas"][0]
+    for malo in [{}, {"pedidos": "x"}, {"pedidos": [{"pedido": "1", "estado": "X"}] * 501}]:
+        with pytest.raises(ValueError): run(zm._call("org-m", "zynex_logistica_entregar", malo))
+    res = json.loads(run(zm._call("org-m", "zynex_logistica_resumen", {"dias": 999}))["content"][0]["text"])
+    assert res["pedidos_por_estado"] == {"NOVEDAD": 4} and res["metricas"]["Tasa de entrega"] == 88 and res["clientes"]["atencion"] == 2
+    assert {t["name"] for t in zm.TOOLS} >= {"zynex_logistica_solicitudes", "zynex_logistica_entregar", "zynex_logistica_resumen"}
