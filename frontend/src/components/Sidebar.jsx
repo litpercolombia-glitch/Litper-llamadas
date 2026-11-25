@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   Package, PlugsConnected, ChartLineUp, Gear, House, Plus, TrashSimple,
-  Envelope, WhatsappLogo, List, X, PhoneCall, Truck, ClipboardText,
+  Envelope, WhatsappLogo, List, X, PhoneCall, Truck, ClipboardText, UsersThree,
 } from "@phosphor-icons/react";
 import { api } from "../lib/api";
 import { useAssistantName } from "../lib/assistant";
@@ -14,7 +14,9 @@ const NAV = [
   { to: "/app/pedidos",    label: "Pendientes", icon: Package,        testId: "nav-pedidos",
     hint: "Cola · Tickets", hintCod: "Cola · Importar · Novedades · Tickets" },
   { to: "/app/logistica",  label: "Logística",  icon: Truck,          testId: "nav-logistica",
-    hint: "Pedidos por estado · Plantillas · Secuencia" },
+    hint: "Pedidos por estado · Métricas · Plantillas" },
+  { to: "/app/clientes",   label: "Clientes",   icon: UsersThree,     testId: "nav-clientes",
+    hint: "CRM con Sofía · Fichas · Notas" },
   { to: "/app/llamadas",   label: "Llamadas",   icon: PhoneCall,      testId: "nav-llamadas",
     hint: "Agentes de voz por estado de Dropi" },
   { to: "/app/conexiones", label: "Conexiones", icon: PlugsConnected, testId: "nav-conexiones",

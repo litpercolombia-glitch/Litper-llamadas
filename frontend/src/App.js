@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-route
 import "@/index.css";
 import { useTheme } from "@/components/ThemeToggle";
 import { api } from "@/lib/api";
+import "@/constants/helpZynex";
 
 import LoginPage       from "@/pages/Login";
 
@@ -16,6 +17,7 @@ const PedidosPage = lazy(() => import("@/pages/Pedidos"));
 const ConexionesPage = lazy(() => import("@/pages/Conexiones"));
 const ZynexCallPage = lazy(() => import("@/pages/ZynexCall"));
 const LogisticaPage = lazy(() => import("@/pages/Logistica"));
+const ClientesPage = lazy(() => import("@/pages/Clientes"));
 const EncuestaPage = lazy(() => import("@/pages/Encuesta"));
 const EncuestaResultadosPage = lazy(() => import("@/pages/EncuestaResultados"));
 const MetricasPage = lazy(() => import("@/pages/Metricas"));
@@ -87,6 +89,7 @@ function AuthRouter() {
       <Route path="/app/conexiones"  element={<AuthGate><ConexionesPage /></AuthGate>} />
       <Route path="/app/llamadas"    element={<AuthGate><ZynexCallPage /></AuthGate>} />
       <Route path="/app/logistica"   element={<AuthGate><LogisticaPage /></AuthGate>} />
+      <Route path="/app/clientes"    element={<AuthGate><ClientesPage /></AuthGate>} />
       <Route path="/app/encuesta"    element={<AuthGate><EncuestaResultadosPage /></AuthGate>} />
       <Route path="/app/metricas"    element={<AuthGate><MetricasPage /></AuthGate>} />
       <Route path="/app/ajustes"     element={<AuthGate><AjustesPage /></AuthGate>} />
