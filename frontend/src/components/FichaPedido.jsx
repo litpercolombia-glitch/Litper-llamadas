@@ -4,7 +4,8 @@ import { api } from "../lib/api";
 import { errorText } from "../lib/assistant";
 import { toast } from "sonner";
 import { Button } from "./ui/button";
-import { Copy, HandPalm, CheckCircle, WhatsappLogo, X, NotePencil, ClockCounterClockwise, Package } from "@phosphor-icons/react";
+import { ETAPA, alertas, grupoLogistico, rastreo } from "../constants/seguimiento";
+import { Copy, HandPalm, CheckCircle, WhatsappLogo, X, NotePencil, ClockCounterClockwise, Package, Truck, WarningCircle, ArrowSquareOut } from "@phosphor-icons/react";
 
 /** Ficha del pedido: se abre al tocar cualquier fila. Muestra todo el pedido, lo que hizo
  *  Zynex con él y la ficha del cliente, con las acciones a la mano (copiar, WhatsApp,
@@ -119,6 +120,58 @@ function TodoDropi({ pedido, dropi }) {
   );
 }
 
+const PASOS = ["Confirmar", "Despacho", "En camino", "Destino", "Última milla", "Final"];
+
+function Seguimiento({ p, dropi }) {
+  const grupo = grupoLogistico(p.estado);
+  const etapa = ETAPA[grupo];
+  const al = alertas(grupo, p.dias);
+  const ras = rastreo(p.transportadora, p.guia);
+  const datos = dropi?.datos || {};
+  const ultimo = datos.actualizado || p.desde;
+  return (
+    <section className={`${caja} p-4 space-y-3`} aria-labelledby="ficha-seg-t" data-testid="ficha-seguimiento">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div id="ficha-seg-t" className={`${rotulo} flex items-center gap-1.5`}><Truck size={13} /> Seguimiento</div>
+        <span className={pill}>{etapa.nombre}</span>
+      </div>
+      <ol className="grid grid-cols-6 gap-1" aria-label={`Etapa ${etapa.paso} de 6: ${etapa.nombre}`}>
+        {PASOS.map((t, i) => (
+          <li key={t} className="min-w-0">
+            <div className={`h-1.5 rounded-sm ${i + 1 < etapa.paso ? "bg-emerald-400/70" : i + 1 === etapa.paso ? "bg-fuchsia-400" : "bg-zinc-800"}`} />
+            <div className={`mt-1 text-[10px] truncate ${i + 1 === etapa.paso ? "text-zinc-100" : "text-zinc-400"}`}>{t}</div>
+          </li>
+        ))}
+      </ol>
+      <div className="grid gap-4 grid-cols-2">
+        <Dato k="Último movimiento" v={`${p.estado}${ultimo ? ` · ${fecha(ultimo)}` : ""}`} />
+        <Dato k="Días en este estado" v={p.dias != null ? String(p.dias) : "—"} />
+        {datos.novedad && <Dato k="Novedad" v={String(datos.novedad)} />}
+      </div>
+      <div>
+        <div className={`${rotulo} mb-1`}>Qué toca hacer</div>
+        <p className="text-sm text-zinc-200">{etapa.que}</p>
+      </div>
+      {al.length > 0 && (
+        <ul className="space-y-1.5" aria-label="Alertas">
+          {al.map((a) => (
+            <li key={a.txt} className="flex items-start gap-2 text-sm text-zinc-100">
+              <WarningCircle size={15} weight="fill" className={`mt-0.5 shrink-0 ${a.persona ? "text-red-500" : "text-amber-400"}`} />
+              <span>{a.txt}{a.persona ? " Usa «Que lo atienda una persona» abajo." : ""}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {ras && (
+        <a href={ras.url} target="_blank" rel="noreferrer"
+           className="inline-flex items-center gap-1.5 h-9 px-3 rounded-sm border border-zinc-700 text-sm text-zinc-100 hover:bg-zinc-800">
+          <ArrowSquareOut size={14} /> {ras.txt}</a>
+      )}
+      <p className="text-[11px] text-zinc-400">La página de la transportadora manda sobre Dropi: Dropi a veces se actualiza tarde.</p>
+    </section>
+  );
+}
+
 export default function FichaPedido({ pedido, onCerrar }) {
   const [actual, setActual] = useState(pedido);
   const [d, setD] = useState(null);
@@ -198,6 +251,8 @@ export default function FichaPedido({ pedido, onCerrar }) {
               <Dato k="Creado" v={fecha(p.creado)} />
               <Dato k="En este estado desde" v={fecha(p.desde)} />
             </section>
+
+            <Seguimiento p={p} dropi={d.dropi} />
 
             <TodoDropi pedido={p.pedido} dropi={d.dropi} />
 
