@@ -7,6 +7,7 @@ import { Toaster } from "sonner";
 import { useLocation } from "react-router-dom";
 import { useInHub } from "./HubContext";
 import PageHelp from "./PageHelp";
+import InicioRapido from "./InicioRapido";
 import { helpForRoute } from "../constants/help";
 
 /**
@@ -63,6 +64,7 @@ export default function Layout({ children, title, subtitle, actions, helpKey }) 
         </header>
         <main className="flex-1 p-4 md:p-8 min-w-0">
           {pageKey && <PageHelp helpKey={pageKey} />}
+          {["/app/logistica", "/app/clientes"].includes(location.pathname) && <InicioRapido />}
           {children}
         </main>
       </div>
