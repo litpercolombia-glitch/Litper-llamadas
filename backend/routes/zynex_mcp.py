@@ -53,13 +53,20 @@ TOOLS = [
                      "Cúmplelas con el conector de Dropi del usuario y entrega con zynex_logistica_entregar."),
      "inputSchema": {"type": "object", "properties": {}}},
     {"name": "zynex_logistica_entregar",
-     "description": ("Entrega a Zynex pedidos leídos de Dropi (vuelta). Alimenta Clientes, Métricas y el panel de "
-                     "Logística del negocio. Cada pedido: pedido (id de la orden), estado, telefono, nombre, ciudad, "
-                     "valor, transportadora, guia, creado (AAAA-MM-DD). Máximo 500 por llamada. Si respondes a una "
-                     "solicitud manda solicitud_id, y final=true en la última entrega. No envía mensajes a clientes."),
+     "description": ("Entrega a Zynex pedidos leídos de Dropi (vuelta). Alimenta Clientes, Métricas, el panel de "
+                     "Logística y la ficha de cada pedido. Básico: pedido (id de la orden), estado, telefono, nombre, "
+                     "ciudad, valor, transportadora, guia, creado (AAAA-MM-DD). Si tienes el detalle de get_order, "
+                     "manda también direccion, departamento, documento, metodo_pago, actualizado, notas, novedad y "
+                     "productos [{producto, variacion, cantidad, precio, subtotal, producto_id}]; cualquier otro dato "
+                     "en otros {nombre: valor}. Máximo 500 por llamada. Si respondes a una solicitud manda "
+                     "solicitud_id, y final=true en la última página de esa solicitud. No envía mensajes a clientes."),
      "inputSchema": {"type": "object", "required": ["pedidos"], "properties": {
-         "pedidos": {"type": "array", "items": {"type": "object", "properties": {k: {"type": "string"} for k in (
-             "pedido", "estado", "telefono", "nombre", "ciudad", "valor", "transportadora", "guia", "creado")},
+         "pedidos": {"type": "array", "items": {"type": "object", "additionalProperties": True, "properties": {
+             **{k: {"type": "string"} for k in ("pedido", "estado", "telefono", "nombre", "ciudad", "valor",
+                                                 "transportadora", "guia", "creado", "direccion", "departamento",
+                                                 "documento", "metodo_pago", "actualizado", "notas", "novedad")},
+             "productos": {"type": "array", "items": {"type": "object"}},
+             "otros": {"type": "object"}},
              "required": ["pedido", "estado"]}},
          "solicitud_id": {"type": "integer"}, "final": {"type": "boolean", "default": False}}}},
     {"name": "zynex_logistica_resumen",
@@ -69,6 +76,26 @@ TOOLS = [
 ]
 
 CAMPOS_PEDIDO = ("pedido", "estado", "telefono", "nombre", "ciudad", "valor", "transportadora", "guia", "creado")
+MAX_DATOS = 20000  # bytes de detalle por pedido
+
+
+def _limpio(v: Any, nivel: int = 0) -> Any:
+    """Recorta el detalle de Dropi a algo seguro de guardar (textos cortos, listas y objetos acotados)."""
+    if v is None or isinstance(v, bool):
+        return v
+    if isinstance(v, (int, float)):
+        return v
+    if isinstance(v, list):
+        return [_limpio(x, nivel + 1) for x in v[:50]] if nivel < 3 else None
+    if isinstance(v, dict):
+        return {str(k)[:60]: _limpio(x, nivel + 1) for k, x in list(v.items())[:80]} if nivel < 3 else None
+    return str(v)[:500]
+
+
+def datos_extra(p: dict) -> dict:
+    """Todo lo que Claude trae de Dropi aparte de los campos básicos va a la ficha del pedido."""
+    d = {k: _limpio(v) for k, v in p.items() if k not in CAMPOS_PEDIDO and v not in (None, "", [], {})}
+    return d if len(json.dumps(d, ensure_ascii=False, default=str)) <= MAX_DATOS else {}
 
 
 def _txt(obj: Any) -> dict:
@@ -122,8 +149,8 @@ async def _call(org: str, name: str, args: dict) -> dict:
             raise ValueError("pedidos debe ser una lista con al menos un pedido")
         if len(pedidos) > 500:
             raise ValueError("máximo 500 pedidos por llamada: entrega por partes")
-        filas = [{k: (None if p.get(k) is None else str(p.get(k))[:200]) for k in CAMPOS_PEDIDO}
-                 for p in pedidos if isinstance(p, dict)]
+        filas = [{**{k: (None if p.get(k) is None else str(p.get(k))[:200]) for k in CAMPOS_PEDIDO},
+                  "datos": datos_extra(p)} for p in pedidos if isinstance(p, dict)]
         sol = args.get("solicitud_id")
         r = await zynex_motor.rpc("zc_api_entregar", {"p_org": org, "p_filas": filas,
                                                      "p_solicitud": int(sol) if str(sol or "").isdigit() else None,
@@ -182,7 +209,9 @@ async def mcp_post(token: str, request: Request):
                        "instructions": ("Zynex OS para ventas contra entrega con Dropi. Logística (ida y vuelta): "
                                         "zynex_logistica_solicitudes dice qué traer de Dropi → léelo con el conector "
                                         "de Dropi → zynex_logistica_entregar lo guarda → zynex_logistica_resumen "
-                                        "muestra cómo va. Llamadas: zynex_subir_pedidos → zynex_despachar → "
+                                        "muestra cómo va. Trabaja una solicitud (una semana) a la vez y cierra cada "
+                                        "una con final=true; si no alcanzas, di cuántas faltan y que el usuario "
+                                        "escriba de nuevo «Sincroniza mi Zynex». Llamadas: zynex_subir_pedidos → zynex_despachar → "
                                         "zynex_resultados → actualiza Dropi → zynex_marcar_dropi.")}
             elif method == "ping":
                 res = {}
