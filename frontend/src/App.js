@@ -16,6 +16,8 @@ const PedidosPage = lazy(() => import("@/pages/Pedidos"));
 const ConexionesPage = lazy(() => import("@/pages/Conexiones"));
 const ZynexCallPage = lazy(() => import("@/pages/ZynexCall"));
 const LogisticaPage = lazy(() => import("@/pages/Logistica"));
+const EncuestaPage = lazy(() => import("@/pages/Encuesta"));
+const EncuestaResultadosPage = lazy(() => import("@/pages/EncuestaResultados"));
 const MetricasPage = lazy(() => import("@/pages/Metricas"));
 const AjustesPage = lazy(() => import("@/pages/Ajustes"));
 const OnboardingPage = lazy(() => import("@/pages/Onboarding"));
@@ -77,6 +79,7 @@ function AuthRouter() {
       <Route path="/funnel"   element={<FunnelPage />} />
       <Route path="/login"    element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/encuesta" element={<EncuestaPage />} />
 
       {/* 5-item nav */}
       <Route path="/app"             element={<AuthGate><CopilotPage /></AuthGate>} />
@@ -84,6 +87,7 @@ function AuthRouter() {
       <Route path="/app/conexiones"  element={<AuthGate><ConexionesPage /></AuthGate>} />
       <Route path="/app/llamadas"    element={<AuthGate><ZynexCallPage /></AuthGate>} />
       <Route path="/app/logistica"   element={<AuthGate><LogisticaPage /></AuthGate>} />
+      <Route path="/app/encuesta"    element={<AuthGate><EncuestaResultadosPage /></AuthGate>} />
       <Route path="/app/metricas"    element={<AuthGate><MetricasPage /></AuthGate>} />
       <Route path="/app/ajustes"     element={<AuthGate><AjustesPage /></AuthGate>} />
       <Route path="/app/onboarding"  element={<AuthGate><OnboardingPage /></AuthGate>} />

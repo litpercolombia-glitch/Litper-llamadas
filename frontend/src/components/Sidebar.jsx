@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   Package, PlugsConnected, ChartLineUp, Gear, House, Plus, TrashSimple,
-  Envelope, WhatsappLogo, List, X, PhoneCall, Truck,
+  Envelope, WhatsappLogo, List, X, PhoneCall, Truck, ClipboardText,
 } from "@phosphor-icons/react";
 import { api } from "../lib/api";
 import { useAssistantName } from "../lib/assistant";
@@ -19,6 +19,8 @@ const NAV = [
     hint: "Agentes de voz por estado de Dropi" },
   { to: "/app/conexiones", label: "Conexiones", icon: PlugsConnected, testId: "nav-conexiones",
     hint: "Claude · Conectores · MCP · Voces · Números" },
+  { to: "/app/encuesta",   label: "Encuesta",   icon: ClipboardText,  testId: "nav-encuesta",
+    hint: "Qué le duele a quien vende con Dropi" },
   { to: "/app/metricas",   label: "Métricas",   icon: ChartLineUp,    testId: "nav-metricas",
     hint: "Resultados de tu operación" },
   { to: "/app/ajustes",    label: "Ajustes",    icon: Gear,           testId: "nav-ajustes",
