@@ -15,6 +15,7 @@ from fastapi.responses import JSONResponse, Response
 
 from db import get_db
 from routes import zynex_call as zc
+from routes import zynex_motor
 
 router = APIRouter(prefix="/mcp", tags=["claude-mcp"])
 PROTO = "2025-06-18"
@@ -46,7 +47,28 @@ TOOLS = [
      "description": "Marca llamadas como ya actualizadas en Dropi después de que Claude hizo el cambio.",
      "inputSchema": {"type": "object", "required": ["ids"], "properties": {
          "ids": {"type": "array", "items": {"type": "string"}}, "nota": {"type": "string"}}}},
+    {"name": "zynex_logistica_solicitudes",
+     "description": ("Lo que Zynex le pide a Claude traer de Dropi (ida). Devuelve solicitudes pendientes con su "
+                     "solicitud_id, el tipo (traer_operacion o refrescar_pedidos), los parámetros y las instrucciones. "
+                     "Cúmplelas con el conector de Dropi del usuario y entrega con zynex_logistica_entregar."),
+     "inputSchema": {"type": "object", "properties": {}}},
+    {"name": "zynex_logistica_entregar",
+     "description": ("Entrega a Zynex pedidos leídos de Dropi (vuelta). Alimenta Clientes, Métricas y el panel de "
+                     "Logística del negocio. Cada pedido: pedido (id de la orden), estado, telefono, nombre, ciudad, "
+                     "valor, transportadora, guia, creado (AAAA-MM-DD). Máximo 500 por llamada. Si respondes a una "
+                     "solicitud manda solicitud_id, y final=true en la última entrega. No envía mensajes a clientes."),
+     "inputSchema": {"type": "object", "required": ["pedidos"], "properties": {
+         "pedidos": {"type": "array", "items": {"type": "object", "properties": {k: {"type": "string"} for k in (
+             "pedido", "estado", "telefono", "nombre", "ciudad", "valor", "transportadora", "guia", "creado")},
+             "required": ["pedido", "estado"]}},
+         "solicitud_id": {"type": "integer"}, "final": {"type": "boolean", "default": False}}}},
+    {"name": "zynex_logistica_resumen",
+     "description": ("Resumen de la operación en Zynex: pedidos por estado, métricas de los últimos días (tasa de "
+                     "entrega, plata por rescatar, por transportadora) y clientes que necesitan a una persona."),
+     "inputSchema": {"type": "object", "properties": {"dias": {"type": "integer", "default": 30}}}},
 ]
+
+CAMPOS_PEDIDO = ("pedido", "estado", "telefono", "nombre", "ciudad", "valor", "transportadora", "guia", "creado")
 
 
 def _txt(obj: Any) -> dict:
@@ -92,6 +114,32 @@ async def _call(org: str, name: str, args: dict) -> dict:
                                                        "actualizado": zc._iso()}})
         await zc.evento(org, "claude_marcar_dropi", {"n": r.modified_count})
         return _txt({"marcadas": r.modified_count})
+    if name == "zynex_logistica_solicitudes":
+        return _txt(await zynex_motor.rpc("zc_api_solicitudes", {"p_org": org, "p_generar": True}))
+    if name == "zynex_logistica_entregar":
+        pedidos = args.get("pedidos") or []
+        if not isinstance(pedidos, list) or not pedidos:
+            raise ValueError("pedidos debe ser una lista con al menos un pedido")
+        if len(pedidos) > 500:
+            raise ValueError("máximo 500 pedidos por llamada: entrega por partes")
+        filas = [{k: (None if p.get(k) is None else str(p.get(k))[:200]) for k in CAMPOS_PEDIDO}
+                 for p in pedidos if isinstance(p, dict)]
+        sol = args.get("solicitud_id")
+        r = await zynex_motor.rpc("zc_api_entregar", {"p_org": org, "p_filas": filas,
+                                                     "p_solicitud": int(sol) if str(sol or "").isdigit() else None,
+                                                     "p_final": bool(args.get("final"))})
+        await zc.evento(org, "claude_entrega_logistica", {"n": len(filas)})
+        return _txt(r)
+    if name == "zynex_logistica_resumen":
+        dias = max(1, min(90, int(args.get("dias") or 30)))
+        panel = await zynex_motor.rpc("zc_api_panel", {"p_org": org})
+        met = await zynex_motor.rpc("zc_api_metricas", {"p_org": org, "p_dias": dias})
+        cli = await zynex_motor.rpc("zc_api_clientes", {"p_org": org, "p_q": "", "p_filtro": "atencion", "p_limite": 1})
+        return _txt({"vinculado": bool((panel or {}).get("vinculado")), "modo": (panel or {}).get("modo"),
+                     "pedidos_por_estado": {t.get("titulo"): t.get("n") for t in (panel or {}).get("por_estado") or []},
+                     "metricas": {k.get("titulo"): k.get("valor") for k in (met or {}).get("kpis") or []},
+                     "transportadoras": (met or {}).get("transportadoras") or [],
+                     "clientes": (cli or {}).get("resumen") or {}})
     raise ValueError(f"Herramienta desconocida: {name}")
 
 
@@ -131,8 +179,10 @@ async def mcp_post(token: str, request: Request):
                 res = {"protocolVersion": params.get("protocolVersion") or PROTO,
                        "capabilities": {"tools": {"listChanged": False}},
                        "serverInfo": {"name": "zynex-os", "version": "1.0.0"},
-                       "instructions": ("Zynex OS: llamadas de voz por estado de Dropi. Flujo: lee pedidos con el "
-                                        "conector de Dropi → zynex_subir_pedidos → zynex_despachar → "
+                       "instructions": ("Zynex OS para ventas contra entrega con Dropi. Logística (ida y vuelta): "
+                                        "zynex_logistica_solicitudes dice qué traer de Dropi → léelo con el conector "
+                                        "de Dropi → zynex_logistica_entregar lo guarda → zynex_logistica_resumen "
+                                        "muestra cómo va. Llamadas: zynex_subir_pedidos → zynex_despachar → "
                                         "zynex_resultados → actualiza Dropi → zynex_marcar_dropi.")}
             elif method == "ping":
                 res = {}

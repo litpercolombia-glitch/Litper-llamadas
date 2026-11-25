@@ -10,6 +10,7 @@ import re
 from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from pydantic import BaseModel
 
 from deps import get_org, require_api_key
 from dropi_import import parse_sheet
@@ -77,3 +78,27 @@ async def importar(request: Request, file: UploadFile = File(...), dias: int = F
         guardados += int(r.get("guardados") or 0)
     return {"ok": True, "dias": dias, "leidos": len(res.consolidated or []), "guardados": guardados, **desc,
             "mensaje": f"Listo: {guardados} pedidos de los últimos {dias} días."}
+
+
+class PedirIn(BaseModel):
+    dias: int = 90
+
+
+@router.post("/pedir", dependencies=[Depends(require_api_key)],
+             summary="Deja una solicitud para que el Claude del cliente traiga su operación de Dropi.")
+async def pedir(p: PedirIn, request: Request):
+    if p.dias not in DIAS_OK:
+        raise HTTPException(400, "Elige 30, 60 o 90 días.")
+    r = await zynex_motor.rpc("zc_api_solicitud_crear", {"p_org": get_org(request), "p_tipo": "traer_operacion",
+                                                        "p_params": {"dias": p.dias}, "p_origen": "app"})
+    if not isinstance(r, dict) or not r.get("ok"):
+        raise HTTPException(400, "Activa tu espacio en Logística antes de pedir tu operación.")
+    return {"ok": True, "id": r.get("id"),
+            "mensaje": "Listo. Ahora dile a tu Claude: «Sincroniza mi Zynex»."}
+
+
+@router.get("/solicitudes", dependencies=[Depends(require_api_key)],
+            summary="Solicitudes a Claude y su avance (no genera solicitudes nuevas).")
+async def solicitudes(request: Request):
+    r = await zynex_motor.rpc("zc_api_solicitudes", {"p_org": get_org(request), "p_generar": False})
+    return {"solicitudes": (r or {}).get("solicitudes") or []}
