@@ -5,6 +5,7 @@ import { errorText } from "../lib/assistant";
 import { toast } from "sonner";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
+import TraerOperacion from "../components/TraerOperacion";
 import { UsersThree, MagnifyingGlass, X, WhatsappLogo, HandPalm, CheckCircle, NotePencil, ArrowsClockwise } from "@phosphor-icons/react";
 
 /** CRM de clientes: una ficha por teléfono, con sus pedidos, notas y
@@ -213,6 +214,8 @@ export default function ClientesPage() {
                   </div>
                 )}
               </div>
+
+              <TraerOperacion onListo={cargar} />
             </>
           )}
       </div>
