@@ -16,6 +16,8 @@ const rotulo = "text-[10px] font-mono uppercase tracking-widest text-zinc-400";
 const pill = "text-[10px] px-1.5 py-0.5 rounded-sm border border-zinc-600 bg-zinc-800 text-zinc-100 whitespace-nowrap";
 export const PROMPT_CLAUDE = "Sincroniza mi Zynex: revisa con zynex_logistica_solicitudes lo que Zynex me pide y cúmplelo con mi conector de Dropi, una semana a la vez. Entrega cada página con zynex_logistica_entregar y marca final=true cuando termines cada semana. Para los pedidos activos usa get_order y manda todo el detalle (dirección, productos y pago). Al final dime cuántas semanas quedaron listas y cuántas faltan.";
 
+export const PROMPT_AL_DIA = "Cada 2 horas, de 7 a.m. a 9 p.m.: sincroniza mi Zynex. Pide con zynex_logistica_solicitudes los pedidos que Zynex necesita actualizar, ábrelos con get_order en mi Dropi y entrégalos completos con zynex_logistica_entregar, marcando final=true al terminar. No escribas a ningún cliente.";
+
 const hace = (v) => {
   if (!v) return "";
   const m = Math.round((Date.now() - new Date(v).getTime()) / 60000);
@@ -184,6 +186,20 @@ export default function TraerOperacion({ onListo }) {
               {res.sin_dato > 0 && ` ${res.sin_dato} no tenían número de pedido o estado.`}
             </p>
           )}
+        </div>
+        <div className="border border-zinc-800 rounded-sm p-4 space-y-3 min-w-0 md:col-span-2" data-testid="traer-op-al-dia">
+          <h3 className="text-sm font-semibold text-white">Mantenerlo al día solo</h3>
+          <div className="grid gap-3 md:grid-cols-2 text-sm text-zinc-300">
+            <p><span className={`${rotulo} block mb-1`}>Por qué</span>
+              Los 90 días son tu punto de partida para medir. Pero un pedido sigue cambiando después de cargarlo: se entrega, cae en novedad, va a oficina o se devuelve. Tus clientes y tus métricas solo sirven si esos cambios llegan.</p>
+            <p><span className={`${rotulo} block mb-1`}>Cómo</span>
+              Zynex lleva la lista de todos tus pedidos que aún no terminan y cada 2 horas pide actualizarlos. Los entregados, devueltos y cancelados ya no se piden. En tu Claude crea una tarea programada con este mensaje y no tienes que volver a pensar en esto:</p>
+          </div>
+          <div className="flex items-start gap-2">
+            <p className="flex-1 min-w-0 text-xs text-zinc-200 bg-black/40 border border-zinc-800 rounded-sm p-2 break-words" data-testid="traer-op-prompt-al-dia">{PROMPT_AL_DIA}</p>
+            <button type="button" onClick={() => copiar(PROMPT_AL_DIA)} aria-label="Copiar mensaje de la tarea programada" title="Copiar mensaje"
+                    className="h-8 w-8 shrink-0 grid place-items-center rounded-sm border border-zinc-700 text-zinc-300 hover:bg-zinc-800"><Copy size={14} /></button>
+          </div>
         </div>
       </div>
     </section>
