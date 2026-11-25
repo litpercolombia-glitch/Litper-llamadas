@@ -37,7 +37,7 @@ const CONNECTORS = [
   },
   {
     key: "chatea_pro",
-    label: "WhatsApp — con tu cuenta de Chatea Pro",
+    label: "Chatea Pro",
     Icon: WhatsappLogo,
     steps: [
       "Entra a chateapro.app → Settings → API.",
