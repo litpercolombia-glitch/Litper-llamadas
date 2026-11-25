@@ -11,15 +11,15 @@ import { usePacks } from "../lib/packs";
 const NAV = [
   { to: "/app",            label: "Lyan",       lyan: true,   testId: "nav-copilot",    exact: true,
     hint: "Pídele lo que necesites" },
-  { to: "/app/pedidos",    label: "Pendientes", icon: Package,        testId: "nav-pedidos",
-    hint: "Cola · Tickets", hintCod: "Cola · Importar · Novedades · Tickets" },
-  { to: "/app/logistica",  label: "Logística",  icon: Truck,          testId: "nav-logistica",
+  { to: "/app/logistica",  label: "Logística",  icon: Truck,          testId: "nav-logistica", grupo: "Logística",
     hint: "Pedidos · Seguimiento · Pendientes · Plantillas" },
   { to: "/app/clientes",   label: "Clientes",   icon: UsersThree,     testId: "nav-clientes",
     hint: "Fichas · Notas · Quién necesita ayuda" },
-  { to: "/app/llamadas",   label: "Llamadas",   icon: PhoneCall,      testId: "nav-llamadas",
-    hint: "Agentes de voz por estado de Dropi" },
-  { to: "/app/conexiones", label: "Conexiones", icon: PlugsConnected, testId: "nav-conexiones",
+  { to: "/app/pedidos",    label: "Pendientes", icon: Package,        testId: "nav-pedidos",
+    hint: "Cola · Tickets", hintCod: "Cola · Importar · Novedades · Tickets" },
+  { to: "/app/llamadas",   label: "Llamadas",   icon: PhoneCall,      testId: "nav-llamadas", grupo: "Llamadas",
+    hint: "Agentes de voz · Logística y otros usos" },
+  { to: "/app/conexiones", label: "Conexiones", icon: PlugsConnected, testId: "nav-conexiones", grupo: "Tu cuenta",
     hint: "Claude · Chatea Pro · Voces · Números" },
   { to: "/app/metricas",   label: "Métricas",   icon: ChartLineUp,    testId: "nav-metricas",
     hint: "Resultados de tu operación" },
@@ -127,9 +127,10 @@ export default function Sidebar({ open = false, onClose }) {
 
       {/* nav — 5 top-level */}
       <nav className="py-3">
-        {NAV.map(({ to, label, icon: Icon, lyan, testId, exact, hint, hintCod }) => (
+        {NAV.map(({ to, label, icon: Icon, lyan, testId, exact, hint, hintCod, grupo }) => (
+          <div key={to}>
+          {grupo && <div className="px-5 pt-3 pb-1 text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-400" data-testid={`nav-grupo-${grupo}`}>{grupo}</div>}
           <NavLink
-            key={to}
             to={to}
             end={exact}
             data-testid={testId}
@@ -155,6 +156,7 @@ export default function Sidebar({ open = false, onClose }) {
               {hasCod && hintCod ? hintCod : hint}
             </div>
           </NavLink>
+          </div>
         ))}
       </nav>
 
