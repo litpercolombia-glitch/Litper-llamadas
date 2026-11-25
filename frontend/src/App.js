@@ -15,6 +15,7 @@ const CopilotPage = lazy(() => import("@/pages/Copilot"));
 const PedidosPage = lazy(() => import("@/pages/Pedidos"));
 const ConexionesPage = lazy(() => import("@/pages/Conexiones"));
 const ZynexCallPage = lazy(() => import("@/pages/ZynexCall"));
+const LogisticaPage = lazy(() => import("@/pages/Logistica"));
 const MetricasPage = lazy(() => import("@/pages/Metricas"));
 const AjustesPage = lazy(() => import("@/pages/Ajustes"));
 const OnboardingPage = lazy(() => import("@/pages/Onboarding"));
@@ -82,6 +83,7 @@ function AuthRouter() {
       <Route path="/app/pedidos"     element={<AuthGate><PedidosPage /></AuthGate>} />
       <Route path="/app/conexiones"  element={<AuthGate><ConexionesPage /></AuthGate>} />
       <Route path="/app/llamadas"    element={<AuthGate><ZynexCallPage /></AuthGate>} />
+      <Route path="/app/logistica"   element={<AuthGate><LogisticaPage /></AuthGate>} />
       <Route path="/app/metricas"    element={<AuthGate><MetricasPage /></AuthGate>} />
       <Route path="/app/ajustes"     element={<AuthGate><AjustesPage /></AuthGate>} />
       <Route path="/app/onboarding"  element={<AuthGate><OnboardingPage /></AuthGate>} />
