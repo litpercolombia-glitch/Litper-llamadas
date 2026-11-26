@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
 import { errorText } from "../lib/assistant";
 import { toast } from "sonner";
@@ -83,29 +83,115 @@ function Linea({ pedido, onCerrar }) {
   );
 }
 
+const DIAS = [["", "Cualquier antigüedad"], ["0-1", "Menos de 1 día"], ["1-3", "1 a 3 días"], ["3-7", "3 a 7 días"], ["7-999", "Más de 7 días"]];
+const CREADO = [["", "Creado cuando sea"], ["1", "Creado hoy o ayer"], ["3", "Últimos 3 días"], ["7", "Últimos 7 días"], ["15", "Últimos 15 días"], ["30", "Últimos 30 días"]];
+const sel = "h-11 rounded-sm bg-zinc-950 border border-zinc-700 text-sm text-zinc-100 px-2 min-w-0";
+const unicos = (filas, k) => [...new Set(filas.map((f) => f[k]).filter(Boolean))].sort();
+
 function Cola({ proceso, onAbrir }) {
   const [filas, setFilas] = useState(null);
-  useEffect(() => { setFilas(null);
+  const [f, setF] = useState({ q: "", estado: "", transportadora: "", ciudad: "", etiqueta: "", canal: "", producto: "", dias: "", creado: "", accion: false, tel: "" });
+  const [ver, setVer] = useState(100);
+  useEffect(() => { setFilas(null); setVer(100);
+    setF({ q: "", estado: "", transportadora: "", ciudad: "", etiqueta: "", canal: "", producto: "", dias: "", creado: "", accion: false, tel: "" });
     api.get("/zcall/cerebro/cola", { params: { proceso, limite: 1000 } }).then((r) => setFilas(r.data.filas || []))
       .catch((e) => { toast.error(errorText(e)); setFilas([]); }); }, [proceso]);
+  const set = (k, v) => { setF((x) => ({ ...x, [k]: v })); setVer(100); };
+  const vistas = useMemo(() => {
+    if (!filas) return [];
+    const q = f.q.trim().toLowerCase();
+    const [dmin, dmax] = f.dias ? f.dias.split("-").map(Number) : [null, null];
+    const desde = f.creado ? new Date(Date.now() - Number(f.creado) * 86400000).toISOString().slice(0, 10) : null;
+    return filas.filter((r) =>
+      (!q || String(r.pedido).includes(q) || String(r.guia || "").toLowerCase().includes(q) || String(r.ciudad || "").toLowerCase().includes(q) || String(r.producto || "").toLowerCase().includes(q))
+      && (!f.estado || r.estado === f.estado) && (!f.transportadora || r.transportadora === f.transportadora)
+      && (!f.ciudad || r.ciudad === f.ciudad) && (!f.etiqueta || r.etiqueta === f.etiqueta) && (!f.canal || r.canal === f.canal)
+      && (!f.producto || r.producto === f.producto)
+      && (dmin === null || (r.dias != null && r.dias >= dmin && r.dias < dmax))
+      && (!desde || (r.creado && r.creado >= desde))
+      && (!f.accion || r.accionable) && (!f.tel || (f.tel === "si" ? r.tiene_telefono : r.tiene_telefono === false)));
+  }, [filas, f]);
+  const activos = Object.entries(f).filter(([, v]) => v && v !== "").length;
+  const conProducto = filas ? filas.filter((r) => r.producto).length : 0;
   return (
     <div className={`${caja} p-5`} data-testid="cm-cola">
-      <div className={`${rotulo} mb-3`}>{NOMBRE[proceso]}{filas ? ` · ${filas.length} · ${filas.filter((f) => f.accionable).length} piden acción (van primero)` : ""}</div>
-      {filas === null ? <p className="text-sm text-zinc-400">Cargando…</p> : filas.length === 0 ? <p className="text-sm text-zinc-400">No hay pedidos en esta cola hoy.</p> : (
+      <div className={`${rotulo} mb-3`}>{NOMBRE[proceso]}{filas ? ` · ${vistas.length} de ${filas.length} · ${vistas.filter((r) => r.accionable).length} piden acción (van primero)` : ""}</div>
+      {filas && filas.length > 0 && (
+        <div className="grid gap-2 grid-cols-2 md:grid-cols-4 mb-3" data-testid="cm-filtros">
+          <Input value={f.q} onChange={(e) => set("q", e.target.value)} placeholder="Buscar pedido, guía, ciudad o producto" aria-label="Buscar" className="h-11 rounded-sm bg-zinc-950 border-zinc-700 col-span-2" />
+          <select aria-label="Estado" value={f.estado} onChange={(e) => set("estado", e.target.value)} className={sel}><option value="">Todos los estados</option>{unicos(filas, "estado").map((v) => <option key={v}>{v}</option>)}</select>
+          <select aria-label="Qué toca" value={f.etiqueta} onChange={(e) => set("etiqueta", e.target.value)} className={sel}><option value="">Todas las etiquetas</option>{unicos(filas, "etiqueta").map((v) => <option key={v} value={v}>{limpio(v)}</option>)}</select>
+          <select aria-label="Días en el estado" value={f.dias} onChange={(e) => set("dias", e.target.value)} className={sel}>{DIAS.map(([v, t]) => <option key={v} value={v}>{t}</option>)}</select>
+          <select aria-label="Fecha de creación" value={f.creado} onChange={(e) => set("creado", e.target.value)} className={sel}>{CREADO.map(([v, t]) => <option key={v} value={v}>{t}</option>)}</select>
+          <select aria-label="Transportadora" value={f.transportadora} onChange={(e) => set("transportadora", e.target.value)} className={sel}><option value="">Todas las transportadoras</option>{unicos(filas, "transportadora").map((v) => <option key={v}>{v}</option>)}</select>
+          <select aria-label="Ciudad" value={f.ciudad} onChange={(e) => set("ciudad", e.target.value)} className={sel}><option value="">Todas las ciudades</option>{unicos(filas, "ciudad").map((v) => <option key={v}>{v}</option>)}</select>
+          <select aria-label="Canal" value={f.canal} onChange={(e) => set("canal", e.target.value)} className={sel}><option value="">Todos los canales</option>{unicos(filas, "canal").map((v) => <option key={v} value={v}>{CANAL[v] || v}</option>)}</select>
+          <select aria-label="Producto" value={f.producto} onChange={(e) => set("producto", e.target.value)} className={sel}><option value="">{conProducto ? `Todos los productos (dato en ${conProducto} de ${filas.length})` : "Producto: sin dato todavía"}</option>{unicos(filas, "producto").map((v) => <option key={v}>{v}</option>)}</select>
+          <select aria-label="Teléfono" value={f.tel} onChange={(e) => set("tel", e.target.value)} className={sel}><option value="">Con y sin teléfono</option><option value="si">Con teléfono</option><option value="no">Sin teléfono</option></select>
+          <label className="text-xs text-zinc-300 flex items-center gap-2 min-h-[44px]"><input type="checkbox" checked={f.accion} onChange={(e) => set("accion", e.target.checked)} className="h-5 w-5" /> Solo lo que pide acción</label>
+          {activos > 0 && <Button variant="outline" onClick={() => { setF({ q: "", estado: "", transportadora: "", ciudad: "", etiqueta: "", canal: "", producto: "", dias: "", creado: "", accion: false, tel: "" }); setVer(100); }} className="h-11 rounded-sm border-zinc-700 bg-zinc-950 hover:bg-zinc-800 text-xs">Quitar filtros ({activos})</Button>}
+        </div>)}
+      {filas === null ? <p className="text-sm text-zinc-400">Cargando…</p> : filas.length === 0 ? <p className="text-sm text-zinc-400">No hay pedidos en esta cola hoy.</p> : vistas.length === 0 ? <p className="text-sm text-zinc-400">Ningún pedido cumple esos filtros.</p> : (
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[720px]">
+          <table className="w-full text-sm min-w-[860px]">
             <thead><tr className="text-left text-[11px] text-zinc-400 uppercase tracking-wider">
-              <th className="py-2 pr-3">Pedido</th><th className="pr-3">Estado</th><th className="pr-3">Días</th><th className="pr-3">Etiqueta</th><th className="pr-3">Qué toca</th><th className="pr-3">Ciudad</th><th className="pr-3">Valor</th><th>Último registro</th></tr></thead>
-            <tbody>{filas.map((f) => (
-              <tr key={`${f.pedido}-${f.accion}`} onClick={() => onAbrir(f.pedido)} tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter") onAbrir(f.pedido); }}
+              <th className="py-2 pr-3">Pedido</th><th className="pr-3">Estado</th><th className="pr-3">Días</th><th className="pr-3">Etiqueta</th><th className="pr-3">Qué toca</th><th className="pr-3">Ciudad</th><th className="pr-3">Transportadora</th><th className="pr-3">Valor</th><th>Producto / último registro</th></tr></thead>
+            <tbody>{vistas.slice(0, ver).map((r) => (
+              <tr key={`${r.pedido}-${r.accion}`} onClick={() => onAbrir(r.pedido)} tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter") onAbrir(r.pedido); }}
                   className="border-t border-zinc-800 hover:bg-zinc-900 cursor-pointer text-zinc-200">
-                <td className="py-2.5 pr-3 tabular-nums text-white">{f.pedido}</td><td className="pr-3">{f.estado}</td><td className="pr-3 tabular-nums" title={f.fecha_confiable ? "Días desde que se vio el cambio de estado" : "Estimado: se vio por primera vez ya en este estado"}>{f.fecha_confiable ? "" : "≈ "}{f.dias ?? "—"}</td>
-                <td className="pr-3">{f.escala && <WarningCircle size={13} className="inline mr-1 text-amber-300" aria-label="Pasa a una persona" />}{limpio(f.etiqueta)}</td>
-                <td className="pr-3">{limpio(f.accion)} · {CANAL[f.canal] || f.canal}</td><td className="pr-3">{f.ciudad || "—"}{f.tiene_telefono === false && <span className="ml-1 text-amber-300">· sin teléfono</span>}{f.repetido_cliente && <span className="ml-1 text-amber-300">· mismo cliente ya tiene otro contacto hoy</span>}{f.verificar_antes && <span className="ml-1 text-amber-300">· verificar en la transportadora antes de contactar</span>}</td><td className="pr-3 tabular-nums">{cop(f.valor)}</td>
-                <td className="text-zinc-400 max-w-[220px] truncate">{f.ultimo_dicho || "—"}</td>
+                <td className="py-2.5 pr-3 tabular-nums text-white">{r.pedido}<div className="text-[11px] text-zinc-500">{r.creado || ""}</div></td><td className="pr-3">{r.estado}</td>
+                <td className="pr-3 tabular-nums" title={r.fecha_confiable ? "Días desde que se vio el cambio de estado" : "Estimado: se vio por primera vez ya en este estado"}>{r.fecha_confiable ? "" : "≈ "}{r.dias ?? "—"}</td>
+                <td className="pr-3">{r.escala && <WarningCircle size={13} className="inline mr-1 text-amber-300" aria-label="Pasa a una persona" />}{limpio(r.etiqueta)}</td>
+                <td className="pr-3">{limpio(r.accion)} · {CANAL[r.canal] || r.canal}{r.verificar_antes && <span className="block text-[11px] text-amber-300">verificar en la transportadora antes de contactar</span>}{r.repetido_cliente && <span className="block text-[11px] text-amber-300">mismo cliente ya tiene otro contacto hoy</span>}{r.plantilla_lista === false && <span className="block text-[11px] text-amber-300">falta asignar la plantilla</span>}</td>
+                <td className="pr-3">{r.ciudad || "—"}{r.tiene_telefono === false && <span className="block text-[11px] text-amber-300">sin teléfono</span>}</td>
+                <td className="pr-3">{r.transportadora || "—"}</td><td className="pr-3 tabular-nums">{cop(r.valor)}</td>
+                <td className="text-zinc-400 max-w-[220px] truncate">{r.ultimo_dicho || r.producto || "—"}</td>
               </tr>))}</tbody>
           </table>
+          {vistas.length > ver && <Button variant="outline" onClick={() => setVer((n) => n + 200)} className="mt-3 h-11 rounded-sm border-zinc-700 bg-zinc-950 hover:bg-zinc-800 text-xs">Ver 200 más ({vistas.length - ver} sin mostrar)</Button>}
         </div>)}
+    </div>
+  );
+}
+
+function Catalogo({ c }) {
+  const [q, setQ] = useState("");
+  const lista = (c?.lista || []).filter((p) => !q || p.nombre.toLowerCase().includes(q.toLowerCase()));
+  return (
+    <div className={`${caja} p-5`} data-testid="cm-catalogo">
+      <div className={`${rotulo} mb-1`}>Catálogo · {c?.productos || 0} productos · {c?.activos || 0} activos</div>
+      <p className="text-[11px] text-zinc-400 mb-3">Se copia de {c?.fuente || "tu bot de ventas"}; aquí no se cambian precios. Última copia: {fechaHora(c?.actualizado)}. Con esto responden Lyan y los agentes cuando el cliente pregunta por producto o precio.</p>
+      <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar producto" aria-label="Buscar producto" className="h-11 rounded-sm bg-zinc-950 border-zinc-700 mb-3" />
+      {lista.length === 0 ? <p className="text-sm text-zinc-400">No hay productos que mostrar.</p> : (
+        <ul className="divide-y divide-zinc-800">{lista.map((p) => (
+          <li key={`${p.nombre}-${p.id_dropi}`} className="py-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+            <span className="text-zinc-100 flex-1 basis-56">{p.nombre}</span><span className="tabular-nums text-white">{cop(p.precio)}</span>
+            <span className={`text-[11px] ${p.estado === "activo" ? "text-green-400" : "text-zinc-500"}`}>{p.estado}</span>
+            <span className="text-[11px] text-zinc-400">{p.id_dropi ? `Dropi ${p.id_dropi}` : "sin ID de Dropi"}{p.complementos ? ` · ${p.complementos} complementos` : ""}</span>
+          </li>))}</ul>)}
+    </div>
+  );
+}
+
+function Secuencia({ pasos }) {
+  const [proc, setProc] = useState("pendientes");
+  const lista = (pasos || []).filter((p) => p.proceso === proc);
+  return (
+    <div className={`${caja} p-5`} data-testid="cm-secuencia">
+      <div className={`${rotulo} mb-3`}>Plan de secuencias · qué hace el motor según el estado y los días</div>
+      <div className="flex flex-wrap gap-2 mb-3">{["pendientes", "seguimiento", "novedades", "oficina", "postventa", "cierre"].map((k) => (
+        <button key={k} type="button" onClick={() => setProc(k)} aria-pressed={proc === k} className={`min-h-[44px] px-3 rounded-sm border text-sm ${proc === k ? "border-fuchsia-400/70 bg-fuchsia-500/10 text-white" : "border-zinc-800 text-zinc-200 hover:bg-zinc-900"}`}>{NOMBRE[k] || k}</button>))}</div>
+      {lista.length === 0 ? <p className="text-sm text-zinc-400">Sin pasos para este proceso.</p> : (
+        <div className="overflow-x-auto"><table className="w-full text-sm min-w-[760px]">
+          <thead><tr className="text-left text-[11px] text-zinc-400 uppercase tracking-wider"><th className="py-2 pr-3">Estado</th><th className="pr-3">Días</th><th className="pr-3">Qué hace</th><th className="pr-3">Canal</th><th className="pr-3">Plantilla</th><th className="pr-3">Llamada</th><th>Persona</th></tr></thead>
+          <tbody>{lista.map((p, i) => (
+            <tr key={`${p.estado}-${p.desde_dia}-${i}`} className="border-t border-zinc-800 text-zinc-200">
+              <td className="py-2 pr-3">{p.estado}</td><td className="pr-3 tabular-nums">{p.desde_dia}{p.hasta_dia != null ? ` a ${p.hasta_dia}` : " o más"}</td>
+              <td className="pr-3">{limpio(p.accion)}</td><td className="pr-3">{CANAL[p.canal] || p.canal}</td>
+              <td className="pr-3 font-mono text-[11px]">{p.casilla ? (p.plantilla || <span className="text-amber-300">falta asignar ({p.casilla})</span>) : "—"}</td>
+              <td className="pr-3">{p.llamada_a_los_min == null ? "—" : p.llamada_a_los_min === 0 ? "de inmediato" : `a los ${p.llamada_a_los_min} min`}</td>
+              <td>{p.pasa_a_persona ? "Sí" : "No"}</td>
+            </tr>))}</tbody></table></div>)}
     </div>
   );
 }
@@ -150,7 +236,7 @@ function Prompts() {
   const cargar = useCallback(() => api.get("/zcall/cerebro/prompts").then((r) => setLista(r.data.prompts || []))
     .catch((e) => { toast.error(errorText(e)); setLista([]); }), []);
   useEffect(() => { cargar(); }, [cargar]);
-  const abrir = (p) => { setAbierto(p); setTexto(p.contenido); };
+  const abrir = (p) => { setAbierto(p); setTexto(p.contenido || ""); };
   const guardar = async () => {
     if (texto.trim().length < 200) { toast.error("El texto debe tener al menos 200 caracteres."); return; }
     setGuardando(true);
@@ -170,11 +256,12 @@ function Prompts() {
           </button>))}</div>)}
       {abierto && (
         <div className="space-y-2">
-          <label className="text-xs text-zinc-300 block">Texto de la instrucción
+          {abierto.protegido && <p className="text-sm text-zinc-300 border border-zinc-700 rounded-sm p-3" data-testid="cm-prompt-protegido">{abierto.resumen} Mínimo para que funcione: nombre de la tienda, qué vendes, tiempo de entrega, garantía y cambios, medios de pago, horario y a quién se pasa el caso.</p>}
+          <label className="text-xs text-zinc-300 block">{abierto.protegido ? "Tu versión para tu tienda (opcional)" : "Texto de la instrucción"}
             <textarea value={texto} onChange={(e) => setTexto(e.target.value)} maxLength={12000} rows={16} data-testid="cm-prompt-texto"
                       className="mt-1 w-full rounded-sm bg-zinc-950 border border-zinc-700 text-sm text-zinc-100 p-3 font-mono leading-relaxed" /></label>
           <div className="flex flex-wrap gap-2 items-center">
-            <Button onClick={guardar} disabled={guardando || texto === abierto.contenido} className="h-11 rounded-sm text-xs">{guardando ? "Guardando…" : "Guardar versión nueva"}</Button>
+            <Button onClick={guardar} disabled={guardando || texto === (abierto.contenido || "")} className="h-11 rounded-sm text-xs">{guardando ? "Guardando…" : "Guardar versión nueva"}</Button>
             <Button variant="outline" onClick={() => setAbierto(null)} className="h-11 rounded-sm border-zinc-700 bg-zinc-950 hover:bg-zinc-800 text-xs">Cancelar</Button>
             <span className="text-[11px] text-zinc-400">Al guardar se crea una versión tuya; la anterior no se borra.</span>
           </div>
@@ -244,6 +331,18 @@ export default function ControlMando() {
             <div className="text-3xl font-semibold text-white tabular-nums mt-1">{d.extra?.proveedores_hoy ?? 0}</div>
             <div className="text-[11px] text-zinc-400">pedidos para reclamarle al proveedor: sin despacho en 48 h o sin movimiento</div>
           </button>
+          <button type="button" onClick={() => { setCola("catalogo"); setPedido(null); }} aria-pressed={cola === "catalogo"} data-testid="cm-proceso-catalogo"
+                  className={`text-left p-4 rounded-sm border min-h-[120px] ${cola === "catalogo" ? "border-fuchsia-400/70 bg-fuchsia-500/10" : "border-zinc-800 bg-zinc-900/40 hover:border-zinc-600"}`}>
+            <div className="text-xs text-zinc-200">Catálogo</div>
+            <div className="text-3xl font-semibold text-white tabular-nums mt-1">{d.extra?.catalogo?.activos ?? 0}</div>
+            <div className="text-[11px] text-zinc-400">productos activos con precio, copiados de tu bot de ventas</div>
+          </button>
+          <button type="button" onClick={() => { setCola("secuencia"); setPedido(null); }} aria-pressed={cola === "secuencia"} data-testid="cm-proceso-secuencia"
+                  className={`text-left p-4 rounded-sm border min-h-[120px] ${cola === "secuencia" ? "border-fuchsia-400/70 bg-fuchsia-500/10" : "border-zinc-800 bg-zinc-900/40 hover:border-zinc-600"}`}>
+            <div className="text-xs text-zinc-200">Plan de secuencias</div>
+            <div className="text-3xl font-semibold text-white tabular-nums mt-1">{(d.extra?.secuencia || []).length}</div>
+            <div className="text-[11px] text-zinc-400">pasos por estado y días: mensaje, llamada, plantilla y cuándo pasa a una persona</div>
+          </button>
           <button type="button" onClick={() => { setCola("prompts"); setPedido(null); }} aria-pressed={cola === "prompts"} data-testid="cm-proceso-prompts"
                   className={`text-left p-4 rounded-sm border min-h-[120px] ${cola === "prompts" ? "border-fuchsia-400/70 bg-fuchsia-500/10" : "border-zinc-800 bg-zinc-900/40 hover:border-zinc-600"}`}>
             <div className="text-xs text-zinc-200">Instrucciones de los asistentes</div>
@@ -263,7 +362,7 @@ export default function ControlMando() {
           <div className={rotulo}>Reglas que faltan</div>
           <p className="mt-1">Estos estados no tienen regla y pasaron a una persona: {d.sin_regla.map((s) => `${s.estado} (${s.n})`).join(", ")}.</p>
         </div>)}
-      {cola === "prompts" ? <Prompts /> : cola === "persona" ? <Persona onAbrir={setPedido} recargar={cargar} /> : cola ? <Cola proceso={cola} onAbrir={setPedido} /> : null}
+      {cola === "catalogo" ? <Catalogo c={d.extra?.catalogo} /> : cola === "secuencia" ? <Secuencia pasos={d.extra?.secuencia} /> : cola === "prompts" ? <Prompts /> : cola === "persona" ? <Persona onAbrir={setPedido} recargar={cargar} /> : cola ? <Cola proceso={cola} onAbrir={setPedido} /> : null}
       {pedido && <Linea pedido={pedido} onCerrar={() => setPedido(null)} />}
     </div>
   );
