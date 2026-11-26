@@ -195,3 +195,15 @@ async def guion_armar(proceso: str, tipo: str, p: GuionIn, request: Request):
                                                 "p_texto": p.texto.strip(), "p_autor": _autor(request)}),
             "No se pudo armar el guion.")
     return {"ok": True, "version": r.get("version"), "vista_previa": r.get("vista_previa")}
+
+
+# ---------------------------------------------------------------- lote de prueba (no envía nada)
+@router.get("/lote", dependencies=[Depends(require_api_key)])
+async def lote(request: Request):
+    return _ok(await rpc("zc_api_cb_lote", {"p_org": get_org(request)}), "No se pudo leer el lote de prueba.")
+
+
+@router.post("/lote/armar", dependencies=[Depends(require_api_key)])
+async def lote_armar(request: Request):
+    return _ok(await rpc("zc_api_cb_lote", {"p_org": get_org(request), "p_armar": True, "p_max": 20}),
+               "No se pudo armar el lote de prueba.")
