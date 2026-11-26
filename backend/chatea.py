@@ -28,6 +28,35 @@ log = logging.getLogger("chatea_pro")
 
 
 NOT_CONNECTED = "Conecta tu cuenta de Chatea Pro (WhatsApp) en Conexiones."
+BASE_OFICIAL = "https://chateapro.app/api"
+
+
+def base_correcta(base_url: str | None) -> str:
+    """Dirección de la API. Si el cliente pegó una dirección de Chatea Pro mal escrita
+    (api.chateapro.app, sin /api, con barra al final…) se usa la oficial: es la única que existe."""
+    base = (base_url or "").strip().rstrip("/")
+    if not base:
+        return BASE_OFICIAL
+    if not base.lower().startswith(("http://", "https://")):
+        base = "https://" + base
+    if "chateapro" in base.lower():
+        return BASE_OFICIAL
+    return base if base.lower().endswith("/api") else base + "/api"
+
+
+def error_claro(status_code: int | None, error: str | None = None) -> str:
+    """Mensaje para el cliente: qué pasó y qué hacer. Nunca devuelve HTML ni detalles técnicos."""
+    if status_code in (401, 403):
+        return "La llave no es válida o venció. En Chatea Pro ve a Configuración → API, copia de nuevo el API Token y pégalo aquí."
+    if status_code == 404:
+        return "Esa dirección no es la de Chatea Pro. Deja la casilla «Base URL» vacía y prueba otra vez."
+    if status_code == 429:
+        return "Chatea Pro está limitando las consultas. Espera un minuto y prueba otra vez."
+    if status_code and status_code >= 500:
+        return "Chatea Pro no está respondiendo ahora. Inténtalo en unos minutos."
+    if not status_code:
+        return "No pude llegar a Chatea Pro. Revisa la dirección o inténtalo en unos minutos."
+    return f"Chatea Pro respondió con un error ({status_code})."
 
 
 class ChateaProClient:
@@ -40,8 +69,7 @@ class ChateaProClient:
                  org_id: str | None = None):
         self.org_id = org_id
         self.api_key = (api_key or "").strip()
-        base = (base_url or "").strip() or "https://chateapro.app/api"
-        self.base_url = base.rstrip("/")
+        self.base_url = base_correcta(base_url)
         self.me_path = os.environ.get("CHATEA_PRO_ME_PATH", "/me")
         self.send_text_path = os.environ.get("CHATEA_PRO_SEND_TEXT_PATH", "/subscriber/send-text")
         self.send_template_path = os.environ.get("CHATEA_PRO_SEND_TEMPLATE_PATH",
@@ -87,12 +115,16 @@ class ChateaProClient:
 
     async def test_connection(self) -> dict[str, Any]:
         res = await self.me()
-        # normalise
+        ok = bool(res.get("ok")) and isinstance(res.get("body"), (dict, list))
+        if not self.configured:
+            error = NOT_CONNECTED
+        else:
+            error = None if ok else error_claro(res.get("status_code") if not res.get("ok") else 404)
         return {
-            "ok": res.get("ok"),
+            "ok": ok,
             "status_code": res.get("status_code"),
-            "body": res.get("body"),
-            "error": res.get("error"),
+            "body": res.get("body") if ok else None,     # nunca se devuelve HTML ni el cuerpo de un error
+            "error": error,
             "url": res.get("url"),
         }
 
@@ -243,14 +275,17 @@ async def _chatea_health(self) -> dict[str, Any]:
         try:
             r = await x.get(f"{self.base_url}{self.me_path}",
                             headers={"Authorization": f"Bearer {self.api_key}"})
-            body = None
             try:
                 body = r.json()
             except Exception:
-                body = r.text[:400]
-            return {"ok": r.status_code < 400, "status_code": r.status_code, "body": body}
-        except Exception as e:  # noqa: BLE001
-            return {"ok": False, "status_code": 0, "error": str(e), "body": None}
+                body = None
+            if r.status_code < 400 and isinstance(body, (dict, list)):
+                return {"ok": True, "status_code": r.status_code, "body": "Conexión correcta con Chatea Pro."}
+            claro = error_claro(r.status_code if r.status_code >= 400 else 404)
+            return {"ok": False, "status_code": r.status_code, "body": claro, "error": claro}
+        except Exception:  # noqa: BLE001
+            claro = error_claro(0)
+            return {"ok": False, "status_code": 0, "error": claro, "body": claro}
 
 
 ChateaProClient.health = _chatea_health  # type: ignore[attr-defined]
