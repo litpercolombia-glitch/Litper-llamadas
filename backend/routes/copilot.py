@@ -136,16 +136,22 @@ async def run(payload: SendMessageIn, request: Request):
     # Un mensaje nuevo invalida lo que estuviera esperando confirmación en el hilo.
     await supersede_pending(org_id, tid)
 
+    # Adjuntos: lo que el modelo lee va aparte de lo que se muestra en el chat.
+    from agent.adjuntos import bloque_adjuntos
+    adj_texto, adj_meta = await bloque_adjuntos(org_id, payload.file_ids)
+    texto_agente = (payload.text or "Revisa lo que adjunté y dime qué ves.") + adj_texto
+
     # Persist user message
-    user_msg = ChatMessage(thread_id=tid, role="user", content=payload.text)
-    await db.chat_messages.insert_one({**user_msg.model_dump(), "org_id": org_id})
+    user_msg = ChatMessage(thread_id=tid, role="user", content=payload.text, attachments=adj_meta)
+    await db.chat_messages.insert_one({**user_msg.model_dump(), "org_id": org_id,
+                                       **({"agent_content": texto_agente} if adj_texto else {})})
 
     # Build history for the agent
     hist_docs = await db.chat_messages.find({"thread_id": tid, "org_id": org_id,
                                              "role": {"$in": ["user", "assistant"]}},
                                             {"_id": 0}) \
         .sort("created_at", 1).to_list(500)
-    history = [{"role": h["role"], "content": h["content"]} for h in hist_docs[:-1]]
+    history = [{"role": h["role"], "content": h.get("agent_content") or h["content"]} for h in hist_docs[:-1]]
 
     # Load skill if any
     skill_instructions = ""
@@ -156,7 +162,7 @@ async def run(payload: SendMessageIn, request: Request):
             skill_instructions = s.get("instructions", "")
 
     # Run
-    result = await run_agent(session_id=tid, history=history, user_text=payload.text,
+    result = await run_agent(session_id=tid, history=history, user_text=texto_agente,
                              skill_instructions=skill_instructions,
                              auto_mode=payload.auto_mode,
                              model_override=payload.model_override,

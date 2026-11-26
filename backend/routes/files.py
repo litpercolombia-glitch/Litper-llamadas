@@ -13,6 +13,10 @@ router = APIRouter(prefix="/files", tags=["copilot"],
                    dependencies=[Depends(require_api_key)])
 
 MAX_PREVIEW_ROWS = 500  # cap on how much we keep in memory for agent import
+MAX_BYTES = 15 * 1024 * 1024      # tope por archivo
+MAX_IMAGEN = 4 * 1024 * 1024      # imágenes que el asistente puede ver
+MAX_TEXTO = 40_000                # caracteres de texto que se guardan para el asistente
+TEXTO_EXT = (".txt", ".md", ".json", ".log", ".tsv")
 
 
 def _now():
@@ -56,6 +60,8 @@ async def upload(file: UploadFile = File(...),
                  thread_id: Optional[str] = Form(None),
                  org: str = Depends(get_org)):
     data = await file.read()
+    if len(data) > MAX_BYTES:
+        raise HTTPException(413, "El archivo pesa más de 15 MB. Súbelo más liviano o por partes.")
     kind = _detect_kind(file.filename or "", file.content_type or "")
     columns: list[str] = []
     preview: list[dict] = []
@@ -70,7 +76,21 @@ async def upload(file: UploadFile = File(...),
             preview, columns, row_count = _parse_xlsx(data)
         except Exception as e:  # noqa: BLE001
             raise HTTPException(400, f"XLSX inválido: {e}")
-    # For PDF/image we just store metadata (no OCR in v1).
+    # Lo que el asistente podrá leer: imagen (para verla) o texto (PDF y archivos de texto).
+    extra: dict = {}
+    nombre = (file.filename or "").lower()
+    if kind == "image" and len(data) <= MAX_IMAGEN:
+        import base64
+        extra["data_b64"] = base64.b64encode(data).decode()
+    elif kind == "pdf":
+        try:
+            from pypdf import PdfReader
+            paginas = PdfReader(io.BytesIO(data)).pages[:30]
+            extra["texto"] = "\n".join((p.extract_text() or "") for p in paginas)[:MAX_TEXTO]
+        except Exception:  # noqa: BLE001 — PDF escaneado o sin lector: se guarda sin texto
+            pass
+    elif nombre.endswith(TEXTO_EXT) or (file.content_type or "").startswith("text/"):
+        extra["texto"] = data.decode("utf-8", errors="replace")[:MAX_TEXTO]
 
     doc = UploadedFile(
         id=str(uuid.uuid4()),
@@ -84,7 +104,7 @@ async def upload(file: UploadFile = File(...),
         thread_id=thread_id,
         created_at=_now(),
     )
-    await get_db().uploaded_files.insert_one({**doc.model_dump(), "org_id": org})
+    await get_db().uploaded_files.insert_one({**doc.model_dump(), **extra, "org_id": org})
     return doc
 
 
@@ -96,7 +116,7 @@ async def list_files(thread_id: Optional[str] = None, limit: int = 50,
     if thread_id:
         q["thread_id"] = thread_id
     docs = await get_db().uploaded_files.find(q,
-        {"_id": 0, "rows_preview": 0}).sort("created_at", -1).limit(limit).to_list(limit)
+        {"_id": 0, "rows_preview": 0, "data_b64": 0, "texto": 0}).sort("created_at", -1).limit(limit).to_list(limit)
     # rows_preview stripped to keep responses small; use GET /files/{id} for full
     return docs
 
