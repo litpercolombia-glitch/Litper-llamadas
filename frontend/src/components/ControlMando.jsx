@@ -56,7 +56,7 @@ function Linea({ pedido, onCerrar }) {
             <div className={rotulo}>Qué toca ahora</div>
             <div className="mt-1 font-medium">{limpio(dec.accion)} · {CANAL[dec.canal] || dec.canal}</div>
             <div className="text-zinc-300 mt-1">{dec.motivo}</div>
-            <div className="text-[11px] text-zinc-400 mt-1">{dec.estado} · {dec.fecha_confiable ? "" : "al menos "}{dec.dias ?? "—"} días en este estado{dec.fecha_confiable ? "" : " (se vio por primera vez ya así)"}{dec.fuente ? ` · Regla: ${dec.fuente}` : ""}</div>
+            <div className="text-[11px] text-zinc-400 mt-1">{dec.estado} · {dec.fecha_confiable ? "" : "cerca de "}{dec.dias ?? "—"} días en este estado{dec.fecha_confiable ? "" : " (estimado: se vio por primera vez ya así)"}{dec.fuente ? ` · Regla: ${dec.fuente}` : ""}</div>
           </div>)}
         <div className="grid gap-2 md:grid-cols-[1fr_1fr_auto_auto_auto] items-end">
           <label className="text-xs text-zinc-300">Qué dijo el cliente
@@ -99,9 +99,9 @@ function Cola({ proceso, onAbrir }) {
             <tbody>{filas.map((f) => (
               <tr key={`${f.pedido}-${f.accion}`} onClick={() => onAbrir(f.pedido)} tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter") onAbrir(f.pedido); }}
                   className="border-t border-zinc-800 hover:bg-zinc-900 cursor-pointer text-zinc-200">
-                <td className="py-2.5 pr-3 tabular-nums text-white">{f.pedido}</td><td className="pr-3">{f.estado}</td><td className="pr-3 tabular-nums" title={f.fecha_confiable ? "Días desde que se vio el cambio de estado" : "Mínimo: se vio por primera vez ya en este estado"}>{f.fecha_confiable ? "" : "≥ "}{f.dias ?? "—"}</td>
+                <td className="py-2.5 pr-3 tabular-nums text-white">{f.pedido}</td><td className="pr-3">{f.estado}</td><td className="pr-3 tabular-nums" title={f.fecha_confiable ? "Días desde que se vio el cambio de estado" : "Estimado: se vio por primera vez ya en este estado"}>{f.fecha_confiable ? "" : "≈ "}{f.dias ?? "—"}</td>
                 <td className="pr-3">{f.escala && <WarningCircle size={13} className="inline mr-1 text-amber-300" aria-label="Pasa a una persona" />}{limpio(f.etiqueta)}</td>
-                <td className="pr-3">{limpio(f.accion)} · {CANAL[f.canal] || f.canal}</td><td className="pr-3">{f.ciudad || "—"}{f.tiene_telefono === false && <span className="ml-1 text-amber-300">· sin teléfono</span>}</td><td className="pr-3 tabular-nums">{cop(f.valor)}</td>
+                <td className="pr-3">{limpio(f.accion)} · {CANAL[f.canal] || f.canal}</td><td className="pr-3">{f.ciudad || "—"}{f.tiene_telefono === false && <span className="ml-1 text-amber-300">· sin teléfono</span>}{f.repetido_cliente && <span className="ml-1 text-amber-300">· mismo cliente ya tiene otro contacto hoy</span>}</td><td className="pr-3 tabular-nums">{cop(f.valor)}</td>
                 <td className="text-zinc-400 max-w-[220px] truncate">{f.ultimo_dicho || "—"}</td>
               </tr>))}</tbody>
           </table>
@@ -129,7 +129,7 @@ function Persona({ onAbrir, recargar }) {
         <ul className="space-y-2">{casos.map((c) => (
           <li key={c.id} className="border border-zinc-800 rounded-sm p-3 grid gap-2 md:grid-cols-[1fr_1fr_auto] items-center text-sm">
             <button type="button" onClick={() => onAbrir(c.pedido)} className="text-left min-h-[44px]">
-              <span className="text-white tabular-nums">{c.pedido}</span> <span className="text-zinc-300">· {c.estado || "—"} · {c.fecha_confiable ? "" : "≥ "}{c.dias ?? "—"} días</span>
+              <span className="text-white tabular-nums">{c.pedido}</span> <span className="text-zinc-300">· {c.estado || "—"} · {c.fecha_confiable ? "" : "≈ "}{c.dias ?? "—"} días</span>
               <div className="text-[11px] text-zinc-400">{NOMBRE[c.proceso] || c.proceso} · {limpio(c.motivo)} · {c.ciudad || "—"} · {cop(c.valor)} · abierto hace {c.horas_abierto ?? "—"} h{c.tiene_telefono === false ? " · sin teléfono" : ""}</div>
               {c.ultimo_dicho && <div className="text-[11px] text-zinc-300 truncate">Cliente: {c.ultimo_dicho}</div>}
             </button>
@@ -202,14 +202,14 @@ export default function ControlMando() {
         <span className="px-2 py-1 rounded-sm border border-zinc-600 bg-zinc-800"><ClockCounterClockwise size={12} className="inline mr-1" />Última revisión: {u ? fechaHora(u.fin || u.inicio) : "aún no corre"}</span>
         <span className="px-2 py-1 rounded-sm border border-zinc-600 bg-zinc-800">Corte: {fechaHora(d.corte)}</span>
       </div>
-      {q.alerta && <div className="border border-amber-300/60 bg-amber-500/10 rounded-sm p-3 text-sm text-amber-100" data-testid="cm-alerta">{q.alerta}</div>}
+      {(q.alertas || []).length > 0 && <ul className="border border-amber-300/60 bg-amber-500/10 rounded-sm p-3 text-sm text-amber-100 space-y-1" data-testid="cm-alerta">{q.alertas.map((t) => <li key={t}>{t}</li>)}</ul>}
       <div className={`${caja} p-4`} data-testid="cm-datos">
         <div className={`${rotulo} mb-2`}>Con qué datos decide</div>
         <div className="grid gap-3 grid-cols-2 lg:grid-cols-4 text-sm text-zinc-200">
           <div><div className="text-2xl font-semibold text-white tabular-nums">{q.activos ?? "—"}</div><div className="text-[11px] text-zinc-400">pedidos activos de {q.pedidos ?? "—"} cargados · leídos de Dropi {fechaHora(q.ultima_carga)}</div></div>
           <div><div className="text-2xl font-semibold text-white tabular-nums">{q.pct_telefono != null ? `${q.pct_telefono} %` : "sin dato"}</div><div className="text-[11px] text-zinc-400">de los activos tienen teléfono ({q.activos_con_telefono ?? 0})</div></div>
-          <div><div className="text-2xl font-semibold text-white tabular-nums">{q.pct_fecha_confiable != null ? `${q.pct_fecha_confiable} %` : "sin dato"}</div><div className="text-[11px] text-zinc-400">con fecha exacta del estado; en el resto los días son un mínimo</div></div>
-          <div><div className="text-2xl font-semibold text-white tabular-nums">{c.tasa != null ? `${c.tasa} %` : "sin dato"}</div><div className="text-[11px] text-zinc-400">entrega vista desde {fechaHora(c.desde)}: {c.entregados || 0} entregados, {c.devueltos || 0} devueltos{d.cierre_total?.tasa != null ? ` · histórico cargado ${d.cierre_total.tasa} %` : ""}</div></div>
+          <div><div className="text-2xl font-semibold text-white tabular-nums">{q.pct_fecha_confiable != null ? `${q.pct_fecha_confiable} %` : "sin dato"}</div><div className="text-[11px] text-zinc-400">con fecha exacta del estado; en el resto los días son estimados</div></div>
+          <div><div className="text-2xl font-semibold text-white tabular-nums">{c.tasa != null ? `${c.tasa} %` : "sin dato"}</div><div className="text-[11px] text-zinc-400">entrega vista desde {fechaHora(c.desde)}: {c.entregados || 0} entregados, {c.devueltos || 0} devueltos{c.aviso ? ` · ${c.aviso}` : ""}{d.cierre_total?.tasa != null ? ` · histórico cargado ${d.cierre_total.tasa} %` : ""}</div></div>
         </div>
       </div>
       <div>
