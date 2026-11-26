@@ -24,6 +24,7 @@ function Linea({ pedido, onCerrar }) {
   const [canal, setCanal] = useState("llamada");
   const [guardando, setGuardando] = useState(false);
   const [ticket, setTicket] = useState(false);
+  const [noMas, setNoMas] = useState(false);
   const cargar = useCallback(() => api.get(`/zcall/cerebro/pedidos/${pedido}/linea`).then((r) => setD(r.data))
     .catch((e) => { toast.error(errorText(e)); setD({ linea: [], decision: null }); }), [pedido]);
   useEffect(() => { setD(null); cargar(); }, [cargar]);
@@ -31,7 +32,7 @@ function Linea({ pedido, onCerrar }) {
     if (texto.trim().length < 3) { toast.error("Escribe qué dijo el cliente (mínimo 3 letras)."); return; }
     setGuardando(true);
     try {
-      const r = await api.post(`/zcall/cerebro/pedidos/${pedido}/dicho`, { texto, compromiso, canal, ticket });
+      const r = await api.post(`/zcall/cerebro/pedidos/${pedido}/dicho`, { texto, compromiso: noMas ? "no_mas" : compromiso, canal, ticket }); setNoMas(false);
       toast.success(r.data?.repetido ? "Ese registro ya estaba guardado." : r.data?.caso_para_persona ? "Registro guardado y caso abierto para una persona." : "Registro guardado."); setTicket(false); setTexto(""); setCompromiso(""); await cargar();
     } catch (e) { toast.error(errorText(e)); } finally { setGuardando(false); }
   };
@@ -66,6 +67,7 @@ function Linea({ pedido, onCerrar }) {
           <label className="text-xs text-zinc-300">Canal
             <select value={canal} onChange={(e) => setCanal(e.target.value)} className="mt-1 h-11 w-full rounded-sm bg-zinc-950 border border-zinc-700 text-sm text-zinc-100 px-2">
               <option value="llamada">Llamada</option><option value="whatsapp">WhatsApp</option><option value="mensaje">Mensaje</option><option value="chat">Chat</option><option value="otro">Otro</option></select></label>
+          <label className="text-xs text-zinc-300 flex items-center gap-2 min-h-[44px]"><input type="checkbox" checked={noMas} onChange={(e) => setNoMas(e.target.checked)} className="h-5 w-5" data-testid="cm-dicho-nomas" /> Pidió que no le escriban ni lo llamen más</label>
           <label className="text-xs text-zinc-300 flex items-center gap-2 min-h-[44px]"><input type="checkbox" checked={ticket} onChange={(e) => setTicket(e.target.checked)} className="h-5 w-5" data-testid="cm-dicho-ticket" /> Necesita a una persona</label>
           <Button onClick={guardar} disabled={guardando} data-testid="cm-dicho-guardar" className="h-11 rounded-sm text-xs">{guardando ? "Guardando…" : "Guardar"}</Button>
         </div>
