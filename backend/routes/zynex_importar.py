@@ -3,6 +3,11 @@
 El cliente sube su archivo de Dropi (Excel o CSV) y elige cuántos días traer
 (30, 60 o 90). Los pedidos quedan en SU espacio: alimentan Clientes y Métricas.
 No crea tareas ni envía mensajes: solo guarda la historia para medir y mejorar.
+
+PUERTA DE ENTRADA (sin API de Dropi): cada cliente tiene una dirección propia
+(`/entrada/{token}`) a la que su automatización (n8n, Chatea Pro u otra) envía
+los pedidos tal cual los lee. El token identifica al cliente; nada del cuerpo
+decide a qué cuenta entra.
 """
 from __future__ import annotations
 
@@ -110,6 +115,113 @@ async def importar(request: Request, file: UploadFile = File(...), dias: int = F
         guardados += int(r.get("guardados") or 0)
     return {"ok": True, "dias": dias, "leidos": len(res.consolidated or []), "guardados": guardados, **desc,
             "mensaje": f"Listo: {guardados} pedidos de los últimos {dias} días."}
+
+
+# ------------------------------------------------------------------ puerta de entrada
+ENTRADA_MAX = 500            # pedidos por envío
+ENTRADA_BYTES = 2 * 1024 * 1024
+ENTRADA_POR_MIN = 120        # envíos por minuto y por cliente
+_ALIAS = {
+    "pedido": ("pedido", "order_id", "id_orden", "orden", "id"),
+    "estado": ("estado", "status", "estatus", "state"),
+    "telefono": ("telefono", "phone", "celular", "customer_phone", "telefono_cliente"),
+    "nombre": ("nombre", "customer_name", "cliente", "name", "nombre_cliente"),
+    "ciudad": ("ciudad", "city", "ciudad_destino"),
+    "valor": ("valor", "total_order", "total", "total_amount", "valor_total"),
+    "transportadora": ("transportadora", "carrier", "shipping_company", "distribution_company", "transportadora_nombre"),
+    "guia": ("guia", "shipping_guide", "tracking_number", "numero_guia", "tracking"),
+    "creado": ("creado", "created_at", "fecha", "order_date", "fecha_creacion"),
+}
+_USADOS = {a for lista in _ALIAS.values() for a in lista}
+
+
+def _texto(v) -> str:
+    """Valor simple como texto; de un objeto toma su nombre (p. ej. la transportadora)."""
+    if isinstance(v, dict):
+        v = v.get("name") or v.get("nombre") or ""
+    return "" if v is None or isinstance(v, (list, dict)) else str(v).strip()
+
+
+def fila_de_entrada(o: dict) -> dict | None:
+    """Un pedido como venga (Dropi, n8n, Chatea Pro) → fila para la base. None si no trae pedido y estado."""
+    if not isinstance(o, dict):
+        return None
+    bajo = {str(k).strip().lower(): v for k, v in o.items()}
+    f = {campo: next((_texto(bajo[a]) for a in alias if _texto(bajo.get(a))), "") for campo, alias in _ALIAS.items()}
+    if not f["nombre"] and _texto(bajo.get("surname")):
+        f["nombre"] = _texto(bajo.get("surname"))
+    elif _texto(bajo.get("surname")) and _texto(bajo.get("name")) == f["nombre"]:
+        f["nombre"] = f"{f['nombre']} {_texto(bajo.get('surname'))}"
+    f["pedido"] = re.sub(r"\D", "", f["pedido"])[:15]
+    f["estado"] = f["estado"].upper()[:60]
+    if not f["pedido"] or not f["estado"]:
+        return None
+    f["telefono"] = re.sub(r"\D", "", f["telefono"])[-10:]
+    f["creado"] = f["creado"][:10] if re.match(r"^\d{4}-\d{2}-\d{2}", f["creado"]) else None
+    try:
+        f["valor"] = str(int(round(float(f["valor"])))) if f["valor"] else None
+    except ValueError:
+        f["valor"] = None
+    for k in ("nombre", "ciudad", "transportadora", "guia"):
+        f[k] = f[k][:120]
+    otros = {str(k)[:60]: (v if isinstance(v, (list, dict)) else _texto(v)[:300])
+             for k, v in list(o.items())[:80] if str(k).strip().lower() not in _USADOS and v not in (None, "", [], {})}
+    f["datos"] = o["datos"] if isinstance(o.get("datos"), dict) else otros
+    return f
+
+
+def pedidos_del_cuerpo(cuerpo) -> list:
+    if isinstance(cuerpo, list):
+        return cuerpo
+    if isinstance(cuerpo, dict):
+        for k in ("pedidos", "orders", "objects", "items", "data"):
+            if isinstance(cuerpo.get(k), list):
+                return cuerpo[k]
+        return [cuerpo]
+    return []
+
+
+@router.post("/entrada/{org_token}",
+             summary="Puerta de entrada de pedidos de UN cliente (su token va en la dirección). "
+                     "Recibe uno o varios pedidos como los lea su automatización. No envía mensajes.")
+async def entrada(org_token: str, request: Request):
+    import json
+    import ratelimit
+    import webhook_tokens
+    org = await webhook_tokens.org_for_token(org_token)
+    if not org:
+        raise HTTPException(404, "Dirección no válida.")
+    if ratelimit.count(f"entrada:{org}", 60) >= ENTRADA_POR_MIN:
+        raise HTTPException(429, "Demasiados envíos seguidos. Espera un minuto.")
+    ratelimit.hit(f"entrada:{org}", 60)
+    crudo = await request.body()
+    if len(crudo) > ENTRADA_BYTES:
+        raise HTTPException(413, "Envío demasiado grande. Manda máximo 500 pedidos por vez.")
+    try:
+        cuerpo = json.loads(crudo or b"null")
+    except ValueError:
+        raise HTTPException(400, "El cuerpo debe ser JSON.")
+    lista = pedidos_del_cuerpo(cuerpo)
+    if len(lista) > ENTRADA_MAX:
+        raise HTTPException(413, "Manda máximo 500 pedidos por vez.")
+    filas = [f for f in (fila_de_entrada(o) for o in lista) if f]
+    if not filas:
+        raise HTTPException(400, "No llegó ningún pedido con número y estado.")
+    r = await zynex_motor.rpc("zc_api_pedidos_importar", {"p_org": org, "p_filas": filas, "p_fuente": "entrada_automatica"})
+    if not isinstance(r, dict) or not r.get("ok"):
+        raise HTTPException(409, "Activa tu espacio en Logística antes de enviar pedidos.")
+    return {"ok": True, "recibidos": len(lista), "guardados": int(r.get("guardados") or 0),
+            "descartados": len(lista) - len(filas)}
+
+
+@router.get("/entrada", dependencies=[Depends(require_api_key)],
+            summary="La dirección de entrada de ESTE cliente, para pegarla en su automatización.")
+async def entrada_url(request: Request):
+    import webhook_tokens
+    token = await webhook_tokens.token_for(get_org(request))
+    return {"url": f"{webhook_tokens.public_base(request)}/api/zcall/motor/operacion/entrada/{token}",
+            "metodo": "POST", "formato": "JSON: un pedido, una lista o {pedidos:[...]}. Mínimo: pedido y estado.",
+            "maximo_por_envio": ENTRADA_MAX, "nota": "Quien tenga esta dirección puede enviar pedidos a tu cuenta. No la compartas."}
 
 
 class PedirIn(BaseModel):
