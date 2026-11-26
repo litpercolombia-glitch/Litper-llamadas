@@ -1,0 +1,14 @@
+.zx-logo { --c: var(--estado, #19c8ff); display: inline-flex; align-items: center; gap: 10px; color: inherit; }
+.zx-hex { width: 28px; height: 31px; display: grid; place-items: center; background: var(--c); transition: background-color 500ms ease-out, transform 300ms ease-out;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%); }
+.zx-hex span { width: calc(100% - 3px); height: calc(100% - 3px); display: grid; place-items: center; clip-path: inherit; background: var(--zx-fondo, #04070c); color: var(--c);
+  font: 700 14px/1 "IBM Plex Mono", ui-monospace, monospace; transition: color 500ms ease-out; }
+html.matrix-day .zx-hex span { background: var(--zx-fondo, #e9f1f8); }
+.zx-palabra { position: relative; font: 700 15px/1 "IBM Plex Mono", ui-monospace, monospace; letter-spacing: .22em; transition: letter-spacing 300ms ease-out;
+  background: linear-gradient(100deg, currentColor 0 42%, var(--c) 50%, currentColor 58% 100%) 0 0 / 300% 100%; -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; animation: zx-barrido 6s ease-in-out infinite; }
+.zx-palabra b { font-weight: 700; -webkit-text-fill-color: var(--c); transition: -webkit-text-fill-color 500ms ease-out; text-shadow: 0 0 14px color-mix(in oklab, var(--c) 60%, transparent); }
+.zx-logo:hover .zx-palabra { letter-spacing: .3em; } .zx-logo:hover .zx-hex { transform: rotate(60deg); }
+.zx-logo-s .zx-hex { width: 22px; height: 25px; } .zx-logo-s .zx-hex span { font-size: 11px; } .zx-logo-s .zx-palabra { font-size: 13px; }
+@keyframes zx-barrido { 0%, 70% { background-position: 100% 0; } 100% { background-position: 0 0; } }
+@media (prefers-reduced-motion: reduce) { .zx-palabra { animation: none; } .zx-hex, .zx-palabra { transition: none; } }
