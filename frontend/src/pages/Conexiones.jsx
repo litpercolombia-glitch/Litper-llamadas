@@ -10,13 +10,15 @@ import NumbersPage    from "./Numbers";
 import McpConnectors  from "../components/McpConnectors";
 import ConectarClaude from "../components/ConectarClaude";
 
+// Orden pensado para alguien que entra por primera vez: primero lo que TODOS
+// conectan, después lo de voz, y al final lo avanzado (casi nadie lo necesita).
 const TABS = [
-  { key: "claude",       label: "Claude",       Icon: Sparkle,        desc: "Opera tu negocio desde tu propio Claude: Dropi, llamadas y resultados." },
-  { key: "conectores",   label: "Conectores",   Icon: PlugsConnected, desc: "Mensajería, telefonía, voz y tu sistema de pedidos o citas, con guía paso a paso." },
-  { key: "mcp",          label: "Conectores MCP", Icon: Plugs,        desc: "Dale herramientas nuevas al asistente conectando servidores MCP de confianza." },
-  { key: "credenciales", label: "Credenciales", Icon: Key,            desc: "Tus llaves, cifradas. Solo tu empresa las usa." },
-  { key: "voces",        label: "Voces",        Icon: Microphone,     desc: "La voz con la que hablan tus agentes." },
-  { key: "numeros",      label: "Números",      Icon: PhoneCall,      desc: "Los números desde los que llaman tus agentes." },
+  { key: "conectores",   label: "Tus conexiones",    Icon: PlugsConnected, desc: "Aquí conectas WhatsApp, la voz y tus pedidos. Cada tarjeta te dice qué hacer, paso a paso." },
+  { key: "claude",       label: "Asistentes de IA",  Icon: Sparkle,        desc: "Maneja tu negocio hablando con Claude, ChatGPT, Grok o Gemini. Se conecta con un enlace." },
+  { key: "voces",        label: "Voces",             Icon: Microphone,     desc: "Elige la voz con la que hablan tus agentes cuando llaman." },
+  { key: "numeros",      label: "Números",           Icon: PhoneCall,      desc: "Los números de teléfono desde los que llaman tus agentes." },
+  { key: "credenciales", label: "Todas las llaves",  Icon: Key,            avanzado: true, desc: "La lista completa de llaves guardadas. Lo normal es conectar desde «Tus conexiones»; entra aquí solo para revisar o borrar una." },
+  { key: "mcp",          label: "Herramientas extra", Icon: Plugs,         avanzado: true, desc: "Para usuarios avanzados: dale al asistente herramientas de otros sistemas." },
 ];
 
 export default function ConexionesPage() {
@@ -34,7 +36,7 @@ export default function ConexionesPage() {
   return (
     <Layout title="Conexiones" subtitle={current.desc}>
       <div className="flex flex-wrap gap-1 border-b border-zinc-800 mb-6" data-testid="conexiones-tabs">
-        {TABS.map(({ key, label, Icon }) => (
+        {TABS.map(({ key, label, Icon, avanzado }) => (
           <button key={key} onClick={() => switchTab(key)}
             data-testid={`conexiones-tab-${key}`}
             className={`px-4 py-2.5 text-sm font-medium flex items-center gap-2 border-b-2 -mb-px transition ${
@@ -43,6 +45,7 @@ export default function ConexionesPage() {
                 : "text-zinc-400 border-transparent hover:text-white hover:border-zinc-600"
             }`}>
             <Icon size={16} weight="duotone" /> {label}
+            {avanzado && <span className="text-[10px] uppercase tracking-wide text-zinc-400 border border-zinc-700 rounded-sm px-1">Avanzado</span>}
           </button>
         ))}
       </div>

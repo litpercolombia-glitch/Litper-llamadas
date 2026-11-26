@@ -40,7 +40,7 @@ const PROVIDER_META = {
 };
 
 // Lo que casi todas las tiendas necesitan. Lo demás es opcional y queda plegado.
-const ESENCIALES = ["chatea_pro", "elevenlabs"];
+const ESENCIALES = ["chatea_pro", "openrouter", "elevenlabs"];
 
 export default function ConfigPage() {
   const [verOpcionales, setVerOpcionales] = useState(false);
@@ -74,7 +74,7 @@ export default function ConfigPage() {
     setBusy((b) => ({ ...b, [`save-${p}`]: true }));
     try {
       await api.put(`/config/credentials/${p}`, { values: drafts[p] || {} });
-      toast.success("Credenciales guardadas (encriptadas).");
+      toast.success("Llave guardada.");
       setDrafts((d) => { const c = { ...d }; delete c[p]; return c; });
       load();
     } catch (e) {
@@ -92,8 +92,9 @@ export default function ConfigPage() {
       const detailText = (typeof detail === "string")
         ? detail
         : (detail ? JSON.stringify(detail).slice(0, 160) : "");
-      if (r.data?.ok) toast.success(`${p}: ${detailText || "OK"}`);
-      else toast.error(`${p}: ${detailText || "falló"}`);
+      const nombre = (PROVIDER_META[p] || {}).label || p;
+      if (r.data?.ok) toast.success(`${nombre}: ${detailText || "conexión correcta"}`);
+      else toast.error(`${nombre}: ${detailText || "no conectó. Revisa la llave."}`);
     } catch (e) {
       toast.error(e.response?.data?.detail || "Error probando.");
     } finally {
@@ -102,7 +103,7 @@ export default function ConfigPage() {
   };
 
   const clearProvider = async (p) => {
-    if (!window.confirm(`¿Borrar credenciales de ${p}? Volverá al fallback .env.`)) return;
+    if (!window.confirm(`¿Borrar la llave de ${p}? Esa conexión dejará de funcionar hasta que pegues otra.`)) return;
     await api.delete(`/config/credentials/${p}`);
     load();
   };
@@ -110,14 +111,14 @@ export default function ConfigPage() {
   return (
     <Layout
       title="Credenciales"
-      subtitle="Cada organización guarda sus propias llaves — encriptadas en el servidor. NUNCA se muestran en el navegador."
+      subtitle="Todas tus llaves, cifradas. Solo tu empresa las usa."
     >
       <div className="mb-4 rounded-lg border border-emerald-500/25 bg-emerald-500/5 backdrop-blur-md p-3 text-xs text-emerald-200 flex gap-2 items-start"
         data-testid="config-security-note">
         <CheckCircle size={16} className="text-emerald-400 mt-0.5" weight="duotone" />
         <div>
-          <b>Encripción en reposo</b> con clave <code>ENCRYPTION_KEY</code>.
-          El frontend solo ve estados (conectado/no) y una pista corta enmascarada como <code>cp_t…3456</code>.
+          <b>Tus llaves se guardan cifradas.</b> Nadie las ve en pantalla: solo se muestra el final de cada una para que la reconozcas.
+          Lo normal es conectar desde la pestaña «Tus conexiones»; aquí está la lista completa por si necesitas revisar o borrar una.
         </div>
       </div>
 
@@ -140,11 +141,11 @@ export default function ConfigPage() {
                       p.origin === "org"   ? "text-emerald-300 border-emerald-500/40 bg-emerald-500/10 text-[10px]" :
                       p.origin === "env"   ? "text-blue-300 border-blue-500/40 bg-blue-500/10 text-[10px]" :
                                              "text-zinc-500 border-zinc-700 bg-zinc-800/50 text-[10px]"}>
-                      {p.origin === "org" ? "org (encriptado)" :
-                       p.origin === "env" ? "env fallback" : "sin configurar"}
+                      {p.origin === "org" ? "Guardada" :
+                       p.origin === "env" ? "Incluida en tu plan" : "Sin conectar"}
                     </Badge>
                   </div>
-                  {p.hint && <div className="text-[10px] font-mono text-zinc-500 mt-1">Hint: {p.hint}</div>}
+                  {p.hint && <div className="text-[10px] font-mono text-zinc-500 mt-1">Termina en {p.hint}</div>}
                   {meta.hint && <p className="text-[11px] text-zinc-400 mt-1">{meta.hint}</p>}
                 </div>
                 {meta.doc && (
@@ -219,7 +220,7 @@ export default function ConfigPage() {
 
       {providers.some((p) => !ESENCIALES.includes(p.provider) && p.origin !== "org") && (
         <div className="mt-4 text-sm text-zinc-300" data-testid="config-opcionales">
-          <p className="mb-2">Para empezar solo necesitas Chatea Pro y, si vas a llamar, ElevenLabs. Lo demás es opcional.</p>
+          <p className="mb-2">Para empezar necesitas Chatea Pro (WhatsApp) y OpenRouter (la inteligencia del asistente). Si vas a llamar, también ElevenLabs. Lo demás es opcional.</p>
           <Button size="sm" variant="outline" onClick={() => setVerOpcionales((v) => !v)} aria-expanded={verOpcionales}
                   className="border-zinc-700 bg-zinc-950 hover:bg-zinc-800 text-zinc-100">
             {verOpcionales ? "Ocultar conexiones opcionales" : "Ver conexiones opcionales (telefonía propia y otros modelos de IA)"}
