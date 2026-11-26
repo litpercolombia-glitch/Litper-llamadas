@@ -14,7 +14,7 @@ from deps import get_org, require_api_key
 from routes.zynex_motor import configurado, rpc
 
 router = APIRouter(prefix="/zcall/cerebro", tags=["zynex-cerebro"])
-PROCESOS = {"pendientes", "seguimiento", "novedades", "oficina", "cierre", "persona"}
+PROCESOS = {"pendientes", "seguimiento", "novedades", "oficina", "cierre", "postventa", "proveedores"}
 CANALES = {"llamada", "mensaje", "chat", "otro"}
 
 
@@ -51,6 +51,11 @@ async def control(request: Request):
         return {"conectado": False, "vinculado": False}
     d = await rpc("zc_api_control", {"p_org": get_org(request)}) or {}
     d["conectado"] = True
+    if d.get("vinculado"):
+        try:
+            d["extra"] = await rpc("zc_api_cb_extra", {"p_org": get_org(request)}) or {}
+        except HTTPException:
+            d["extra"] = {}
     return d
 
 

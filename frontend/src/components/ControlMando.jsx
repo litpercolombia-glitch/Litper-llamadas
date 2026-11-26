@@ -13,7 +13,7 @@ const caja = "border border-zinc-800 rounded-sm bg-zinc-900/40";
 const rotulo = "text-[10px] font-mono uppercase tracking-widest text-zinc-400";
 const cop = (v) => (v ? `$${Number(v).toLocaleString("es-CO")}` : "—");
 const fechaHora = (v) => (v ? new Date(v).toLocaleString("es-CO", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : "—");
-const NOMBRE = { pendientes: "Pendientes", seguimiento: "Seguimiento", novedades: "Novedades", oficina: "Reclamo en oficina", cierre: "Cierre", persona: "Para una persona" };
+const NOMBRE = { pendientes: "Pendientes", seguimiento: "Seguimiento", novedades: "Novedades", oficina: "Reclamo en oficina", cierre: "Cierre", persona: "Para una persona", postventa: "Postventa", proveedores: "Proveedores" };
 const CANAL = { "mensaje+llamada": "Mensaje y llamada", mensaje: "Mensaje", llamada: "Llamada", proveedor: "Proveedor", persona: "Persona", ninguno: "Sin acción" };
 const limpio = (t) => String(t || "").replace(/_/g, " ");
 
@@ -205,6 +205,18 @@ export default function ControlMando() {
                 <span>{p.registros_hoy} registros del cliente</span>
               </div>
             </button>))}
+          <button type="button" onClick={() => { setCola("postventa"); setPedido(null); }} aria-pressed={cola === "postventa"} data-testid="cm-proceso-postventa"
+                  className={`text-left p-4 rounded-sm border min-h-[120px] ${cola === "postventa" ? "border-fuchsia-400/70 bg-fuchsia-500/10" : "border-zinc-800 bg-zinc-900/40 hover:border-zinc-600"}`}>
+            <div className="text-xs text-zinc-200">Postventa</div>
+            <div className="text-3xl font-semibold text-white tabular-nums mt-1">{d.extra?.postventa_hoy ?? 0}</div>
+            <div className="text-[11px] text-zinc-400">clientes con un paso de postventa hoy (gracias, encuesta, guía, referidos, segunda compra)</div>
+          </button>
+          <button type="button" onClick={() => { setCola("proveedores"); setPedido(null); }} aria-pressed={cola === "proveedores"} data-testid="cm-proceso-proveedores"
+                  className={`text-left p-4 rounded-sm border min-h-[120px] ${cola === "proveedores" ? "border-fuchsia-400/70 bg-fuchsia-500/10" : "border-zinc-800 bg-zinc-900/40 hover:border-zinc-600"}`}>
+            <div className="text-xs text-zinc-200">Proveedores</div>
+            <div className="text-3xl font-semibold text-white tabular-nums mt-1">{d.extra?.proveedores_hoy ?? 0}</div>
+            <div className="text-[11px] text-zinc-400">pedidos para reclamarle al proveedor: sin despacho en 48 h o sin movimiento</div>
+          </button>
           <button type="button" onClick={() => { setCola("prompts"); setPedido(null); }} aria-pressed={cola === "prompts"} data-testid="cm-proceso-prompts"
                   className={`text-left p-4 rounded-sm border min-h-[120px] ${cola === "prompts" ? "border-fuchsia-400/70 bg-fuchsia-500/10" : "border-zinc-800 bg-zinc-900/40 hover:border-zinc-600"}`}>
             <div className="text-xs text-zinc-200">Instrucciones de los asistentes</div>
