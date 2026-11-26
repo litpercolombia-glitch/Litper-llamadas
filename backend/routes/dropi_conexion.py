@@ -16,9 +16,7 @@ un código de un solo uso que vence en 10 minutos. Ningún permiso sale del back
 from __future__ import annotations
 
 import base64
-import csv
 import hashlib
-import io
 import json
 import logging
 import os
@@ -44,7 +42,6 @@ REGISTRO = os.environ.get("DROPI_OAUTH_REGISTER", "https://mcp.dropi.co/oauth/re
 PERMISOS = os.environ.get("DROPI_SCOPES", "read:orders")     # solo lectura de pedidos
 PAGINA = 50
 MAX_PAGINAS = 10
-CABECERA = re.compile(r"^\s*\w+\[(\d+)\]\{([^}]*)\}:\s*$")
 
 
 def _now() -> datetime:
@@ -96,54 +93,7 @@ async def _cliente(redirect: str) -> str:
 
 
 # ------------------------------------------------------------------ lectura
-def pedidos_de_texto(texto: str) -> list[dict]:
-    """Lo que devuelve el conector → lista de pedidos. Entiende JSON y la tabla compacta
-    `items[N]{campo,campo}:` seguida de N filas separadas por comas."""
-    texto = (texto or "").strip()
-    if not texto:
-        return []
-    if texto[0] in "[{":
-        try:
-            return _lista_de_pedidos(json.loads(texto))
-        except ValueError:
-            pass
-    lineas = texto.splitlines()
-    for i, linea in enumerate(lineas):
-        m = CABECERA.match(linea)
-        if not m:
-            continue
-        campos = [c.strip() for c in m.group(2).split(",")]
-        filas = [x for x in lineas[i + 1:i + 1 + int(m.group(1))] if x.strip()]
-        out = []
-        for fila in csv.reader(io.StringIO("\n".join(x.strip() for x in filas)), skipinitialspace=True):
-            if len(fila) == len(campos):
-                out.append(dict(zip(campos, fila)))
-        return out
-    return []
-
-
-def _lista_de_pedidos(dato, nivel: int = 0) -> list[dict]:
-    """Primera lista de objetos que aparezca en la respuesta, esté al nivel que esté."""
-    if isinstance(dato, list):
-        objs = [o for o in dato if isinstance(o, dict)]
-        if objs or not dato:
-            return objs
-        return []
-    if isinstance(dato, dict) and nivel < 4:
-        for v in dato.values():
-            if isinstance(v, (list, dict)):
-                r = _lista_de_pedidos(v, nivel + 1)
-                if r:
-                    return r
-        if nivel == 0 and any(k in dato for k in ("order_id", "id", "pedido")):
-            return [dato]
-    return []
-
-
-def _forma(texto: str, truncado: bool) -> str:
-    """Cómo viene una respuesta que no se pudo leer: tamaño y comienzo, sin cifras ni datos de clientes."""
-    cab = re.sub(r"\d", "9", (texto or "")[:90]).replace("\n", "⏎")
-    return f"sin_leer largo={len(texto or '')} truncado={truncado} inicio={cab}"
+from routes.dropi_formato import forma as _forma, pedidos_de_texto  # noqa: E402,F401
 
 
 async def _guardar_tokens(org: str, tok: dict, client_id: str, anterior: dict | None = None) -> None:
