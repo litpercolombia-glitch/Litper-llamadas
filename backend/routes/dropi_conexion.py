@@ -160,52 +160,85 @@ async def _acceso(org: str, forzar: bool = False) -> str | None:
         return None
 
 
-async def sincronizar(org: str, dias: int = 2) -> dict:
-    """Lee los pedidos recientes del cliente en Dropi y los guarda en SU cuenta. Solo lectura."""
+BARRIDO_DIAS = 30       # hasta dónde se revisan cambios de estado de pedidos viejos
+
+
+async def _latido(org: str, ok: bool, detalle: str) -> None:
+    """Deja rastro de cada lectura (sin secretos) para poder ver si la conexión está sana."""
+    try:
+        from routes import zynex_motor
+        await zynex_motor.rpc("zc_api_latido", {"p_org": org, "p_fuente": "dropi_conector", "p_ok": ok, "p_detalle": detalle[:300]})
+    except Exception:  # noqa: BLE001 — el rastro nunca tumba la lectura
+        pass
+
+
+async def _leer_rango(org: str, acceso: str, desde: str, hasta: str) -> tuple[int, int, str]:
+    """Lee y guarda los pedidos creados entre dos fechas. Devuelve (leídos, guardados, permiso vigente)."""
     import mcp_client
     from routes import zynex_motor
     from routes.zynex_importar import fila_de_entrada
+    args = {"from": desde, "until": hasta, "result_number": PAGINA}
+    leidos = guardados = 0
+    for pagina in range(MAX_PAGINAS):
+        try:
+            r = await mcp_client.call_tool({"url": MCP_URL, "auth_type": "bearer", "secret": acceso},
+                                           "list_orders", {**args, "start": pagina * PAGINA})
+        except Exception as e:  # noqa: BLE001
+            if "401" not in str(e) or pagina:
+                raise
+            acceso = await _acceso(org, forzar=True)
+            if not acceso:
+                raise RuntimeError("reconectar")
+            r = await mcp_client.call_tool({"url": MCP_URL, "auth_type": "bearer", "secret": acceso},
+                                           "list_orders", {**args, "start": 0})
+        if r.get("is_error"):
+            raise RuntimeError("Dropi respondió con error: " + str(r.get("text") or "")[:120])
+        pedidos = pedidos_de_texto(r.get("text") or "")
+        leidos += len(pedidos)
+        filas = [f for f in (fila_de_entrada(o) for o in pedidos) if f]
+        if filas:
+            g = await zynex_motor.rpc("zc_api_pedidos_importar", {"p_org": org, "p_filas": filas, "p_fuente": "dropi_conector"})
+            if not isinstance(g, dict) or not g.get("ok"):
+                raise RuntimeError("espacio sin activar")
+            guardados += int(g.get("guardados") or 0)
+        if len(pedidos) < PAGINA:
+            break
+    return leidos, guardados, acceso
+
+
+async def sincronizar(org: str, dias: int = 2, barrer: bool = True) -> dict:
+    """Lee los pedidos recientes del cliente en Dropi y los guarda en SU cuenta. Solo lectura.
+    Además, en cada pasada relee UN día más antiguo (rotando hasta 30 días atrás): así los
+    cambios de estado de pedidos viejos (oficina, novedad, entregado) también llegan."""
+    import mcp_client
     db = get_db()
     acceso = await _acceso(org)
     if not acceso:
+        await _latido(org, False, "reconectar")
         return {"ok": False, "error": "reconectar"}
     hoy = (_now() - timedelta(hours=5)).date()          # día de Colombia
-    args = {"from": (hoy - timedelta(days=max(1, min(dias, 88)))).isoformat(),
-            "until": (hoy + timedelta(days=1)).isoformat(), "result_number": PAGINA}
+    dias = max(1, min(dias, 88))
     leidos = guardados = 0
-    error = ""
+    error, dia_barrido = "", None
     try:
-        for pagina in range(MAX_PAGINAS):
-            servidor = {"url": MCP_URL, "auth_type": "bearer", "secret": acceso}
-            try:
-                r = await mcp_client.call_tool(servidor, "list_orders", {**args, "start": pagina * PAGINA})
-            except Exception as e:  # noqa: BLE001
-                if "401" in str(e) and pagina == 0:
-                    acceso = await _acceso(org, forzar=True)
-                    if not acceso:
-                        return {"ok": False, "error": "reconectar"}
-                    r = await mcp_client.call_tool({"url": MCP_URL, "auth_type": "bearer", "secret": acceso},
-                                                   "list_orders", {**args, "start": 0})
-                else:
-                    raise
-            if r.get("is_error"):
-                raise RuntimeError("Dropi respondió con error")
-            pedidos = pedidos_de_texto(r.get("text") or "")
-            leidos += len(pedidos)
-            filas = [f for f in (fila_de_entrada(o) for o in pedidos) if f]
-            if filas:
-                g = await zynex_motor.rpc("zc_api_pedidos_importar", {"p_org": org, "p_filas": filas, "p_fuente": "dropi_conector"})
-                if not isinstance(g, dict) or not g.get("ok"):
-                    raise RuntimeError("espacio sin activar")
-                guardados += int(g.get("guardados") or 0)
-            if len(pedidos) < PAGINA:
-                break
+        leidos, guardados, acceso = await _leer_rango(org, acceso, (hoy - timedelta(days=dias)).isoformat(),
+                                                      (hoy + timedelta(days=1)).isoformat())
+        if barrer and dias < BARRIDO_DIAS:
+            doc = await db.dropi_conexiones.find_one({"org_id": org}, {"_id": 0, "barrido_dia": 1}) or {}
+            dia_barrido = int(doc.get("barrido_dia") or dias) + 1
+            if dia_barrido > BARRIDO_DIAS or dia_barrido <= dias:
+                dia_barrido = dias + 1
+            d = (hoy - timedelta(days=dia_barrido)).isoformat()
+            l2, g2, acceso = await _leer_rango(org, acceso, d, d)
+            leidos, guardados = leidos + l2, guardados + g2
     except Exception as e:  # noqa: BLE001
-        error = mcp_client.safe_error(e)[:200] if hasattr(mcp_client, "safe_error") else type(e).__name__
+        error = "reconectar" if str(e) == "reconectar" else (mcp_client.safe_error(e)[:200] or type(e).__name__)
         log.warning("Sincronización Dropi falló (org=%s): %s", org, error)
     await db.dropi_conexiones.update_one({"org_id": org}, {"$set": {
         "ultimo_intento": _now().isoformat(), "ultimo_error": error,
-        **({} if error else {"ultimo_sync": _now().isoformat(), "ultimo_leidos": leidos, "ultimo_guardados": guardados})}})
+        **({} if error else {"ultimo_sync": _now().isoformat(), "ultimo_leidos": leidos, "ultimo_guardados": guardados}),
+        **({"barrido_dia": dia_barrido} if dia_barrido and not error else {})}})
+    await _latido(org, not error, error or f"leidos={leidos} guardados={guardados} barrido_dia={dia_barrido}")
     return {"ok": not error, "leidos": leidos, "guardados": guardados, **({"error": error} if error else {})}
 
 
@@ -221,8 +254,10 @@ async def ciclo() -> int:
                 n += 1
             except Exception as e:  # noqa: BLE001
                 log.warning("ciclo Dropi (org=%s): %s", d.get("org_id"), type(e).__name__)
+                await _latido(d.get("org_id") or "", False, "ciclo: " + type(e).__name__)
     except Exception as e:  # noqa: BLE001
         log.warning("ciclo Dropi falló: %s", type(e).__name__)
+        await _latido("_sistema", False, "ciclo: " + type(e).__name__)
     return n
 
 
@@ -281,7 +316,7 @@ async def estado(request: Request):
 @router.post("/sincronizar", dependencies=[Depends(require_api_key)],
              summary="Lee ahora los pedidos recientes de Dropi de esta cuenta.")
 async def sincronizar_ahora(request: Request):
-    r = await sincronizar(get_org(request), dias=7)
+    r = await sincronizar(get_org(request), dias=7, barrer=False)
     if not r.get("ok") and r.get("error") == "reconectar":
         raise HTTPException(409, "Conecta Dropi de nuevo: el permiso venció o no existe.")
     return r
