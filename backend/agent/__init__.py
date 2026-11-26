@@ -15,3 +15,8 @@ _REGLAS_TRATO = """- Entiende el lenguaje de todos los días y los errores de te
 _ANCLA = "- Muestra números, fechas y montos literalmente"
 if _REGLAS_TRATO not in _loop.SYSTEM_PROMPT_TEMPLATE and _ANCLA in _loop.SYSTEM_PROMPT_TEMPLATE:
     _loop.SYSTEM_PROMPT_TEMPLATE = _loop.SYSTEM_PROMPT_TEMPLATE.replace(_ANCLA, _REGLAS_TRATO + _ANCLA, 1)
+
+# IA incluida con tope diario por cuenta (solo cuando usa la llave de la plataforma).
+from agent import tope_ia as _tope  # noqa: E402
+if not hasattr(_loop.llm_call, "__wrapped__"):
+    _loop.llm_call = _tope.envolver(_loop.llm_call)
