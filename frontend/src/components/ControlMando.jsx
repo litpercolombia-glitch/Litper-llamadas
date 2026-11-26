@@ -158,7 +158,7 @@ function Catalogo({ c, fuente, recargar }) {
   const [q, setQ] = useState("");
   const [ocupado, setOcupado] = useState(false);
   const actualizar = async () => { setOcupado(true);
-    try { const r = await api.post("/zcall/cerebro/catalogo/actualizar"); toast.success(r.data?.mensaje || "Listo."); await recargar(); }
+    try { const r = await api.post("/zcall/cerebro/catalogo/actualizar"); (r.data?.pendiente ? toast.info : toast.success)(r.data?.mensaje || "Listo."); await recargar(); }
     catch (e) { toast.error(errorText(e)); } finally { setOcupado(false); } };
   const lista = (c?.lista || []).filter((p) => !q || p.nombre.toLowerCase().includes(q.toLowerCase()));
   return (
@@ -192,7 +192,7 @@ function Tienda({ t, recargar }) {
   return (
     <div className={`${caja} p-5 space-y-3`} data-testid="cm-tienda">
       <div className={rotulo}>Datos de tu tienda · {(t?.campos || []).length - faltan.length} de {(t?.campos || []).length}{t?.fuente === "precargado" ? " · por revisar" : ""}</div>
-      <p className="text-[11px] text-zinc-400">Con esto se arman los guiones de tus asistentes; lo que no esté aquí no lo dicen. Al guardar, tus guiones armados se ponen al día. Sin los 7 datos no se puede crear un guion propio.{t?.fuente === "precargado" ? " Estos datos se precargaron: revísalos y corrige lo que no sea exacto." : ""}</p>
+      <p className="text-[11px] text-zinc-400">Con esto se arman los guiones de tus asistentes: los guiones armados llevan solo estos datos y se ponen al día cuando guardas. Sin los 7 datos no se puede crear un guion propio.{t?.fuente === "precargado" ? " Estos datos se precargaron: revísalos y corrige lo que no sea exacto." : ""}</p>
       {(t?.campos || []).map((c) => (
         <label key={c.k} className="text-xs text-zinc-300 block">{c.t}{faltan.includes(c.t) && <span className="text-amber-300"> · falta</span>}
           <textarea value={v[c.k] || ""} onChange={(e) => setV((x) => ({ ...x, [c.k]: e.target.value }))} maxLength={600} rows={2} data-testid={`cm-tienda-${c.k}`}
@@ -221,7 +221,7 @@ function Conocimiento() {
       {d?.base_zynex && <p className="text-sm text-zinc-300 border border-zinc-700 rounded-sm p-3">{d.base_zynex.aviso} ({d.base_zynex.notas} notas de método).</p>}
       <label className="text-xs text-zinc-300 block">Título
         <Input value={titulo} onChange={(e) => setTitulo(e.target.value)} maxLength={120} placeholder="Ej.: Promoción de diciembre" className="mt-1 h-11 rounded-sm bg-zinc-950 border-zinc-700" /></label>
-      <label className="text-xs text-zinc-300 block">Qué debe saber el asistente
+      <label className="text-xs text-zinc-300 block">Qué debe saber el asistente (se usará cuando los asistentes se conecten a esta base)
         <textarea value={contenido} onChange={(e) => setContenido(e.target.value)} maxLength={4000} rows={3} className="mt-1 w-full rounded-sm bg-zinc-950 border border-zinc-700 text-sm text-zinc-100 p-2" /></label>
       <Button onClick={guardar} disabled={g} className="h-11 rounded-sm text-xs">{g ? "Guardando…" : "Agregar nota"}</Button>
       {d === null ? <p className="text-sm text-zinc-400">Cargando…</p> : (d.tuyas || []).length === 0 ? <p className="text-sm text-zinc-400">Todavía no has agregado notas propias.</p> : (
