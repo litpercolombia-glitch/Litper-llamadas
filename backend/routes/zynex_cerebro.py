@@ -25,6 +25,10 @@ class DichoIn(BaseModel):
     ticket: bool = False
 
 
+class PromptIn(BaseModel):
+    contenido: str = Field(min_length=200, max_length=12000)
+
+
 class ResolverIn(BaseModel):
     nota: str = Field(min_length=2, max_length=500)
 
@@ -95,3 +99,22 @@ async def resolver(caso: int, p: ResolverIn, request: Request):
 @router.get("/reglas", dependencies=[Depends(require_api_key)])
 async def reglas(request: Request):
     return {"reglas": await rpc("zc_api_cb_reglas", {"p_org": get_org(request)}) or []}
+
+
+PROMPTS = {"maestro", "pedidos", "pendientes", "seguimiento", "novedades", "oficina"}
+
+
+@router.get("/prompts", dependencies=[Depends(require_api_key)])
+async def prompts(request: Request):
+    return {"prompts": await rpc("zc_api_cb_prompts", {"p_org": get_org(request)}) or []}
+
+
+@router.put("/prompts/{proceso}/{tipo}", dependencies=[Depends(require_api_key)])
+async def guardar_prompt(proceso: str, tipo: str, p: PromptIn, request: Request):
+    if proceso not in PROMPTS or tipo not in {"texto", "voz"}:
+        raise HTTPException(400, "Proceso o tipo inválido.")
+    r = await rpc("zc_api_cb_prompt_guardar", {"p_org": get_org(request), "p_proceso": proceso, "p_tipo": tipo,
+                                               "p_contenido": p.contenido.strip(), "p_autor": _autor(request)})
+    if not (r or {}).get("ok"):
+        raise HTTPException(400, "No se pudo guardar. Revisa que el texto tenga al menos 200 caracteres.")
+    return {"ok": True, "version": r.get("version")}

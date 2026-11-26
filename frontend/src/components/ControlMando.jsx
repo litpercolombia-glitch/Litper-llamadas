@@ -129,6 +129,47 @@ function Persona({ onAbrir, recargar }) {
   );
 }
 
+function Prompts() {
+  const [lista, setLista] = useState(null);
+  const [abierto, setAbierto] = useState(null);
+  const [texto, setTexto] = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const cargar = useCallback(() => api.get("/zcall/cerebro/prompts").then((r) => setLista(r.data.prompts || []))
+    .catch((e) => { toast.error(errorText(e)); setLista([]); }), []);
+  useEffect(() => { cargar(); }, [cargar]);
+  const abrir = (p) => { setAbierto(p); setTexto(p.contenido); };
+  const guardar = async () => {
+    if (texto.trim().length < 200) { toast.error("El texto debe tener al menos 200 caracteres."); return; }
+    setGuardando(true);
+    try { const r = await api.put(`/zcall/cerebro/prompts/${abierto.proceso}/${abierto.tipo}`, { contenido: texto });
+      toast.success(`Guardado como versión ${r.data.version}. La anterior quedó guardada.`); setAbierto(null); await cargar(); }
+    catch (e) { toast.error(errorText(e)); } finally { setGuardando(false); }
+  };
+  return (
+    <div className={`${caja} p-5 space-y-3`} data-testid="cm-prompts">
+      <div className={rotulo}>Instrucciones de los asistentes{lista ? ` · ${lista.length}` : ""}</div>
+      {lista === null ? <p className="text-sm text-zinc-400">Cargando…</p> : (
+        <div className="flex flex-wrap gap-2">{lista.map((p) => (
+          <button key={p.id} type="button" onClick={() => abrir(p)} aria-pressed={abierto?.id === p.id}
+                  className={`min-h-[44px] px-3 rounded-sm border text-sm text-left ${abierto?.id === p.id ? "border-fuchsia-400/70 bg-fuchsia-500/10 text-white" : "border-zinc-800 text-zinc-200 hover:bg-zinc-900"}`}>
+            {p.proceso === "maestro" ? "Cerebro central" : NOMBRE[p.proceso] || p.proceso} · {p.tipo === "voz" ? "Voz" : "Texto"}
+            <span className="block text-[11px] text-zinc-400">Versión {p.version}{p.propio ? " · tuya" : " · base"}{p.nota != null ? ` · nota ${p.nota}` : ""}</span>
+          </button>))}</div>)}
+      {abierto && (
+        <div className="space-y-2">
+          <label className="text-xs text-zinc-300 block">Texto de la instrucción
+            <textarea value={texto} onChange={(e) => setTexto(e.target.value)} maxLength={12000} rows={16} data-testid="cm-prompt-texto"
+                      className="mt-1 w-full rounded-sm bg-zinc-950 border border-zinc-700 text-sm text-zinc-100 p-3 font-mono leading-relaxed" /></label>
+          <div className="flex flex-wrap gap-2 items-center">
+            <Button onClick={guardar} disabled={guardando || texto === abierto.contenido} className="h-11 rounded-sm text-xs">{guardando ? "Guardando…" : "Guardar versión nueva"}</Button>
+            <Button variant="outline" onClick={() => setAbierto(null)} className="h-11 rounded-sm border-zinc-700 bg-zinc-950 hover:bg-zinc-800 text-xs">Cancelar</Button>
+            <span className="text-[11px] text-zinc-400">Al guardar se crea una versión tuya; la anterior no se borra.</span>
+          </div>
+        </div>)}
+    </div>
+  );
+}
+
 export default function ControlMando() {
   const [d, setD] = useState(null);
   const [cola, setCola] = useState(null);
@@ -164,6 +205,12 @@ export default function ControlMando() {
                 <span>{p.registros_hoy} registros del cliente</span>
               </div>
             </button>))}
+          <button type="button" onClick={() => { setCola("prompts"); setPedido(null); }} aria-pressed={cola === "prompts"} data-testid="cm-proceso-prompts"
+                  className={`text-left p-4 rounded-sm border min-h-[120px] ${cola === "prompts" ? "border-fuchsia-400/70 bg-fuchsia-500/10" : "border-zinc-800 bg-zinc-900/40 hover:border-zinc-600"}`}>
+            <div className="text-xs text-zinc-200">Instrucciones de los asistentes</div>
+            <div className="text-3xl font-semibold text-white tabular-nums mt-1">{d.reglas}</div>
+            <div className="text-[11px] text-zinc-400">reglas activas · toca para ver y editar lo que dice cada asistente</div>
+          </button>
           <button type="button" onClick={() => { setCola("persona"); setPedido(null); }} aria-pressed={cola === "persona"} data-testid="cm-proceso-persona"
                   className={`text-left p-4 rounded-sm border min-h-[120px] ${cola === "persona" ? "border-amber-300/70 bg-amber-500/10" : "border-zinc-800 bg-zinc-900/40 hover:border-zinc-600"}`}>
             <div className="text-xs text-zinc-200">Para una persona</div>
@@ -177,7 +224,7 @@ export default function ControlMando() {
           <div className={rotulo}>Reglas que faltan</div>
           <p className="mt-1">Estos estados no tienen regla y pasaron a una persona: {d.sin_regla.map((s) => `${s.estado} (${s.n})`).join(", ")}.</p>
         </div>)}
-      {cola === "persona" ? <Persona onAbrir={setPedido} recargar={cargar} /> : cola ? <Cola proceso={cola} onAbrir={setPedido} /> : null}
+      {cola === "prompts" ? <Prompts /> : cola === "persona" ? <Persona onAbrir={setPedido} recargar={cargar} /> : cola ? <Cola proceso={cola} onAbrir={setPedido} /> : null}
       {pedido && <Linea pedido={pedido} onCerrar={() => setPedido(null)} />}
     </div>
   );
