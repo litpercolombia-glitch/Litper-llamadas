@@ -164,7 +164,7 @@ function Catalogo({ c, fuente, recargar }) {
   return (
     <div className={`${caja} p-5`} data-testid="cm-catalogo">
       <div className={`${rotulo} mb-1`}>Catálogo · {c?.productos || 0} productos · {c?.activos || 0} activos</div>
-      <p className="text-[11px] text-zinc-400 mb-3">Se copia de {c?.fuente || "tu bot de ventas"}; aquí no se cambian precios. Última copia: {fechaHora(c?.actualizado)}. Con esto responden Lyan y los agentes cuando el cliente pregunta por producto o precio.</p>
+      <p className="text-[11px] text-zinc-400 mb-3">Se copia de {c?.fuente || "tu bot de ventas"}; aquí no se cambian precios. Última copia: {fechaHora(c?.actualizado)}. Queda guardado para que los asistentes respondan producto y precio cuando se conecten a este catálogo.</p>
       <div className="flex flex-wrap gap-2 mb-3">
         <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar producto" aria-label="Buscar producto" className="h-11 rounded-sm bg-zinc-950 border-zinc-700 flex-1 basis-56" />
         <Button variant="outline" onClick={actualizar} disabled={ocupado} data-testid="cm-catalogo-actualizar" className="h-11 rounded-sm border-zinc-700 bg-zinc-950 hover:bg-zinc-800 text-xs">{ocupado ? "Actualizando…" : "Actualizar ahora"}</Button>
@@ -186,12 +186,12 @@ function Tienda({ t, recargar }) {
   const [g, setG] = useState(false);
   useEffect(() => { setV(t?.datos || {}); }, [t]);
   const guardar = async () => { setG(true);
-    try { const r = await api.put("/zcall/cerebro/tienda", { datos: v }); toast.success(r.data?.completo ? "Datos de la tienda completos." : `Guardado. Faltan: ${(r.data?.faltan || []).join(", ")}`); await recargar(); }
+    try { const r = await api.put("/zcall/cerebro/tienda", { datos: v }); toast.success(r.data?.por_revisar ? "Guardado. Para darlos por revisados completa los 7 datos." : r.data?.completo ? "Datos de la tienda completos." : `Guardado. Faltan: ${(r.data?.faltan || []).join(", ")}`); await recargar(); }
     catch (e) { toast.error(errorText(e)); } finally { setG(false); } };
   const faltan = t?.faltan || [];
   return (
     <div className={`${caja} p-5 space-y-3`} data-testid="cm-tienda">
-      <div className={rotulo}>Datos de tu tienda · {(t?.campos || []).length - faltan.length} de {(t?.campos || []).length}</div>
+      <div className={rotulo}>Datos de tu tienda · {(t?.campos || []).length - faltan.length} de {(t?.campos || []).length}{t?.fuente === "precargado" ? " · por revisar" : ""}</div>
       <p className="text-[11px] text-zinc-400">Con esto se arman los guiones de tus asistentes; lo que no esté aquí no lo dicen. Al guardar, tus guiones armados se ponen al día. Sin los 7 datos no se puede crear un guion propio.{t?.fuente === "precargado" ? " Estos datos se precargaron: revísalos y corrige lo que no sea exacto." : ""}</p>
       {(t?.campos || []).map((c) => (
         <label key={c.k} className="text-xs text-zinc-300 block">{c.t}{faltan.includes(c.t) && <span className="text-amber-300"> · falta</span>}
@@ -214,7 +214,7 @@ function Conocimiento() {
     setG(true);
     try { await api.post("/zcall/cerebro/conocimiento", { titulo, contenido }); toast.success("Nota guardada."); setTitulo(""); setContenido(""); await cargar(); }
     catch (e) { toast.error(errorText(e)); } finally { setG(false); } };
-  const quitar = async (n) => { try { const r = await api.delete(`/zcall/cerebro/conocimiento/${n.id}`); setD(r.data); toast.success("Nota quitada. Los asistentes ya no la usan."); } catch (e) { toast.error(errorText(e)); } };
+  const quitar = async (n) => { if (!window.confirm(`¿Quitar la nota «${n.titulo}»?`)) return; try { const r = await api.delete(`/zcall/cerebro/conocimiento/${n.id}`); setD(r.data); toast.success("Nota quitada."); } catch (e) { toast.error(errorText(e)); } };
   return (
     <div className={`${caja} p-5 space-y-3`} data-testid="cm-conocimiento">
       <div className={rotulo}>Base de conocimiento{d ? ` · ${(d.tuyas || []).length} notas tuyas` : ""}</div>
@@ -449,7 +449,7 @@ export default function ControlMando() {
                   className={`text-left p-4 rounded-sm border min-h-[120px] ${cola === "tienda" ? "border-fuchsia-400/70 bg-fuchsia-500/10" : "border-zinc-800 bg-zinc-900/40 hover:border-zinc-600"}`}>
             <div className="text-xs text-zinc-200">Datos de tu tienda</div>
             <div className="text-3xl font-semibold text-white tabular-nums mt-1">{(d.extra?.tienda?.campos || []).length - (d.extra?.tienda?.faltan || []).length} de {(d.extra?.tienda?.campos || []).length}</div>
-            <div className="text-[11px] text-zinc-400">envío, garantía, cambios, pagos y soporte: la base de tus guiones</div>
+            <div className="text-[11px] text-zinc-400">{d.extra?.tienda?.fuente === "precargado" ? "precargados: revísalos y guárdalos una vez" : "envío, garantía, cambios, pagos y soporte: la base de tus guiones"}</div>
           </button>
           <button type="button" onClick={() => { setCola("conocimiento"); setPedido(null); }} aria-pressed={cola === "conocimiento"} data-testid="cm-proceso-conocimiento"
                   className={`text-left p-4 rounded-sm border min-h-[120px] ${cola === "conocimiento" ? "border-fuchsia-400/70 bg-fuchsia-500/10" : "border-zinc-800 bg-zinc-900/40 hover:border-zinc-600"}`}>
