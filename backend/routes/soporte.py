@@ -233,3 +233,8 @@ async def entrar(payload: EntrarIn, request: Request, response: Response):
                         max_age=max(60, int((vence - ahora).total_seconds())), path="/")
     await _anotar(payload.org_id, "soporte_entro", str(s.get("email")), f"sesión hasta {_iso(vence)}")
     return {"ok": True, "hasta": _iso(vence)}
+
+
+# Recuperar contraseña: /zcall/motor/operacion/soporte/clave/...
+from routes.recuperar import router as _clave_router  # noqa: E402
+router.include_router(_clave_router)
