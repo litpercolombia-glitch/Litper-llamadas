@@ -11,6 +11,7 @@ import InicioRapido from "./InicioRapido";
 import LyanDock from "./LyanDock";
 import ConectarDropi from "./ConectarDropi";
 import DatosTienda from "./DatosTienda";
+import MiPlan from "./MiPlan";
 import { helpForRoute } from "../constants/help";
 import "../dia.css";
 
@@ -71,6 +72,7 @@ export default function Layout({ children, title, subtitle, actions, helpKey }) 
           {["/app/logistica", "/app/clientes"].includes(location.pathname) && <InicioRapido />}
           {location.pathname === "/app/logistica" && <ConectarDropi />}
           {location.pathname === "/app/ajustes" && <DatosTienda />}
+          {location.pathname === "/app/ajustes" && <MiPlan />}
           {children}
         </main>
       </div>
