@@ -56,6 +56,10 @@ async def control(request: Request):
             d["extra"] = await rpc("zc_api_cb_extra", {"p_org": get_org(request)}) or {}
         except HTTPException:
             d["extra"] = {}
+        try:
+            d["extra"].update(await rpc("zc_api_cb_extra2", {"p_org": get_org(request)}) or {})
+        except HTTPException:
+            pass
     return d
 
 
@@ -109,7 +113,7 @@ async def reglas(request: Request):
     return {"reglas": await rpc("zc_api_cb_reglas", {"p_org": get_org(request)}) or []}
 
 
-PROMPTS = {"maestro", "pedidos", "pendientes", "seguimiento", "novedades", "oficina"}
+PROMPTS = {"maestro", "pedidos", "pendientes", "seguimiento", "novedades", "oficina", "postventa"}
 
 
 @router.get("/prompts", dependencies=[Depends(require_api_key)])
@@ -124,5 +128,87 @@ async def guardar_prompt(proceso: str, tipo: str, p: PromptIn, request: Request)
     r = await rpc("zc_api_cb_prompt_guardar", {"p_org": get_org(request), "p_proceso": proceso, "p_tipo": tipo,
                                                "p_contenido": p.contenido.strip(), "p_autor": _autor(request)})
     if not (r or {}).get("ok"):
-        raise HTTPException(400, "No se pudo guardar. Revisa que el texto tenga al menos 200 caracteres.")
+        raise HTTPException(400, (r or {}).get("error") or "No se pudo guardar. Revisa que el texto tenga al menos 200 caracteres.")
     return {"ok": True, "version": r.get("version")}
+
+
+# ---------------------------------------------------------------- tienda, catálogo, conocimiento y guiones
+GUIONES = {"pedidos", "pendientes", "seguimiento", "novedades", "oficina", "postventa"}
+
+
+class TiendaIn(BaseModel):
+    datos: dict[str, str] = Field(default_factory=dict)
+
+
+class NotaIn(BaseModel):
+    titulo: str = Field(min_length=3, max_length=120)
+    contenido: str = Field(min_length=10, max_length=4000)
+    proceso: str = Field(default="general", max_length=30)
+
+
+class GuionIn(BaseModel):
+    texto: str = Field(min_length=40, max_length=3000)
+
+
+def _ok(r, defecto: str) -> dict:
+    r = r if isinstance(r, dict) else {}
+    if not r.get("ok"):
+        raise HTTPException(400, r.get("error") or defecto)
+    return r
+
+
+@router.get("/tienda", dependencies=[Depends(require_api_key)])
+async def tienda(request: Request):
+    return _ok(await rpc("zc_api_cb_tienda", {"p_org": get_org(request)}), "No se pudo leer los datos de la tienda.")
+
+
+@router.put("/tienda", dependencies=[Depends(require_api_key)])
+async def tienda_guardar(p: TiendaIn, request: Request):
+    if len(p.datos) > 12:
+        raise HTTPException(400, "Demasiados campos.")
+    return _ok(await rpc("zc_api_cb_tienda", {"p_org": get_org(request), "p_datos": p.datos, "p_autor": _autor(request)}),
+               "No se pudieron guardar los datos de la tienda.")
+
+
+@router.post("/catalogo/actualizar", dependencies=[Depends(require_api_key)])
+async def catalogo_actualizar(request: Request):
+    return _ok(await rpc("zc_api_cb_catalogo_actualizar", {"p_org": get_org(request)}), "No se pudo actualizar el catálogo.")
+
+
+@router.get("/conocimiento", dependencies=[Depends(require_api_key)])
+async def conocimiento(request: Request):
+    return _ok(await rpc("zc_api_cb_conocimiento", {"p_org": get_org(request)}), "No se pudo leer la base de conocimiento.")
+
+
+@router.post("/conocimiento", dependencies=[Depends(require_api_key)])
+async def conocimiento_agregar(p: NotaIn, request: Request):
+    return _ok(await rpc("zc_api_cb_conocimiento", {"p_org": get_org(request), "p_titulo": p.titulo.strip(),
+                                                    "p_contenido": p.contenido.strip(), "p_proceso": p.proceso.strip() or "general",
+                                                    "p_autor": _autor(request)}), "No se pudo guardar la nota.")
+
+
+@router.post("/guion/{proceso}/{tipo}", dependencies=[Depends(require_api_key)])
+async def guion_armar(proceso: str, tipo: str, p: GuionIn, request: Request):
+    if proceso not in GUIONES or tipo not in {"texto", "voz"}:
+        raise HTTPException(400, "Proceso o tipo inválido.")
+    r = _ok(await rpc("zc_api_cb_guion_armar", {"p_org": get_org(request), "p_proceso": proceso, "p_tipo": tipo,
+                                                "p_texto": p.texto.strip(), "p_autor": _autor(request)}),
+            "No se pudo armar el guion.")
+    return {"ok": True, "version": r.get("version"), "vista_previa": r.get("vista_previa")}
+
+
+# ---------------------------------------------------------------- lote de prueba (no envía nada)
+@router.get("/lote", dependencies=[Depends(require_api_key)])
+async def lote(request: Request):
+    return _ok(await rpc("zc_api_cb_lote", {"p_org": get_org(request)}), "No se pudo leer el lote de prueba.")
+
+
+@router.post("/lote/armar", dependencies=[Depends(require_api_key)])
+async def lote_armar(request: Request):
+    return _ok(await rpc("zc_api_cb_lote", {"p_org": get_org(request), "p_armar": True, "p_max": 20}),
+               "No se pudo armar el lote de prueba.")
+
+
+@router.delete("/conocimiento/{nota_id}", dependencies=[Depends(require_api_key)])
+async def conocimiento_quitar(nota_id: int, request: Request):
+    return _ok(await rpc("zc_api_cb_conocimiento_quitar", {"p_org": get_org(request), "p_id": nota_id}), "No se pudo quitar la nota.")
