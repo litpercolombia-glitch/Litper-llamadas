@@ -3,10 +3,11 @@ equipo responde, y el cliente puede dar permiso TEMPORAL para que soporte entre
 a su cuenta.
 
 Reglas de seguridad:
-  · El equipo de soporte está APAGADO por defecto. Solo existe si están las dos
-    variables: SUPPORT_STAFF_EMAILS (correos, separados por coma) y
-    SUPPORT_STAFF_ORG (la cuenta interna de Zynex). Hacen falta LAS DOS: un
-    correo de la lista registrado en otra cuenta no sirve.
+  · El equipo de soporte está APAGADO por defecto. Se enciende de dos formas:
+    (a) variables SUPPORT_STAFF_EMAILS y SUPPORT_STAFF_ORG (hacen falta LAS DOS:
+    un correo de la lista registrado en otra cuenta no sirve), o (b) una fila en
+    la tabla zc_soporte_equipo de la base: la cuenta interna y, si se quiere,
+    solo ciertos correos. Si la base no responde, nadie es del equipo.
   · Nadie entra a una cuenta sin permiso vigente dado por el cliente. El permiso
     vence solo (1, 24 o 72 horas) y el cliente lo puede quitar cuando quiera.
   · La sesión de soporte dura 30 minutos como máximo, nunca más que el permiso,
@@ -43,17 +44,42 @@ async def _sesion(request: Request) -> dict:
     return s
 
 
-def _es_equipo(s: dict) -> bool:
+_EQUIPO_CACHE: dict[tuple[str, str], tuple[float, bool]] = {}
+EQUIPO_CACHE_S = 60
+
+
+async def _equipo_en_base(org: str, correo: str) -> bool:
+    """La lista del equipo también vive en la base (tabla zc_soporte_equipo), para encenderlo sin tocar el servidor.
+    Si la base no responde, la respuesta es NO: ante la duda nadie es del equipo."""
+    import time
+    clave, ahora = (org, correo), time.monotonic()
+    visto = _EQUIPO_CACHE.get(clave)
+    if visto and ahora - visto[0] < EQUIPO_CACHE_S:
+        return visto[1]
+    try:
+        from routes import zynex_motor
+        r = await zynex_motor.rpc("zc_api_soporte_equipo", {"p_org": org, "p_correo": correo})
+        si = bool(isinstance(r, dict) and r.get("es_equipo") is True)
+    except Exception:  # noqa: BLE001
+        si = False
+    _EQUIPO_CACHE[clave] = (ahora, si)
+    return si
+
+
+async def _es_equipo(s: dict) -> bool:
+    if s.get("soporte") or not s.get("org"):
+        return False
+    correo, org = str(s.get("email", "")).lower(), str(s.get("org"))
     correos = {c.strip().lower() for c in os.environ.get("SUPPORT_STAFF_EMAILS", "").split(",") if c.strip()}
     cuenta = os.environ.get("SUPPORT_STAFF_ORG", "").strip()
-    if not correos or not cuenta or s.get("soporte"):
-        return False
-    return str(s.get("email", "")).lower() in correos and str(s.get("org")) == cuenta
+    if correos and cuenta and correo in correos and org == cuenta:
+        return True
+    return await _equipo_en_base(org, correo)
 
 
 async def _equipo(request: Request) -> dict:
     s = await _sesion(request)
-    if not _es_equipo(s):
+    if not await _es_equipo(s):
         raise HTTPException(404, "No encontrado.")
     return s
 
@@ -104,7 +130,7 @@ async def mis_mensajes(request: Request, marcar: bool = True):
     return {"mensajes": [_limpio(m) for m in ms],
             "sin_leer": sum(1 for m in ms if m.get("de") == "equipo" and not m.get("visto")),
             "permiso": {"activo": bool(p), "hasta": p["hasta"] if p else None},
-            "es_equipo": _es_equipo(s), "sesion_soporte": bool(s.get("soporte"))}
+            "es_equipo": await _es_equipo(s), "sesion_soporte": bool(s.get("soporte"))}
 
 
 @router.post("/mensajes", summary="El cliente le escribe a soporte.")

@@ -27,6 +27,10 @@ def test_soporte_pregunta_respuesta_permiso_y_entrada(monkeypatch):
     from routes import soporte as sp, auth
     db = FakeDB()
     monkeypatch.setattr(sp, "get_db", lambda: db)
+    base = {"encendida": set()}
+
+    async def en_base(org, correo): return org in base["encendida"]
+    monkeypatch.setattr(sp, "_equipo_en_base", en_base)
     cli = Req(auth._issue_token("u1", "A", "dueno@a.co"))
     otro = Req(auth._issue_token("u2", "B", "dueno@b.co"))
     eq = Req(auth._issue_token("u9", "ZX", "ayuda@zynex.co"))
@@ -41,6 +45,10 @@ def test_soporte_pregunta_respuesta_permiso_y_entrada(monkeypatch):
     assert e.value.status_code == 404
     monkeypatch.setenv("SUPPORT_STAFF_EMAILS", "ayuda@zynex.co"); monkeypatch.setenv("SUPPORT_STAFF_ORG", "ZX")
     with pytest.raises(HTTPException): run(sp.bandeja(cli))
+    with pytest.raises(HTTPException): run(sp.bandeja(falso))
+    base["encendida"] = {"B"}                                            # encendido desde la base: vale para esa cuenta y solo esa
+    assert run(sp.bandeja(falso))["cuentas"][0]["org_id"] == "A"
+    base["encendida"] = set()
     with pytest.raises(HTTPException): run(sp.bandeja(falso))
     b = run(sp.bandeja(eq))["cuentas"]
     assert [(c["org_id"], c["pendientes"], c["permiso"]) for c in b] == [("A", 1, False)]
