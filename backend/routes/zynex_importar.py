@@ -129,7 +129,7 @@ _ALIAS = {
     "ciudad": ("ciudad", "city", "ciudad_destino"),
     "valor": ("valor", "total_order", "total", "total_amount", "valor_total"),
     "transportadora": ("transportadora", "carrier", "shipping_company", "distribution_company", "transportadora_nombre"),
-    "guia": ("guia", "shipping_guide", "tracking_number", "numero_guia", "tracking"),
+    "guia": ("guia", "shipping_guide", "tracking_number", "tracking_code", "numero_guia", "tracking"),
     "creado": ("creado", "created_at", "fecha", "order_date", "fecha_creacion"),
 }
 _USADOS = {a for lista in _ALIAS.values() for a in lista}
@@ -255,3 +255,8 @@ async def terminar(sid: int, request: Request):
 async def solicitudes(request: Request):
     r = await zynex_motor.rpc("zc_api_solicitudes", {"p_org": get_org(request), "p_generar": False})
     return {"solicitudes": (r or {}).get("solicitudes") or []}
+
+
+# Conexión directa con Dropi (inicio de sesión del cliente, solo lectura): /zcall/motor/operacion/dropi/...
+from routes.dropi_conexion import router as _dropi_router  # noqa: E402
+router.include_router(_dropi_router)
