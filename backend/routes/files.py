@@ -108,6 +108,84 @@ async def upload(file: UploadFile = File(...),
     return doc
 
 
+MAX_AUDIO = 25 * 1024 * 1024
+SIN_VOZ = ("Para dictar o subir audios conecta ElevenLabs en Conexiones (la misma llave de los agentes de voz). "
+           "También sirve una llave de Groq o de Gemini.")
+
+
+async def _oir_elevenlabs(key: str, nombre: str, mime: str, data: bytes) -> str:
+    import os
+    import httpx
+    async with httpx.AsyncClient(timeout=120) as cli:
+        r = await cli.post("https://api.elevenlabs.io/v1/speech-to-text", headers={"xi-api-key": key},
+                           data={"model_id": os.environ.get("ELEVENLABS_STT_MODEL", "scribe_v1")},
+                           files={"file": (nombre, data, mime)})
+    r.raise_for_status()
+    return (r.json().get("text") or "").strip()
+
+
+async def _oir_groq(key: str, nombre: str, mime: str, data: bytes) -> str:
+    import os
+    import httpx
+    async with httpx.AsyncClient(timeout=120) as cli:
+        r = await cli.post("https://api.groq.com/openai/v1/audio/transcriptions",
+                           headers={"Authorization": f"Bearer {key}"},
+                           data={"model": os.environ.get("GROQ_STT_MODEL", "whisper-large-v3")},
+                           files={"file": (nombre, data, mime)})
+    r.raise_for_status()
+    return (r.json().get("text") or "").strip()
+
+
+async def _oir_gemini(key: str, nombre: str, mime: str, data: bytes) -> str:
+    import base64
+    import httpx
+    from agent.router import PROVIDERS
+    async with httpx.AsyncClient(timeout=120) as cli:
+        r = await cli.post(
+            f"https://generativelanguage.googleapis.com/v1beta/models/{PROVIDERS['gemini']['model']}:generateContent",
+            headers={"x-goog-api-key": key, "Content-Type": "application/json"},
+            json={"contents": [{"role": "user", "parts": [
+                {"text": "Transcribe literalmente este audio en su idioma original. Devuelve solo el texto."},
+                {"inline_data": {"mime_type": mime, "data": base64.b64encode(data).decode()}}]}]})
+    r.raise_for_status()
+    return (r.json()["candidates"][0]["content"]["parts"][0]["text"] or "").strip()
+
+
+@router.post("/transcribir",
+             summary="Pasa a texto un audio o video (dictado o archivo) con la llave de voz de ESTE cliente. "
+                     "No guarda el audio.")
+async def transcribir(file: UploadFile = File(...), org: str = Depends(get_org)):
+    data = await file.read()
+    mime = (file.content_type or "").split(";")[0].strip() or "audio/webm"
+    if not mime.startswith(("audio/", "video/")):
+        raise HTTPException(400, "Sube un audio o un video.")
+    if not data:
+        raise HTTPException(400, "El audio llegó vacío. Graba de nuevo.")
+    if len(data) > MAX_AUDIO:
+        raise HTTPException(413, "El audio pesa más de 25 MB. Córtalo en partes más cortas.")
+    from agent.router import _safe_err
+    from org_credentials import get_credentials
+    intentado = False
+    for proveedor, fn in (("elevenlabs", _oir_elevenlabs), ("groq", _oir_groq), ("gemini", _oir_gemini)):
+        try:
+            key = (await get_credentials(proveedor, org)).get("api_key", "")
+        except Exception:  # noqa: BLE001
+            key = ""
+        if not key:
+            continue
+        intentado = True
+        try:
+            texto = await fn(key, file.filename or "audio.webm", mime, data)
+            if texto:
+                return {"texto": texto[:8000], "proveedor": proveedor}
+        except Exception as e:  # noqa: BLE001 — sin secretos en el log
+            import logging
+            logging.getLogger("files").warning("Transcripción %s falló (org=%s): %s", proveedor, org, _safe_err(e, [key]))
+    if not intentado:
+        raise HTTPException(409, SIN_VOZ)
+    raise HTTPException(502, "No pude entender el audio. Inténtalo de nuevo o escríbelo.")
+
+
 @router.get("", response_model=List[UploadedFile],
             summary="List uploaded files.")
 async def list_files(thread_id: Optional[str] = None, limit: int = 50,
