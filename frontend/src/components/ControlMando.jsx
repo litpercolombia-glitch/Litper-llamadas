@@ -171,8 +171,8 @@ function Catalogo({ c, fuente, recargar }) {
       </div>
       <p className="text-[11px] text-zinc-400 mb-3">Se actualiza solo una vez al día.{fuente?.ultimo_ok ? ` Última actualización desde Chatea: ${fechaHora(fuente.ultimo_ok)}.` : ""}{fuente?.error ? ` ${fuente.error}.` : ""}</p>
       {lista.length === 0 ? <p className="text-sm text-zinc-400">No hay productos que mostrar.</p> : (
-        <ul className="divide-y divide-zinc-800">{lista.map((p) => (
-          <li key={`${p.nombre}-${p.id_dropi}`} className="py-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+        <ul className="divide-y divide-zinc-800">{lista.map((p, i) => (
+          <li key={`${p.nombre}-${p.id_dropi}-${i}`} className="py-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
             <span className="text-zinc-100 flex-1 basis-56">{p.nombre}</span><span className="tabular-nums text-white">{cop(p.precio)}</span>
             <span className={`text-[11px] ${p.estado === "activo" ? "text-green-400" : "text-zinc-500"}`}>{p.estado}</span>
             <span className="text-[11px] text-zinc-400">{p.id_dropi ? `Dropi ${p.id_dropi}` : "sin ID de Dropi"}{p.complementos ? ` · ${p.complementos} complementos` : ""}</span>
@@ -192,7 +192,7 @@ function Tienda({ t, recargar }) {
   return (
     <div className={`${caja} p-5 space-y-3`} data-testid="cm-tienda">
       <div className={rotulo}>Datos de tu tienda · {(t?.campos || []).length - faltan.length} de {(t?.campos || []).length}</div>
-      <p className="text-[11px] text-zinc-400">Con esto responden Lyan y los agentes; lo que no esté aquí no lo dicen. Sin los 7 datos no se puede crear un guion propio.{t?.fuente === "precargado" ? " Estos datos se precargaron: revísalos y corrige lo que no sea exacto." : ""}</p>
+      <p className="text-[11px] text-zinc-400">Con esto se arman los guiones de tus asistentes; lo que no esté aquí no lo dicen. Al guardar, tus guiones armados se ponen al día. Sin los 7 datos no se puede crear un guion propio.{t?.fuente === "precargado" ? " Estos datos se precargaron: revísalos y corrige lo que no sea exacto." : ""}</p>
       {(t?.campos || []).map((c) => (
         <label key={c.k} className="text-xs text-zinc-300 block">{c.t}{faltan.includes(c.t) && <span className="text-amber-300"> · falta</span>}
           <textarea value={v[c.k] || ""} onChange={(e) => setV((x) => ({ ...x, [c.k]: e.target.value }))} maxLength={600} rows={2} data-testid={`cm-tienda-${c.k}`}
@@ -214,6 +214,7 @@ function Conocimiento() {
     setG(true);
     try { await api.post("/zcall/cerebro/conocimiento", { titulo, contenido }); toast.success("Nota guardada."); setTitulo(""); setContenido(""); await cargar(); }
     catch (e) { toast.error(errorText(e)); } finally { setG(false); } };
+  const quitar = async (n) => { try { const r = await api.delete(`/zcall/cerebro/conocimiento/${n.id}`); setD(r.data); toast.success("Nota quitada. Los asistentes ya no la usan."); } catch (e) { toast.error(errorText(e)); } };
   return (
     <div className={`${caja} p-5 space-y-3`} data-testid="cm-conocimiento">
       <div className={rotulo}>Base de conocimiento{d ? ` · ${(d.tuyas || []).length} notas tuyas` : ""}</div>
@@ -224,7 +225,8 @@ function Conocimiento() {
         <textarea value={contenido} onChange={(e) => setContenido(e.target.value)} maxLength={4000} rows={3} className="mt-1 w-full rounded-sm bg-zinc-950 border border-zinc-700 text-sm text-zinc-100 p-2" /></label>
       <Button onClick={guardar} disabled={g} className="h-11 rounded-sm text-xs">{g ? "Guardando…" : "Agregar nota"}</Button>
       {d === null ? <p className="text-sm text-zinc-400">Cargando…</p> : (d.tuyas || []).length === 0 ? <p className="text-sm text-zinc-400">Todavía no has agregado notas propias.</p> : (
-        <ul className="divide-y divide-zinc-800">{d.tuyas.map((n) => (<li key={n.id} className="py-2 text-sm"><div className="text-zinc-100">{n.titulo}</div><div className="text-zinc-400 whitespace-pre-wrap">{n.contenido}</div></li>))}</ul>)}
+        <ul className="divide-y divide-zinc-800">{d.tuyas.map((n) => (<li key={n.id} className="py-2 text-sm flex gap-3 items-start"><div className="flex-1"><div className="text-zinc-100">{n.titulo}</div><div className="text-zinc-400 whitespace-pre-wrap">{n.contenido}</div></div>
+          <Button variant="outline" onClick={() => quitar(n)} aria-label={`Quitar la nota ${n.titulo}`} className="h-11 rounded-sm border-zinc-700 bg-zinc-950 hover:bg-zinc-800 text-xs">Quitar</Button></li>))}</ul>)}
     </div>
   );
 }
@@ -444,10 +446,10 @@ export default function ControlMando() {
             <div className="text-[11px] text-zinc-400">pedidos para reclamarle al proveedor: sin despacho en 48 h o sin movimiento</div>
           </button>
           <button type="button" onClick={() => { setCola("tienda"); setPedido(null); }} aria-pressed={cola === "tienda"} data-testid="cm-proceso-tienda"
-                  className={`text-left p-4 rounded-sm border min-h-[120px] ${cola === "lote" ? <Lote /> : cola === "tienda" ? "border-fuchsia-400/70 bg-fuchsia-500/10" : "border-zinc-800 bg-zinc-900/40 hover:border-zinc-600"}`}>
+                  className={`text-left p-4 rounded-sm border min-h-[120px] ${cola === "tienda" ? "border-fuchsia-400/70 bg-fuchsia-500/10" : "border-zinc-800 bg-zinc-900/40 hover:border-zinc-600"}`}>
             <div className="text-xs text-zinc-200">Datos de tu tienda</div>
             <div className="text-3xl font-semibold text-white tabular-nums mt-1">{(d.extra?.tienda?.campos || []).length - (d.extra?.tienda?.faltan || []).length} de {(d.extra?.tienda?.campos || []).length}</div>
-            <div className="text-[11px] text-zinc-400">envío, garantía, cambios, pagos y soporte: lo que responden Lyan y los agentes</div>
+            <div className="text-[11px] text-zinc-400">envío, garantía, cambios, pagos y soporte: la base de tus guiones</div>
           </button>
           <button type="button" onClick={() => { setCola("conocimiento"); setPedido(null); }} aria-pressed={cola === "conocimiento"} data-testid="cm-proceso-conocimiento"
                   className={`text-left p-4 rounded-sm border min-h-[120px] ${cola === "conocimiento" ? "border-fuchsia-400/70 bg-fuchsia-500/10" : "border-zinc-800 bg-zinc-900/40 hover:border-zinc-600"}`}>
@@ -492,7 +494,7 @@ export default function ControlMando() {
           <div className={rotulo}>Reglas que faltan</div>
           <p className="mt-1">Estos estados no tienen regla y pasaron a una persona: {d.sin_regla.map((s) => `${s.estado} (${s.n})`).join(", ")}.</p>
         </div>)}
-      {cola === "tienda" ? <Tienda t={d.extra?.tienda} recargar={cargar} /> : cola === "conocimiento" ? <Conocimiento /> : cola === "catalogo" ? <Catalogo c={d.extra?.catalogo} fuente={d.extra?.catalogo_fuente} recargar={cargar} /> : cola === "secuencia" ? <Secuencia pasos={d.extra?.secuencia} /> : cola === "prompts" ? <Prompts /> : cola === "persona" ? <Persona onAbrir={setPedido} recargar={cargar} /> : cola ? <Cola proceso={cola} onAbrir={setPedido} /> : null}
+      {cola === "lote" ? <Lote /> : cola === "tienda" ? <Tienda t={d.extra?.tienda} recargar={cargar} /> : cola === "conocimiento" ? <Conocimiento /> : cola === "catalogo" ? <Catalogo c={d.extra?.catalogo} fuente={d.extra?.catalogo_fuente} recargar={cargar} /> : cola === "secuencia" ? <Secuencia pasos={d.extra?.secuencia} /> : cola === "prompts" ? <Prompts /> : cola === "persona" ? <Persona onAbrir={setPedido} recargar={cargar} /> : cola ? <Cola proceso={cola} onAbrir={setPedido} /> : null}
       {pedido && <Linea pedido={pedido} onCerrar={() => setPedido(null)} />}
     </div>
   );
