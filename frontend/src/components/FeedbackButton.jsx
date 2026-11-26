@@ -178,6 +178,7 @@ export default function FeedbackButton() {
                           ))
                         )}
                       </div>
+                      <Registro />
                     </div>
                   </div>
                 </div>
@@ -198,6 +199,31 @@ export default function FeedbackButton() {
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+/** Quién dio permiso y quién entró: el cliente lo puede revisar cuando quiera. */
+function Registro() {
+  const [filas, setFilas] = useState(null);
+  const NOMBRE = { permiso_dado: "Diste permiso", permiso_quitado: "Quitaste el permiso", soporte_entro: "Soporte entró a tu cuenta" };
+  const ver = () => {
+    if (filas) { setFilas(null); return; }
+    api.get(`${S}/registro`).then((r) => setFilas(r.data?.registro || [])).catch(() => setFilas([]));
+  };
+  return (
+    <div className="mt-2">
+      <button type="button" onClick={ver} aria-expanded={!!filas} className="text-xs text-cyan-300 underline" data-testid="ayuda-registro-ver">
+        {filas ? "Ocultar registro" : "Ver quién ha entrado"}
+      </button>
+      {filas && (
+        <ul className="mt-1 space-y-0.5 text-xs text-zinc-400" data-testid="ayuda-registro">
+          {!filas.length && <li>Nadie ha entrado a tu cuenta.</li>}
+          {filas.map((f, i) => (
+            <li key={i}>{hora(f.creado)} · {NOMBRE[f.que] || f.que}{f.que === "soporte_entro" && f.quien ? ` (${f.quien})` : ""}</li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
