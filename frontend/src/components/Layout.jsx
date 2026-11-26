@@ -10,6 +10,7 @@ import PageHelp from "./PageHelp";
 import InicioRapido from "./InicioRapido";
 import LyanDock from "./LyanDock";
 import ConectarDropi from "./ConectarDropi";
+import DatosTienda from "./DatosTienda";
 import { helpForRoute } from "../constants/help";
 
 /**
@@ -68,6 +69,7 @@ export default function Layout({ children, title, subtitle, actions, helpKey }) 
           {pageKey && <PageHelp helpKey={pageKey} />}
           {["/app/logistica", "/app/clientes"].includes(location.pathname) && <InicioRapido />}
           {location.pathname === "/app/logistica" && <ConectarDropi />}
+          {location.pathname === "/app/ajustes" && <DatosTienda />}
           {children}
         </main>
       </div>
