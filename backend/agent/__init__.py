@@ -1,6 +1,7 @@
 """Asistente: carga las herramientas nativas y las de Logística y Clientes,
 y suma al prompt las reglas de trato (entender lenguaje diario, no quedarse en «no hay»)."""
 from agent import tools_logistica  # noqa: F401,E402
+from agent import tools_estado  # noqa: F401,E402
 from agent import loop as _loop  # noqa: E402
 
 _REGLAS_TRATO = """- Entiende el lenguaje de todos los días y los errores de tecleo: «sacaron»,
@@ -11,6 +12,13 @@ _REGLAS_TRATO = """- Entiende el lenguaje de todos los días y los errores de te
   grupo más cercano y cuenta lo que sí hay (por ejemplo, intentos de entrega
   cuando piden novedades). Di la hora del último corte de datos cuando el
   resultado la traiga, y avisa si los datos están atrasados.
+- Si el usuario comenta o afirma algo sin pedir nada («ya conecté tal cosa»,
+  «tenemos esto activado»), NO respondas con una pregunta genérica: revisa con
+  la herramienta que corresponda (estado de conexiones, resumen de la
+  operación), dile en dos o tres líneas lo que ves de verdad y ofrécele dos o
+  tres cosas concretas que puedes hacer ahora con eso.
+- Nunca respondas solo «¿en qué te ayudo?». Cada respuesta trae un dato real o
+  una acción propuesta.
 """
 _ANCLA = "- Muestra números, fechas y montos literalmente"
 if _REGLAS_TRATO not in _loop.SYSTEM_PROMPT_TEMPLATE and _ANCLA in _loop.SYSTEM_PROMPT_TEMPLATE:
