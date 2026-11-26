@@ -15,11 +15,11 @@ from routes.zynex_motor import configurado, rpc
 
 router = APIRouter(prefix="/zcall/cerebro", tags=["zynex-cerebro"])
 PROCESOS = {"pendientes", "seguimiento", "novedades", "oficina", "cierre", "postventa", "proveedores"}
-CANALES = {"llamada", "mensaje", "chat", "otro"}
+CANALES = {"llamada", "whatsapp", "mensaje", "chat", "correo", "otro"}
 
 
 class DichoIn(BaseModel):
-    texto: str = Field(min_length=2, max_length=1000)
+    texto: str = Field(min_length=3, max_length=1000)
     canal: str = Field(default="llamada", max_length=20)
     compromiso: str = Field(default="", max_length=300)
     ticket: bool = False
@@ -30,7 +30,7 @@ class PromptIn(BaseModel):
 
 
 class ResolverIn(BaseModel):
-    nota: str = Field(min_length=2, max_length=500)
+    nota: str = Field(min_length=5, max_length=500)
 
 
 def _pedido(pedido: str) -> int:
@@ -64,15 +64,15 @@ async def cola(proceso: str, request: Request, limite: int = 100):
     if proceso not in PROCESOS:
         raise HTTPException(400, "Proceso inválido.")
     filas = await rpc("zc_api_cb_cola", {"p_org": get_org(request), "p_proceso": proceso,
-                                         "p_limite": max(1, min(int(limite), 300))})
+                                         "p_limite": max(1, min(int(limite), 1000))})
     return {"proceso": proceso, "filas": filas or []}
 
 
 @router.get("/pedidos/{pedido}/linea", dependencies=[Depends(require_api_key)])
 async def linea(pedido: str, request: Request):
     d = await rpc("zc_api_cb_linea", {"p_org": get_org(request), "p_pedido": _pedido(pedido)})
-    if not d or not d.get("decision"):
-        raise HTTPException(404, "Pedido no encontrado.")
+    if not d or not d.get("encontrado"):
+        raise HTTPException(404, (d or {}).get("error") or "Pedido no encontrado.")
     return d
 
 
@@ -82,9 +82,11 @@ async def dicho(pedido: str, p: DichoIn, request: Request):
     r = await rpc("zc_api_cb_dicho", {"p_org": get_org(request), "p_pedido": _pedido(pedido), "p_texto": p.texto.strip(),
                                       "p_canal": canal, "p_compromiso": p.compromiso.strip(), "p_ticket": p.ticket,
                                       "p_autor": _autor(request)})
-    if not (r or {}).get("ok"):
-        raise HTTPException(404, "Pedido no encontrado.")
-    return {"ok": True}
+    r = r or {}
+    if not r.get("ok"):
+        raise HTTPException(400, r.get("error") or "No se pudo guardar el registro.")
+    return {"ok": True, "id": r.get("id"), "repetido": bool(r.get("repetido")),
+            "caso_para_persona": bool(r.get("caso_para_persona"))}
 
 
 @router.get("/persona", dependencies=[Depends(require_api_key)])
@@ -96,9 +98,10 @@ async def persona(request: Request):
 async def resolver(caso: int, p: ResolverIn, request: Request):
     r = await rpc("zc_api_cb_persona", {"p_org": get_org(request), "p_id": caso, "p_nota": p.nota.strip(),
                                         "p_autor": _autor(request)})
-    if not (r or {}).get("ok"):
-        raise HTTPException(404, "Caso no encontrado o ya resuelto.")
-    return {"ok": True}
+    r = r or {}
+    if not r.get("ok"):
+        raise HTTPException(400, r.get("error") or "Caso no encontrado o ya cerrado.")
+    return {"ok": True, "no_se_reabre_hasta": r.get("no_se_reabre_hasta")}
 
 
 @router.get("/reglas", dependencies=[Depends(require_api_key)])
