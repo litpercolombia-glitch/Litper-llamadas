@@ -7,14 +7,16 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import PendientesChatea from "../components/PendientesChatea";
 import FichaPedido from "../components/FichaPedido";
+import ControlMando from "../components/ControlMando";
 import {
-  Package, ArrowsClockwise, ChartBar, MagnifyingGlass, DownloadSimple, ChatText, ChatsCircle, PhoneCall, WhatsappLogo, User, CheckCircle, WarningCircle, X, ListChecks, Path,
+  Package, ArrowsClockwise, ChartBar, MagnifyingGlass, DownloadSimple, ChatText, ChatsCircle, PhoneCall, WhatsappLogo, User, CheckCircle, WarningCircle, X, ListChecks, Path, Compass,
 } from "@phosphor-icons/react";
 
 /** Agente de Logística: panel por estado de Dropi (cada número abre su lista),
  *  casillas de plantilla del cliente y la secuencia mensaje → llamada → WhatsApp. */
 const TABS = [
   { key: "panel",     label: "Panel",      Icon: Package,    desc: "Pedidos por estado de Dropi. Toca un número para ver los pedidos." },
+  { key: "control",   label: "Control de mando", Icon: Compass, desc: "Informe por proceso: qué toca hoy con cada pedido, qué dijo el cliente y qué pasa a una persona." },
   { key: "metricas",  label: "Métricas",   Icon: ChartBar,   desc: "Cómo va tu operación. Toca un número para ver los pedidos que lo forman." },
   { key: "pendientes", label: "Pendientes", Icon: ChatsCircle, desc: "Chats de Chatea que quedaron a medias: qué columnas trabaja el agente y con qué reglas." },
   { key: "casillas",  label: "Plantillas", Icon: ListChecks, desc: "Pon en cada casilla la plantilla de WhatsApp que tú quieras usar." },
@@ -389,6 +391,7 @@ export default function LogisticaPage() {
           ))}
         </div>
         {tab === "panel" && (d === null ? <p className="text-sm text-zinc-400">Cargando…</p> : <Panel d={d} recargar={cargar} />)}
+        {tab === "control" && <ControlMando />}
         {tab === "metricas" && <Metricas />}
         {tab === "pendientes" && <PendientesChatea />}
         {tab === "casillas" && <Casillas />}
