@@ -101,7 +101,7 @@ function Cola({ proceso, onAbrir }) {
                   className="border-t border-zinc-800 hover:bg-zinc-900 cursor-pointer text-zinc-200">
                 <td className="py-2.5 pr-3 tabular-nums text-white">{f.pedido}</td><td className="pr-3">{f.estado}</td><td className="pr-3 tabular-nums" title={f.fecha_confiable ? "Días desde que se vio el cambio de estado" : "Estimado: se vio por primera vez ya en este estado"}>{f.fecha_confiable ? "" : "≈ "}{f.dias ?? "—"}</td>
                 <td className="pr-3">{f.escala && <WarningCircle size={13} className="inline mr-1 text-amber-300" aria-label="Pasa a una persona" />}{limpio(f.etiqueta)}</td>
-                <td className="pr-3">{limpio(f.accion)} · {CANAL[f.canal] || f.canal}</td><td className="pr-3">{f.ciudad || "—"}{f.tiene_telefono === false && <span className="ml-1 text-amber-300">· sin teléfono</span>}{f.repetido_cliente && <span className="ml-1 text-amber-300">· mismo cliente ya tiene otro contacto hoy</span>}</td><td className="pr-3 tabular-nums">{cop(f.valor)}</td>
+                <td className="pr-3">{limpio(f.accion)} · {CANAL[f.canal] || f.canal}</td><td className="pr-3">{f.ciudad || "—"}{f.tiene_telefono === false && <span className="ml-1 text-amber-300">· sin teléfono</span>}{f.repetido_cliente && <span className="ml-1 text-amber-300">· mismo cliente ya tiene otro contacto hoy</span>}{f.verificar_antes && <span className="ml-1 text-amber-300">· verificar en la transportadora antes de contactar</span>}</td><td className="pr-3 tabular-nums">{cop(f.valor)}</td>
                 <td className="text-zinc-400 max-w-[220px] truncate">{f.ultimo_dicho || "—"}</td>
               </tr>))}</tbody>
           </table>
@@ -131,6 +131,8 @@ function Persona({ onAbrir, recargar }) {
             <button type="button" onClick={() => onAbrir(c.pedido)} className="text-left min-h-[44px]">
               <span className="text-white tabular-nums">{c.pedido}</span> <span className="text-zinc-300">· {c.estado || "—"} · {c.fecha_confiable ? "" : "≈ "}{c.dias ?? "—"} días</span>
               <div className="text-[11px] text-zinc-400">{NOMBRE[c.proceso] || c.proceso} · {limpio(c.motivo)} · {c.ciudad || "—"} · {cop(c.valor)} · abierto hace {c.horas_abierto ?? "—"} h{c.tiene_telefono === false ? " · sin teléfono" : ""}</div>
+              {c.motivo_texto && <div className="text-[11px] text-zinc-300">{c.motivo_texto}</div>}
+              {c.edad_pedido_dias != null && <div className="text-[11px] text-zinc-400">Pedido creado hace {c.edad_pedido_dias} días{c.fecha_tipo === "estimada" || c.fecha_tipo === "minima" ? " · fecha del estado estimada" : ""}</div>}
               {c.ultimo_dicho && <div className="text-[11px] text-zinc-300 truncate">Cliente: {c.ultimo_dicho}</div>}
             </button>
             <Input value={nota[c.id] || ""} onChange={(e) => setNota((s) => ({ ...s, [c.id]: e.target.value }))} maxLength={500} placeholder="Qué se hizo" aria-label={`Qué se hizo con el pedido ${c.pedido}`} className="h-11 rounded-sm bg-zinc-950 border-zinc-700" />
@@ -209,7 +211,7 @@ export default function ControlMando() {
           <div><div className="text-2xl font-semibold text-white tabular-nums">{q.activos ?? "—"}</div><div className="text-[11px] text-zinc-400">pedidos activos de {q.pedidos ?? "—"} cargados · leídos de Dropi {fechaHora(q.ultima_carga)}</div></div>
           <div><div className="text-2xl font-semibold text-white tabular-nums">{q.pct_telefono != null ? `${q.pct_telefono} %` : "sin dato"}</div><div className="text-[11px] text-zinc-400">de los activos tienen teléfono ({q.activos_con_telefono ?? 0})</div></div>
           <div><div className="text-2xl font-semibold text-white tabular-nums">{q.pct_fecha_confiable != null ? `${q.pct_fecha_confiable} %` : "sin dato"}</div><div className="text-[11px] text-zinc-400">con fecha exacta del estado; en el resto los días son estimados</div></div>
-          <div><div className="text-2xl font-semibold text-white tabular-nums">{c.tasa != null ? `${c.tasa} %` : "sin dato"}</div><div className="text-[11px] text-zinc-400">entrega vista desde {fechaHora(c.desde)}: {c.entregados || 0} entregados, {c.devueltos || 0} devueltos{c.aviso ? ` · ${c.aviso}` : ""}{d.cierre_total?.tasa != null ? ` · histórico cargado ${d.cierre_total.tasa} %` : ""}</div></div>
+          <div><div className="text-2xl font-semibold text-white tabular-nums">{c.tasa != null ? `${c.tasa} %` : "sin dato"}</div><div className="text-[11px] text-zinc-400">entrega vista desde {fechaHora(c.desde)}: {c.entregados || 0} entregados, {c.devueltos || 0} devueltos{c.aviso ? ` · ${c.aviso}` : ""}{d.cierre_total?.tasa != null ? ` · histórico cargado ${d.cierre_total.tasa} % (sale más alto que el real: lo que sigue en camino no cuenta)` : ""}</div></div>
         </div>
       </div>
       <div>
@@ -252,7 +254,7 @@ export default function ControlMando() {
                   className={`text-left p-4 rounded-sm border min-h-[120px] ${cola === "persona" ? "border-amber-300/70 bg-amber-500/10" : "border-zinc-800 bg-zinc-900/40 hover:border-zinc-600"}`}>
             <div className="text-xs text-zinc-200">Para una persona</div>
             <div className="text-3xl font-semibold text-white tabular-nums mt-1">{d.para_persona}</div>
-            <div className="text-[11px] text-zinc-400">casos abiertos que el motor no decide solo{pe.mas_antiguo_horas != null ? ` · el más viejo lleva ${pe.mas_antiguo_horas} h` : ""} · hoy cerró {pe.cerrados_hoy ?? 0} el equipo y {pe.cerrados_solos_hoy ?? 0} se cerraron solos</div>
+            <div className="text-[11px] text-zinc-400">casos abiertos que el motor no decide solo{pe.mas_antiguo_horas != null ? ` · el más viejo lleva ${pe.mas_antiguo_horas} h` : ""} · hoy cerró {pe.cerrados_hoy ?? 0} el equipo y {pe.cerrados_solos_hoy ?? 0} se cerraron solos{d.extra?.casos_fecha_estimada ? ` · ${d.extra.casos_fecha_estimada} con fecha estimada` : ""}</div>
           </button>
         </div>
       </div>
