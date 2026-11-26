@@ -229,6 +229,35 @@ function Conocimiento() {
   );
 }
 
+function Lote() {
+  const [d, setD] = useState(null);
+  const [o, setO] = useState(false);
+  const cargar = useCallback(() => api.get("/zcall/cerebro/lote").then((r) => setD(r.data)).catch((e) => { toast.error(errorText(e)); setD({ filas: [] }); }), []);
+  useEffect(() => { cargar(); }, [cargar]);
+  const armar = async () => { setO(true);
+    try { const r = await api.post("/zcall/cerebro/lote/armar"); setD(r.data); const x = r.data?.resultado || {}; toast.success(`Lote armado: ${x.listos ?? 0} listos y ${x.bloqueados ?? 0} retenidos. No se envió nada.`); }
+    catch (e) { toast.error(errorText(e)); } finally { setO(false); } };
+  return (
+    <div className={`${caja} p-5 space-y-3`} data-testid="cm-lote">
+      <div className={rotulo}>Lote de confirmación · modo prueba</div>
+      <p className="text-sm text-amber-200 border border-amber-500/40 rounded-sm p-3">{d?.aviso || "Vista previa. Nada se envía."}</p>
+      <div className="flex flex-wrap items-center gap-3">
+        <Button onClick={armar} disabled={o} data-testid="cm-lote-armar" className="h-11 rounded-sm text-xs">{o ? "Armando…" : "Armar lote de hoy (hasta 20)"}</Button>
+        {d?.resumen && <span className="text-sm text-zinc-300">Hoy: {d.resumen.listos} listos · {d.resumen.bloqueados} retenidos · {d.resumen.enviados} enviados</span>}
+      </div>
+      {(d?.causas || []).length > 0 && <ul className="text-[11px] text-zinc-400 list-disc pl-4">{d.causas.map((c) => <li key={c.causa}>{c.n} · {c.causa}</li>)}</ul>}
+      {d === null ? <p className="text-sm text-zinc-400">Cargando…</p> : (d.filas || []).length === 0 ? <p className="text-sm text-zinc-400">Todavía no hay lote de hoy.</p> : (
+        <ul className="space-y-2">{d.filas.map((f) => (
+          <li key={f.id} className="border border-zinc-800 rounded-sm p-3 text-sm">
+            <div className="text-zinc-100"><span className="tabular-nums">{f.pedido}</span> · {f.ciudad || "—"} · {cop(f.valor)} · <span className={f.estado === "listo" ? "text-emerald-300" : "text-amber-300"}>{f.estado === "listo" ? "listo para aprobar" : "retenido"}</span></div>
+            <div className="text-[11px] text-zinc-400">{f.plantilla || "sin plantilla"}</div>
+            {(f.bloqueos || []).map((b) => <div key={b} className="text-[11px] text-amber-300">• {b}</div>)}
+            {f.vista_previa && <pre className="mt-2 text-[11px] text-zinc-300 whitespace-pre-wrap border-t border-zinc-800 pt-2">{f.vista_previa}</pre>}
+          </li>))}</ul>)}
+    </div>
+  );
+}
+
 function Secuencia({ pasos }) {
   const [proc, setProc] = useState("pendientes");
   const lista = (pasos || []).filter((p) => p.proceso === proc);
@@ -255,6 +284,7 @@ function Secuencia({ pasos }) {
 function Persona({ onAbrir, recargar }) {
   const [casos, setCasos] = useState(null);
   const [nota, setNota] = useState({});
+  const [fq, setFq] = useState(""); const [fp, setFp] = useState(""); const [fd, setFd] = useState("");
   const cargar = useCallback(() => api.get("/zcall/cerebro/persona").then((r) => setCasos(r.data.casos || []))
     .catch((e) => { toast.error(errorText(e)); setCasos([]); }), []);
   useEffect(() => { cargar(); }, [cargar]);
@@ -264,11 +294,21 @@ function Persona({ onAbrir, recargar }) {
     try { await api.post(`/zcall/cerebro/persona/${c.id}/resolver`, { nota: n }); toast.success("Caso cerrado. No se vuelve a abrir en 24 horas."); setNota((s) => ({ ...s, [c.id]: "" })); await cargar(); recargar(); }
     catch (e) { toast.error(errorText(e)); }
   };
+  const procesos = [...new Set((casos || []).map((c) => c.proceso).filter(Boolean))];
+  const vistos = (casos || []).filter((c) => (!fp || c.proceso === fp) && (!fd || (c.dias ?? 0) >= Number(fd))
+    && (!fq || `${c.pedido} ${c.estado || ""} ${c.ciudad || ""} ${c.motivo || ""} ${c.motivo_texto || ""}`.toLowerCase().includes(fq.toLowerCase())));
+  const sel = "h-11 rounded-sm bg-zinc-950 border border-zinc-700 text-sm text-zinc-100 px-2";
   return (
     <div className={`${caja} p-5`} data-testid="cm-persona">
-      <div className={`${rotulo} mb-3`}>Casos para una persona{casos ? ` · ${casos.length}` : ""}</div>
-      {casos === null ? <p className="text-sm text-zinc-400">Cargando…</p> : casos.length === 0 ? <p className="text-sm text-zinc-400">No hay casos abiertos.</p> : (
-        <ul className="space-y-2">{casos.map((c) => (
+      <div className={`${rotulo} mb-3`}>Casos para una persona{casos ? ` · ${vistos.length} de ${casos.length}` : ""}</div>
+      {casos && casos.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-3" data-testid="cm-persona-filtros">
+          <Input value={fq} onChange={(e) => setFq(e.target.value)} placeholder="Buscar pedido, ciudad, estado o motivo" aria-label="Buscar en casos" className="h-11 rounded-sm bg-zinc-950 border-zinc-700 flex-1 basis-56" />
+          <select value={fp} onChange={(e) => setFp(e.target.value)} aria-label="Proceso" className={sel}><option value="">Todos los procesos</option>{procesos.map((x) => <option key={x} value={x}>{NOMBRE[x] || x}</option>)}</select>
+          <select value={fd} onChange={(e) => setFd(e.target.value)} aria-label="Días en el estado" className={sel}><option value="">Cualquier tiempo</option><option value="3">3 días o más</option><option value="7">7 días o más</option><option value="15">15 días o más</option></select>
+        </div>)}
+      {casos === null ? <p className="text-sm text-zinc-400">Cargando…</p> : casos.length === 0 ? <p className="text-sm text-zinc-400">No hay casos abiertos.</p> : vistos.length === 0 ? <p className="text-sm text-zinc-400">Ningún caso coincide con los filtros.</p> : (
+        <ul className="space-y-2">{vistos.map((c) => (
           <li key={c.id} className="border border-zinc-800 rounded-sm p-3 grid gap-2 md:grid-cols-[1fr_1fr_auto] items-center text-sm">
             <button type="button" onClick={() => onAbrir(c.pedido)} className="text-left min-h-[44px]">
               <span className="text-white tabular-nums">{c.pedido}</span> <span className="text-zinc-300">· {c.estado || "—"} · {c.fecha_confiable ? "" : "≈ "}{c.dias ?? "—"} días</span>
@@ -404,7 +444,7 @@ export default function ControlMando() {
             <div className="text-[11px] text-zinc-400">pedidos para reclamarle al proveedor: sin despacho en 48 h o sin movimiento</div>
           </button>
           <button type="button" onClick={() => { setCola("tienda"); setPedido(null); }} aria-pressed={cola === "tienda"} data-testid="cm-proceso-tienda"
-                  className={`text-left p-4 rounded-sm border min-h-[120px] ${cola === "tienda" ? "border-fuchsia-400/70 bg-fuchsia-500/10" : "border-zinc-800 bg-zinc-900/40 hover:border-zinc-600"}`}>
+                  className={`text-left p-4 rounded-sm border min-h-[120px] ${cola === "lote" ? <Lote /> : cola === "tienda" ? "border-fuchsia-400/70 bg-fuchsia-500/10" : "border-zinc-800 bg-zinc-900/40 hover:border-zinc-600"}`}>
             <div className="text-xs text-zinc-200">Datos de tu tienda</div>
             <div className="text-3xl font-semibold text-white tabular-nums mt-1">{(d.extra?.tienda?.campos || []).length - (d.extra?.tienda?.faltan || []).length} de {(d.extra?.tienda?.campos || []).length}</div>
             <div className="text-[11px] text-zinc-400">envío, garantía, cambios, pagos y soporte: lo que responden Lyan y los agentes</div>
@@ -420,6 +460,12 @@ export default function ControlMando() {
             <div className="text-xs text-zinc-200">Catálogo</div>
             <div className="text-3xl font-semibold text-white tabular-nums mt-1">{d.extra?.catalogo?.activos ?? 0}</div>
             <div className="text-[11px] text-zinc-400">productos activos con precio, copiados de tu bot de ventas</div>
+          </button>
+          <button type="button" onClick={() => { setCola("lote"); setPedido(null); }} aria-pressed={cola === "lote"} data-testid="cm-proceso-lote"
+                  className={`text-left p-4 rounded-sm border min-h-[120px] ${cola === "lote" ? "border-fuchsia-400/70 bg-fuchsia-500/10" : "border-zinc-800 bg-zinc-900/40 hover:border-zinc-600"}`}>
+            <div className="text-xs text-zinc-200">Lote de confirmación</div>
+            <div className="text-3xl font-semibold text-white mt-1">Prueba</div>
+            <div className="text-[11px] text-zinc-400">arma los mensajes de hoy con sus datos y muestra cuáles se retienen; no envía</div>
           </button>
           <button type="button" onClick={() => { setCola("secuencia"); setPedido(null); }} aria-pressed={cola === "secuencia"} data-testid="cm-proceso-secuencia"
                   className={`text-left p-4 rounded-sm border min-h-[120px] ${cola === "secuencia" ? "border-fuchsia-400/70 bg-fuchsia-500/10" : "border-zinc-800 bg-zinc-900/40 hover:border-zinc-600"}`}>
