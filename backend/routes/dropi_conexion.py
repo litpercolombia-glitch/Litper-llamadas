@@ -42,8 +42,8 @@ AUTORIZAR = os.environ.get("DROPI_OAUTH_AUTHORIZE", "https://mcp.dropi.co/login/
 TOKEN = os.environ.get("DROPI_OAUTH_TOKEN", "https://mcp.dropi.co/oauth/token")
 REGISTRO = os.environ.get("DROPI_OAUTH_REGISTER", "https://mcp.dropi.co/oauth/register")
 PERMISOS = os.environ.get("DROPI_SCOPES", "read:orders")     # solo lectura de pedidos
-PAGINA = 100
-MAX_PAGINAS = 5
+PAGINA = 50
+MAX_PAGINAS = 10
 CABECERA = re.compile(r"^\s*\w+\[(\d+)\]\{([^}]*)\}:\s*$")
 
 
@@ -104,8 +104,7 @@ def pedidos_de_texto(texto: str) -> list[dict]:
         return []
     if texto[0] in "[{":
         try:
-            from routes.zynex_importar import pedidos_del_cuerpo
-            return [o for o in pedidos_del_cuerpo(json.loads(texto)) if isinstance(o, dict)]
+            return _lista_de_pedidos(json.loads(texto))
         except ValueError:
             pass
     lineas = texto.splitlines()
@@ -121,6 +120,30 @@ def pedidos_de_texto(texto: str) -> list[dict]:
                 out.append(dict(zip(campos, fila)))
         return out
     return []
+
+
+def _lista_de_pedidos(dato, nivel: int = 0) -> list[dict]:
+    """Primera lista de objetos que aparezca en la respuesta, esté al nivel que esté."""
+    if isinstance(dato, list):
+        objs = [o for o in dato if isinstance(o, dict)]
+        if objs or not dato:
+            return objs
+        return []
+    if isinstance(dato, dict) and nivel < 4:
+        for v in dato.values():
+            if isinstance(v, (list, dict)):
+                r = _lista_de_pedidos(v, nivel + 1)
+                if r:
+                    return r
+        if nivel == 0 and any(k in dato for k in ("order_id", "id", "pedido")):
+            return [dato]
+    return []
+
+
+def _forma(texto: str, truncado: bool) -> str:
+    """Cómo viene una respuesta que no se pudo leer: tamaño y comienzo, sin cifras ni datos de clientes."""
+    cab = re.sub(r"\d", "9", (texto or "")[:90]).replace("\n", "⏎")
+    return f"sin_leer largo={len(texto or '')} truncado={truncado} inicio={cab}"
 
 
 async def _guardar_tokens(org: str, tok: dict, client_id: str, anterior: dict | None = None) -> None:
@@ -160,6 +183,7 @@ async def _acceso(org: str, forzar: bool = False) -> str | None:
         return None
 
 
+_NOTAS: dict[str, str] = {}
 BARRIDO_DIAS = 30       # hasta dónde se revisan cambios de estado de pedidos viejos
 
 
@@ -194,6 +218,8 @@ async def _leer_rango(org: str, acceso: str, desde: str, hasta: str) -> tuple[in
         if r.get("is_error"):
             raise RuntimeError("Dropi respondió con error: " + str(r.get("text") or "")[:120])
         pedidos = pedidos_de_texto(r.get("text") or "")
+        if not pedidos and pagina == 0:
+            _NOTAS[org] = _forma(r.get("text") or "", bool(r.get("truncated")))   # para diagnosticar, sin datos
         leidos += len(pedidos)
         filas = [f for f in (fila_de_entrada(o) for o in pedidos) if f]
         if filas:
@@ -238,7 +264,8 @@ async def sincronizar(org: str, dias: int = 2, barrer: bool = True) -> dict:
         "ultimo_intento": _now().isoformat(), "ultimo_error": error,
         **({} if error else {"ultimo_sync": _now().isoformat(), "ultimo_leidos": leidos, "ultimo_guardados": guardados}),
         **({"barrido_dia": dia_barrido} if dia_barrido and not error else {})}})
-    await _latido(org, not error, error or f"leidos={leidos} guardados={guardados} barrido_dia={dia_barrido}")
+    nota = _NOTAS.pop(org, "")
+    await _latido(org, not error, error or f"leidos={leidos} guardados={guardados} barrido_dia={dia_barrido} {nota}".strip())
     return {"ok": not error, "leidos": leidos, "guardados": guardados, **({"error": error} if error else {})}
 
 
