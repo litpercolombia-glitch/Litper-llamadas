@@ -3,6 +3,18 @@
 .tc { --a: #19c8ff; --tx: #f2f8fc; --tx2: #9fb2c2; --pan: rgba(5, 11, 19, .66); --ln: rgba(25, 200, 255, .26); --fd: #04070c;
   position: relative; min-height: 100vh; color: var(--tx); background: var(--fd); overflow-x: clip; }
 html.matrix-day .tc { --a: #0369a1; --tx: #071826; --tx2: #3d5568; --pan: rgba(255, 255, 255, .78); --ln: rgba(3, 105, 161, .3); --fd: #e9f1f8; }
+/* Estado de Lyan: el acento de toda la página la sigue (azul vigila, ámbar novedad, verde resuelto). */
+.tc { --estado: var(--a); }
+.tc-e-novedad { --estado: #ffb020; } .tc-e-resuelto { --estado: #34e3a0; }
+html.matrix-day .tc-e-novedad { --estado: #b45309; } html.matrix-day .tc-e-resuelto { --estado: #047857; }
+.tc-h1 em, .tc-rotulo { transition: color 600ms ease-out; } .tc-h1 em { color: var(--estado) !important; }
+.tc-hud { position: fixed; left: clamp(12px, 3vw, 40px); bottom: clamp(12px, 3vh, 28px); z-index: 5; display: inline-flex; align-items: center; gap: 10px; padding: 10px 14px;
+  font: 500 12px/1.2 "IBM Plex Mono", ui-monospace, monospace; letter-spacing: .04em; color: var(--tx); background: var(--pan); backdrop-filter: blur(12px);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--estado) 55%, transparent); transition: box-shadow 500ms ease-out;
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px); }
+.tc-hud i { width: 9px; height: 9px; transform: rotate(45deg); background: var(--estado); box-shadow: 0 0 12px var(--estado); transition: background-color 500ms ease-out; }
+.tc-hud em { font-style: normal; color: var(--tx2); padding-left: 10px; border-left: 1px solid var(--ln); }
+@media (max-width: 719px) { .tc-hud { left: 12px; right: 12px; bottom: 10px; justify-content: flex-start; font-size: 11px; } .tc-pie { padding-bottom: 64px; } }
 .tc-lienzo { position: fixed; inset: 0; width: 100%; height: 100%; display: block; z-index: 0; }
 .tc-plano { position: fixed; right: 6vw; bottom: 8vh; width: min(46vw, 420px); border-radius: 50%; z-index: 0; opacity: .9; }
 .tc-plano ~ * .tc-pista, .tc-plano .tc-lienzo { display: none; }

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import ThemeToggle from "../components/ThemeToggle";
+import LogoZynex from "../components/LogoZynex";
 import { GRATIS, PLANES, WHATSAPP_VENTAS } from "../constants/planes";
 import { ArrowRight, WhatsappLogo } from "@phosphor-icons/react";
 import "../dia.css";
@@ -30,6 +31,7 @@ export default function FunnelPage() {
   const [carga, setCarga] = useState(0);
   const [estado, setEstado] = useState("cargando");      // cargando | listo | plano (sin 3D)
   const [conCodigo, setConCodigo] = useState(false);
+  const [lyan, setLyan] = useState({ e: "vigila", id: null });   // qué está haciendo Lyan ahora (ejemplo)
 
   useEffect(() => {
     let escena, vivo = true;
@@ -39,6 +41,7 @@ export default function FunnelPage() {
         onProgreso: (p) => vivo && setCarga(Math.round(p * 100)),
         onListo: () => vivo && setEstado("listo"),
         onError: () => vivo && setEstado("plano"),
+        onEstado: (e, id) => vivo && setLyan({ e, id: id || null }),
       });
       if (!escena) setEstado("plano");
     }).catch(() => vivo && setEstado("plano"));
@@ -46,7 +49,7 @@ export default function FunnelPage() {
   }, []);
 
   return (
-    <div className={`tc tc-${estado}`} data-testid="funnel-page">
+    <div className={`tc tc-${estado} tc-e-${lyan.e}`} data-testid="funnel-page">
       <canvas ref={lienzo} className="tc-lienzo" aria-hidden="true" />
       {estado === "plano" && <img src="/lyan.webp" alt="" className="tc-plano" />}
 
@@ -57,7 +60,7 @@ export default function FunnelPage() {
       </div>
 
       <header className="tc-top">
-        <a href="/" className="tc-marca"><span className="tc-hex tc-hex-s" aria-hidden="true"><span>Z</span></span> ZYNEX</a>
+        <a href="/" className="tc-marca"><LogoZynex /></a>
         <nav aria-label="Secciones">
           <a href="#rutas">Cómo funciona</a><a href="#apps">Apps</a><a href="#precios">Precios</a><a href="#preguntas">Preguntas</a>
         </nav>
@@ -154,6 +157,18 @@ export default function FunnelPage() {
           </div>
         </section>
       </main>
+
+      {estado === "listo" && (
+        <div className="tc-hud" role="status" aria-live="polite" data-testid="inicio-hud">
+          <i aria-hidden="true" />
+          <span>
+            {lyan.e === "vigila" && "Lyan vigila las rutas"}
+            {lyan.e === "novedad" && `Novedad en el pedido ${lyan.id}: Lyan lo atiende`}
+            {lyan.e === "resuelto" && `Pedido ${lyan.id} resuelto`}
+          </span>
+          <em>Ejemplo</em>
+        </div>
+      )}
 
       <footer className="tc-pie">
         <span>Zynex</span>

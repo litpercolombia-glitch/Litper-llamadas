@@ -5,6 +5,7 @@ import { Input } from "../components/ui/input";
 import { Toaster, toast } from "sonner";
 import { api } from "../lib/api";
 import { GOOGLE_LOGIN_ENABLED, startGoogleLogin } from "../lib/googleLogin";
+import LogoZynex from "../components/LogoZynex";
 import {
   LockKey, Envelope, ArrowRight, GoogleLogo, ShieldCheck, Sparkle,
   WhatsappLogo, Eye, EyeSlash,
@@ -15,14 +16,15 @@ const WHATSAPP = "https://wa.me/573144644054?text=" + encodeURIComponent("Hola, 
 
 // La ayuda se descarga aparte para que el login pinte rápido.
 const PageHelp = lazy(() => import("../components/PageHelp"));
+const Lyan3D = lazy(() => import("../components/Lyan3D"));
 
 const BENEFITS = [
-  { title: "Crea un agente con una frase",
-    body:  "Describe tu negocio y qué debe hacer. El asistente prepara la propuesta y tú la revisas." },
-  { title: "Tú decides antes de cada cambio",
-    body:  "El asistente propone y espera a que pulses «Aplicar». Nada se hace a tus espaldas." },
-  { title: "Tus llaves, tus proveedores",
-    body:  "Conectas tus propias cuentas y pagas al proveedor solo lo que uses. Se guardan cifradas." },
+  { title: "Conecta tu Dropi con un clic",
+    body:  "Entras con tu cuenta de Dropi una vez. No necesitas API ni instalar nada." },
+  { title: "Primero ves, después decides",
+    body:  "Arranca en modo sombra: te muestra qué haría, sin contactar a ningún cliente." },
+  { title: "Tus llaves, cifradas",
+    body:  "Conectas tus propias cuentas. Las llaves se guardan cifradas y no se muestran en pantalla." },
 ];
 
 export default function LoginPage() {
@@ -38,6 +40,8 @@ export default function LoginPage() {
   const [nueva, setNueva] = useState("");
   const [nueva2, setNueva2] = useState("");
   const [porCorreo, setPorCorreo] = useState(true);
+  const [lyan, setLyan] = useState("vigila");
+  const COLOR = { vigila: "#19c8ff", novedad: "#ffb020", resuelto: "#34e3a0" };
 
   useEffect(() => {
     if (modo !== "pedir") return;
@@ -98,21 +102,19 @@ export default function LoginPage() {
       <section
         className="relative flex-1 flex flex-col justify-center px-8 md:px-16 py-14 login-hero-bg"
         data-testid="login-hero"
+        style={{ "--estado": COLOR[lyan] }}
       >
+        <Suspense fallback={null}>
+          <Lyan3D className="hidden xl:block absolute right-0 bottom-0 w-[38%] h-[72%] z-0" onEstado={setLyan} />
+        </Suspense>
         <div className="relative z-10 max-w-lg mx-auto md:mx-0">
-          <div className="flex items-center gap-2 mb-5">
-            <img src="/lyan.webp" alt="Lyan"
-                 className="w-8 h-8 rounded-full object-cover ring-1 ring-cyan-400/50" />
-            <div className="text-[10px] uppercase tracking-[0.3em] font-mono text-cyan-300">
-              Zynex OS · Agentes para tu negocio
-            </div>
-          </div>
+          <div className="mb-6 text-white"><LogoZynex /></div>
 
           <h1 className="text-3xl md:text-[42px] font-semibold leading-tight mb-6"
               data-testid="login-hook">
-            Agentes que llaman y escriben a tus clientes.
+            Lyan vigila tus pedidos.
             <br />
-            <span className="text-cyan-300">Los creas con una frase.</span>
+            <span style={{ color: "var(--estado)", transition: "color 600ms ease-out" }}>Tú decides.</span>
           </h1>
 
           <div className="space-y-3" data-testid="login-benefits">
