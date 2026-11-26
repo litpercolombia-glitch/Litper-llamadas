@@ -41,3 +41,7 @@ html.matrix-day .bg-red-950 { background-color: #FEE2E2 !important; }
 .ayuda-punto { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: #B91C1C; color: #FFFFFF;
   font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
 html.matrix-day .feedback-fab, html.matrix-day .feedback-fab * { color: #FFFFFF !important; }
+
+/* Color del módulo: la barra de arriba y el título toman el tono del módulo donde estás. */
+header.sticky { box-shadow: inset 0 -2px 0 0 color-mix(in oklab, var(--modulo, transparent) 70%, transparent); transition: box-shadow 500ms ease-out; }
+header.sticky .text-zinc-500.font-mono { color: var(--modulo, inherit) !important; transition: color 500ms ease-out; }
