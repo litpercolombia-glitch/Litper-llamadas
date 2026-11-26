@@ -1,288 +1,268 @@
-import { useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import Constellation from "../components/Constellation";
 import ThemeToggle from "../components/ThemeToggle";
-import AgentFromPrompt from "../components/AgentFromPrompt";
-import PageHelp from "../components/PageHelp";
+import { GRATIS, PLANES, WHATSAPP_VENTAS } from "../constants/planes";
 import {
-  ArrowRight, ArrowUp, Bank, Buildings, CaretDown, ForkKnife, Key, Package, PhoneCall,
-  Plugs, ShoppingBag, Stethoscope, WhatsappLogo, Envelope,
+  ArrowRight, ChatsCircle, CheckCircle, Lifebuoy, Package, PhoneCall, TrafficSignal, UsersThree, WhatsappLogo,
 } from "@phosphor-icons/react";
+import "../dia.css";
+import "./inicio.css";
 
 /**
- * Página de presentación de Zynex OS (ruta "/").
- *
- * Reglas de contenido: nada de cifras de resultados, testimonios, garantías,
- * plazos, conteos ni precios. Solo se describe lo que el producto hace, y la
- * demostración va rotulada como ejemplo.
+ * Página de inicio de Zynex (ruta "/").
+ * Reglas de contenido: sin cifras de resultados, sin testimonios y sin promesas de ventas.
+ * El tablero del inicio es una simulación rotulada como ejemplo: no usa datos de nadie.
  */
 
-// Casos de uso: la clave coincide con las plantillas del creador de agentes.
-const CASOS = [
-  { key: "clinica", Icon: Stethoscope, titulo: "Clínica",
-    texto: "Recuerda la cita un día antes, confirma si el paciente asistirá y ofrece reprogramar." },
-  { key: "inmobiliaria", Icon: Buildings, titulo: "Inmobiliaria",
-    texto: "Contacta a quien pidió información, pregunta presupuesto y zona, y agenda la visita." },
-  { key: "restaurante", Icon: ForkKnife, titulo: "Restaurante",
-    texto: "Confirma las reservas del día, el número de personas y si hay alergias." },
-  { key: "cobranza", Icon: Bank, titulo: "Cobranza",
-    texto: "Recuerda un pago pendiente con respeto y registra cuándo se compromete a pagar el cliente." },
-  { key: "tienda", Icon: ShoppingBag, titulo: "Tienda en línea",
-    texto: "Confirma el pedido, la dirección de entrega y el valor a pagar." },
-  { key: "oficina", Icon: Package, titulo: "Reclamo en oficina",
-    texto: "Avisa que el paquete espera en la oficina de envíos y confirma cuándo lo recogerá el cliente." },
-];
+const usd = (n) => `US$${Number.isInteger(n) ? n : n.toFixed(2).replace(".", ",")}`;
 
+// Simulación del tablero: cada pedido avanza por estos pasos.
 const PASOS = [
-  { n: "1", titulo: "Descríbelo con un prompt",
-    texto: "Escribe con tus palabras qué hace tu negocio y qué debe hacer el agente. También puedes partir de una plantilla." },
-  { n: "2", titulo: "Revisa la propuesta y aplícala",
-    texto: "El asistente prepara nombre, saludo, guion y cierre. Cambias lo que quieras; nada se activa hasta que pulsas «Aplicar»." },
-  { n: "3", titulo: "Conecta y haz una llamada de prueba",
-    texto: "Eliges la voz, conectas tu número y tu WhatsApp, y el agente te llama a ti primero. La app te dice qué falta en cada paso." },
+  { estado: "En reparto", tono: "azul", nota: "Va en camino" },
+  { estado: "Novedad", tono: "ambar", nota: "El cliente no estaba" },
+  { estado: "Zynex llama", tono: "violeta", nota: "Confirmando nueva entrega" },
+  { estado: "Reprogramado", tono: "verde", nota: "Entrega acordada para mañana" },
+];
+const PEDIDOS = [
+  { id: "48213", ciudad: "Cali", paso: 0 },
+  { id: "48207", ciudad: "Bogotá", paso: 1 },
+  { id: "48196", ciudad: "Medellín", paso: 2 },
+  { id: "48188", ciudad: "Barranquilla", paso: 3 },
+  { id: "48174", ciudad: "Pereira", paso: 0 },
 ];
 
-const CONECTORES = [
-  { Icon: PhoneCall, titulo: "Voz y telefonía",
-    texto: "Conectas tu proveedor de telefonía y eliges la voz. El agente llama desde tu número." },
-  { Icon: WhatsappLogo, titulo: "WhatsApp",
-    texto: "Conectas tu cuenta de WhatsApp para empresas. El agente escribe con tus plantillas aprobadas." },
-  { Icon: Plugs, titulo: "Conectores MCP",
-    texto: "Dale al agente herramientas de tus propios sistemas (calendario, inventario, CRM) con la dirección de un servidor MCP. Tú decides cuáles activa y cuáles piden confirmación." },
-  { Icon: Key, titulo: "Tu propia llave de IA",
-    texto: "Usas la llave de tu proveedor de inteligencia artificial. Le pagas a él directamente lo que consumas y ves ese costo en su panel, sin recargo oculto." },
-];
-
-const FAQ = [
-  { q: "¿Necesito saber programar?",
-    a: "No. Escribes qué debe hacer el agente como se lo explicarías a una persona. El asistente lo convierte en un guion que puedes leer y corregir." },
-  { q: "¿El asistente hace cambios sin avisarme?",
-    a: "No. Antes de cualquier cambio te muestra qué va a hacer y espera a que pulses «Aplicar». Cada acción queda registrada en una bitácora que puedes consultar." },
-  { q: "¿Cuánto cuesta?",
-    a: "Precios: por minuto y por conversación, visibles antes de pagar. Lo que consumas con tus propios proveedores (telefonía, voz, WhatsApp, inteligencia artificial) se lo pagas a ellos." },
-  { q: "¿Qué necesito para que el agente pueda llamar?",
-    a: "Una voz y un número de teléfono conectados. Para escribir por WhatsApp, tu cuenta de WhatsApp para empresas. Al crear el agente, la app te muestra la lista exacta de lo que falta." },
-  { q: "¿Sirve para mi tipo de empresa?",
-    a: "Sirve si tu equipo llama o escribe a clientes para tareas repetidas: recordar, confirmar, calificar, cobrar o avisar. Para operaciones específicas, como envíos contra entrega, hay paquetes opcionales que se instalan desde tu perfil." },
-  { q: "¿Qué es un conector MCP?",
-    a: "Es una dirección web que le da al agente herramientas nuevas, por ejemplo consultar tu agenda. Conecta solo servidores en los que confíes: sus herramientas pueden actuar en tu nombre." },
-  { q: "¿Dónde quedan mis llaves?",
-    a: "Se guardan cifradas en el servidor y no se vuelven a mostrar completas. Puedes reemplazarlas o borrarlas cuando quieras." },
-];
-
-function Cta({ testId }) {
+function Tablero() {
+  const [filas, setFilas] = useState(PEDIDOS);
+  const [turno, setTurno] = useState(0);
+  useEffect(() => {
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return undefined;
+    const t = setInterval(() => setTurno((n) => n + 1), 2200);
+    return () => clearInterval(t);
+  }, []);
+  useEffect(() => {
+    if (!turno) return;
+    setFilas((f) => f.map((p, i) => (i === turno % f.length ? { ...p, paso: (p.paso + 1) % PASOS.length } : p)));
+  }, [turno]);
+  const activa = turno ? turno % filas.length : -1;
   return (
-    <Link to="/register" data-testid={testId}
-          className="btn-cta-grad inline-flex items-center justify-center gap-2 h-12 px-6 rounded-sm text-[15px] font-semibold w-full sm:w-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300">
-      Crear mi agente gratis <ArrowRight size={16} weight="bold" />
-    </Link>
-  );
-}
-
-function Eyebrow({ children }) {
-  return (
-    <div className="text-xs uppercase tracking-[0.15em] font-medium font-mono text-[var(--text-muted)] mb-2">
-      {children}
+    <div className="ini-tablero" data-testid="inicio-tablero" aria-label="Ejemplo del tablero de Zynex">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
+        <div className="flex items-center gap-2 text-sm font-medium text-white">
+          <span className="ini-pulso" aria-hidden="true" /> Logística · hoy
+        </div>
+        <span className="text-[11px] rounded-full border border-zinc-700 px-2 py-0.5 text-zinc-400">Ejemplo</span>
+      </div>
+      <ul>
+        {filas.map((p, i) => {
+          const s = PASOS[p.paso];
+          return (
+            <li key={p.id} className={`ini-fila ${i === activa ? "ini-fila-activa" : ""}`}>
+              <div className="min-w-0">
+                <div className="text-sm text-white ini-num">Pedido {p.id} · {p.ciudad}</div>
+                <div className="text-xs text-zinc-400 truncate">{s.nota}</div>
+              </div>
+              <span className={`ini-chip ini-${s.tono}`}>
+                {s.estado === "Zynex llama" && <PhoneCall size={12} weight="fill" />} {s.estado}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+      <div className="px-4 py-3 border-t border-zinc-800 text-xs text-zinc-400">
+        Zynex lee tus pedidos de Dropi cada 5 minutos y te dice cuáles necesitan una llamada.
+      </div>
     </div>
   );
 }
 
+const PRODUCTOS = [
+  { Icon: TrafficSignal, nombre: "Semáforo", precio: "Gratis",
+    texto: "Antes de despachar, te dice si a esa ciudad conviene enviar con esa transportadora." },
+  { Icon: Package, nombre: "Logística", precio: `Desde ${usd(61)} al mes`,
+    texto: "Tus pedidos de Dropi por estado: reparto, novedad, oficina y entregado. Ves qué se está quedando quieto." },
+  { Icon: PhoneCall, nombre: "Llamadas", precio: `${usd(124)} al mes`,
+    texto: "Un agente de voz llama al cliente cuando hay novedad o el paquete espera en oficina, y deja anotado qué respondió." },
+];
+
+const ARRANQUE = [
+  { n: "1", titulo: "Conecta tu Dropi", texto: "Entras con tu cuenta de Dropi una vez. No necesitas API ni instalar nada." },
+  { n: "2", titulo: "Mira qué haría Zynex", texto: "Arranca en modo sombra: te muestra a quién llamaría y por qué, sin contactar a nadie." },
+  { n: "3", titulo: "Enciéndelo cuando quieras", texto: "Tú eliges qué estados atiende y con qué plantilla. Si tu bot ya escribió, Zynex no repite el mensaje: llama." },
+];
+
+const FAQ = [
+  { q: "¿Necesito la API de Dropi?", a: "No. Zynex lee tus pedidos con tu inicio de sesión de Dropi, en modo de solo lectura." },
+  { q: "¿Zynex le escribe a mis clientes sin avisarme?", a: "No. Empieza en modo sombra: solo muestra lo que haría. Nada sale hasta que tú lo enciendes." },
+  { q: "¿Puedo pagar solo Logística o solo Llamadas?", a: "Sí, se pagan aparte. Si llevas las dos, pagas 15 % menos que por separado." },
+  { q: "¿Qué es el código de socio?", a: "Si llegaste por un socio de Zynex, su código te da 20 % menos mientras sigas con tu plan." },
+  { q: "¿Y si me trabo?", a: "Dentro de la app hay un botón de Ayuda: escribes, y una persona del equipo te responde ahí mismo. También está el grupo VIP de usuarios." },
+  { q: "¿Dónde quedan mis llaves y datos?", a: "Las llaves se guardan cifradas y no se muestran en pantalla. Cada cuenta solo ve sus propios pedidos." },
+];
+
 export default function FunnelPage() {
-  const demoRef = useRef(null);
-  const [seed, setSeed] = useState(null); // { key, n } → carga una plantilla en la demostración
-
-  const verEjemplo = (key) => {
-    setSeed((s) => ({ key, n: (s?.n || 0) + 1 }));
-    const el = demoRef.current;
-    if (!el) return;
-    let smooth = true;
-    try { smooth = !window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { /* noop */ }
-    el.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "start" });
-  };
-
+  const [conCodigo, setConCodigo] = useState(false);
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] relative overflow-x-hidden"
-         data-testid="funnel-page">
-      <Constellation density={70} />
-
-      {/* Barra superior */}
-      <header className="sticky top-0 z-30 backdrop-blur-xl bg-[color-mix(in_oklab,var(--bg-primary)_80%,transparent)] border-b border-[var(--border)]">
-        <div className="max-w-6xl mx-auto flex items-center justify-between gap-3 px-4 sm:px-5 py-3">
-          <Link to="/" className="flex items-center gap-2.5 min-w-0" aria-label="Zynex OS, inicio">
-            <span className="relative w-8 h-8 grid place-items-center shrink-0" aria-hidden="true">
-              <span className="absolute inset-0 rounded-sm" style={{ background: "var(--accent-grad)" }} />
-              <span className="absolute inset-[1px] rounded-[3px] bg-[var(--bg-primary)] grid place-items-center">
-                <span className="text-[14px] font-bold grad-text tracking-tight">Z</span>
-              </span>
-            </span>
-            <span className="font-semibold text-sm truncate">Zynex <span className="grad-text">OS</span></span>
-          </Link>
-          <nav className="hidden md:flex items-center gap-6 text-[13px] text-[var(--text-secondary)]" aria-label="Secciones">
-            <a href="#casos" className="hover:text-[var(--text-primary)] transition">Casos de uso</a>
-            <a href="#como-funciona" className="hover:text-[var(--text-primary)] transition">Cómo funciona</a>
-            <a href="#conectores" className="hover:text-[var(--text-primary)] transition">Conectores</a>
-            <a href="#preguntas" className="hover:text-[var(--text-primary)] transition">Preguntas</a>
+    <div className="ini min-h-screen bg-zinc-950 text-zinc-100" data-testid="funnel-page">
+      <header className="sticky top-0 z-30 border-b border-zinc-800 bg-zinc-950/85 backdrop-blur">
+        <div className="ini-wrap flex items-center justify-between gap-3 py-3">
+          <a href="/" className="flex items-center gap-2 font-semibold text-white">
+            <img src="/lyan.webp" alt="" className="w-7 h-7 rounded-full object-cover" /> Zynex
+          </a>
+          <nav className="hidden md:flex items-center gap-6 text-sm text-zinc-400" aria-label="Secciones">
+            <a href="#producto" className="hover:text-white">Producto</a>
+            <a href="#empezar" className="hover:text-white">Cómo empiezas</a>
+            <a href="#precios" className="hover:text-white">Precios</a>
+            <a href="#preguntas" className="hover:text-white">Preguntas</a>
           </nav>
-          <div className="flex items-center gap-2 shrink-0">
-            <Link to="/login" data-testid="funnel-nav-login"
-                  className="text-[13px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition px-3 py-1.5 rounded-sm border border-[var(--border)]">
-              Entrar
-            </Link>
+          <div className="flex items-center gap-2">
+            <Link to="/login" className="ini-btn ini-btn-2" data-testid="funnel-login">Entrar</Link>
             <ThemeToggle />
           </div>
         </div>
       </header>
 
-      <main className="relative z-10">
-        {/* 1 · Primera pantalla: la frase y el producto funcionando */}
-        <section className="max-w-6xl mx-auto px-4 sm:px-5 pt-8 pb-12 md:pt-14 md:pb-20" data-testid="funnel-hero">
-          <div className="grid lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] gap-8 lg:gap-10 items-start">
-            <div className="lg:pt-6">
-              <Eyebrow>Zynex OS · Agentes para cualquier empresa</Eyebrow>
-              <h1 className="text-3xl sm:text-4xl lg:text-[44px] font-semibold leading-[1.1] tracking-tight"
-                  data-testid="funnel-hero-headline">
-                Crea un agente de IA que <span className="grad-text">llama y escribe por WhatsApp</span> a tus clientes.
-              </h1>
-              <p className="mt-4 text-base sm:text-lg text-[var(--text-secondary)] leading-relaxed max-w-xl"
-                 data-testid="funnel-hero-subhead">
-                Lo describes con un prompt; pagas por uso.
-              </p>
-              <div className="mt-6">
-                <Cta testId="funnel-hero-cta" />
-              </div>
-              <p className="mt-3 text-sm text-[var(--text-muted)]">
-                ¿Ya tienes cuenta?{" "}
-                <Link to="/login" className="underline underline-offset-2 hover:text-[var(--text-primary)]">Entra aquí</Link>
-              </p>
+      <main>
+        <section className="ini-wrap grid gap-10 lg:grid-cols-[1.05fr_1fr] items-center py-14 md:py-20">
+          <div>
+            <p className="text-sm text-cyan-300 mb-4">Para tiendas que venden contra entrega con Dropi</p>
+            <h1 className="ini-h1" data-testid="funnel-hook">
+              Sabe qué pedido se está cayendo <span className="ini-acento">antes de que se devuelva.</span>
+            </h1>
+            <p className="ini-lead mt-5">
+              Zynex vigila tus pedidos de Dropi, te muestra los que necesitan atención y llama al cliente por ti cuando hay novedad.
+            </p>
+            <div className="mt-7 flex flex-wrap items-center gap-3">
+              <Link to="/register" className="ini-btn ini-btn-1" data-testid="funnel-cta">
+                Crear mi cuenta gratis <ArrowRight size={16} weight="bold" />
+              </Link>
+              <a href="#precios" className="ini-btn ini-btn-2">Ver precios</a>
             </div>
-
-            {/* La demostración: la frase se convierte en agente a la vista */}
-            <div ref={demoRef} id="demo" className="scroll-mt-20 min-w-0" data-testid="funnel-demo">
-              <div className="flex items-center justify-between gap-2 mb-2">
-                <span className="text-xs uppercase tracking-[0.15em] font-medium font-mono text-[var(--text-muted)]">
-                  Pruébalo aquí
-                </span>
-                <span className="text-xs font-mono text-[var(--text-muted)]">de la frase al agente</span>
-              </div>
-              <AgentFromPrompt demo seed={seed} />
-            </div>
+            <p className="mt-4 text-sm text-zinc-400">El Semáforo es gratis. No pide tarjeta.</p>
           </div>
+          <Tablero />
         </section>
 
-        {/* 2 · Casos de uso por industria */}
-        <section id="casos" className="scroll-mt-20 border-t border-[var(--border)]" data-testid="funnel-casos">
-          <div className="max-w-6xl mx-auto px-4 sm:px-5 py-12 md:py-16">
-            <Eyebrow>Casos de uso</Eyebrow>
-            <h2 className="text-xl sm:text-2xl tracking-tight font-medium mb-6">Un agente para la tarea que hoy haces a mano</h2>
-            <ul className="grid sm:grid-cols-2 lg:grid-cols-3 border-l border-t border-[var(--border)]">
-              {CASOS.map(({ key, Icon, titulo, texto }) => (
-                <li key={key} className="border-r border-b border-[var(--border)] p-5 flex flex-col"
-                    data-testid={`funnel-caso-${key}`}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Icon size={18} weight="duotone" className="text-[var(--accent)]" aria-hidden="true" />
-                    <h3 className="text-lg font-medium">{titulo}</h3>
-                  </div>
-                  <p className="text-sm text-[var(--text-secondary)] leading-relaxed flex-1">{texto}</p>
-                  <button type="button" onClick={() => verEjemplo(key)}
-                          data-testid={`funnel-caso-ver-${key}`}
-                          className="mt-3 self-start inline-flex items-center gap-1.5 text-sm text-[var(--accent)] underline underline-offset-4 decoration-transparent hover:decoration-current transition py-1">
-                    Ver este ejemplo <ArrowUp size={13} aria-hidden="true" />
-                  </button>
-                </li>
+        <section id="producto" className="border-t border-zinc-800">
+          <div className="ini-wrap py-16">
+            <h2 className="ini-h2">Tres apps, una sola ficha del pedido</h2>
+            <p className="ini-lead mt-3">Lo que ves en Logística es lo mismo que usa Llamadas. Empiezas por la que necesites.</p>
+            <div className="mt-10 grid gap-8 md:grid-cols-3">
+              {PRODUCTOS.map(({ Icon, nombre, precio, texto }) => (
+                <article key={nombre} className="ini-prod">
+                  <Icon size={28} className="text-cyan-300" />
+                  <h3 className="mt-4 text-lg font-semibold text-white">{nombre}</h3>
+                  <p className="mt-2 text-sm text-zinc-400 ini-texto">{texto}</p>
+                  <p className="mt-4 text-sm font-medium text-white ini-num">{precio}</p>
+                </article>
               ))}
-            </ul>
+            </div>
           </div>
         </section>
 
-        {/* 3 · Cómo funciona */}
-        <section id="como-funciona" className="scroll-mt-20 border-t border-[var(--border)]" data-testid="funnel-pasos">
-          <div className="max-w-6xl mx-auto px-4 sm:px-5 py-12 md:py-16">
-            <Eyebrow>Cómo funciona</Eyebrow>
-            <h2 className="text-xl sm:text-2xl tracking-tight font-medium mb-6">Tres pasos</h2>
-            <ol className="grid md:grid-cols-3 border-l border-t border-[var(--border)]">
-              {PASOS.map((p) => (
-                <li key={p.n} className="border-r border-b border-[var(--border)] p-5" data-testid={`funnel-paso-${p.n}`}>
-                  <div className="font-mono text-sm text-[var(--accent)] mb-2" aria-hidden="true">{p.n.padStart(2, "0")}</div>
-                  <h3 className="text-lg font-medium mb-1.5">{p.titulo}</h3>
-                  <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{p.texto}</p>
+        <section id="empezar" className="border-t border-zinc-800">
+          <div className="ini-wrap py-16 grid gap-10 lg:grid-cols-[1fr_1.4fr]">
+            <div>
+              <h2 className="ini-h2">Empiezas sin tocar a ningún cliente</h2>
+              <p className="ini-lead mt-3">Primero ves, después decides.</p>
+            </div>
+            <ol className="space-y-6">
+              {ARRANQUE.map((p) => (
+                <li key={p.n} className="flex gap-4">
+                  <span className="ini-paso ini-num" aria-hidden="true">{p.n}</span>
+                  <div>
+                    <h3 className="text-base font-semibold text-white">{p.titulo}</h3>
+                    <p className="mt-1 text-sm text-zinc-400 ini-texto">{p.texto}</p>
+                  </div>
                 </li>
               ))}
             </ol>
           </div>
         </section>
 
-        {/* 4 · Conectores */}
-        <section id="conectores" className="scroll-mt-20 border-t border-[var(--border)]" data-testid="funnel-conectores">
-          <div className="max-w-6xl mx-auto px-4 sm:px-5 py-12 md:py-16">
-            <Eyebrow>Conectores</Eyebrow>
-            <h2 className="text-xl sm:text-2xl tracking-tight font-medium mb-6">Trabaja con tus cuentas y tus sistemas</h2>
-            <ul className="grid sm:grid-cols-2 border-l border-t border-[var(--border)]">
-              {CONECTORES.map(({ Icon, titulo, texto }) => (
-                <li key={titulo} className="border-r border-b border-[var(--border)] p-5">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Icon size={18} weight="duotone" className="text-[var(--accent)]" aria-hidden="true" />
-                    <h3 className="text-lg font-medium">{titulo}</h3>
-                  </div>
-                  <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{texto}</p>
+        <section id="precios" className="border-t border-zinc-800">
+          <div className="ini-wrap py-16">
+            <div className="flex flex-wrap items-end justify-between gap-4">
+              <div>
+                <h2 className="ini-h2">Precios</h2>
+                <p className="ini-lead mt-3">Logística y Llamadas se pagan aparte. Juntas, 15 % menos.</p>
+              </div>
+              <label className="ini-switch" data-testid="precios-codigo">
+                <input type="checkbox" checked={conCodigo} onChange={(e) => setConCodigo(e.target.checked)} />
+                <span>Tengo código de socio (20 % menos)</span>
+              </label>
+            </div>
+            <ul className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {PLANES.map((p) => (
+                <li key={p.id} className={`ini-plan ${p.paquete ? "ini-plan-paquete" : ""}`}>
+                  {p.paquete && <span className="ini-etiqueta">Las dos apps</span>}
+                  <h3 className="text-base font-semibold text-white">{p.nombre}</h3>
+                  <p className="mt-1 text-sm text-zinc-400">{p.incluye}</p>
+                  <p className="mt-4 text-3xl font-semibold text-white ini-num">
+                    {usd(conCodigo ? p.conCodigo : p.lista)}<span className="text-sm font-normal text-zinc-400"> al mes</span>
+                  </p>
+                  {conCodigo && <p className="text-xs text-zinc-400 ini-num">Sin código: {usd(p.lista)}</p>}
+                  <a href={p.pago || `${WHATSAPP_VENTAS}?text=${encodeURIComponent(`Hola, quiero el plan ${p.nombre} de Zynex`)}`}
+                     target="_blank" rel="noreferrer" className="ini-btn ini-btn-2 mt-5" data-testid={`precio-${p.id}`}>
+                    {p.pago ? "Pagar este plan" : "Pedir este plan"}
+                  </a>
                 </li>
               ))}
             </ul>
-            <p className="mt-5 text-sm text-[var(--text-secondary)] border border-[var(--border)] rounded-sm px-4 py-3"
-               data-testid="funnel-precios">
-              <span className="font-medium text-[var(--text-primary)]">Precios:</span> por minuto y por conversación, visibles antes de pagar.
+            <p className="mt-6 text-sm text-zinc-400 flex flex-wrap gap-x-5 gap-y-2">
+              {GRATIS.map((g) => (
+                <span key={g} className="inline-flex items-center gap-1.5"><CheckCircle size={16} className="text-emerald-300" /> {g}</span>
+              ))}
             </p>
+            <p className="mt-2 text-xs text-zinc-400">Precios en dólares, sin impuestos. El plan de Llamadas incluye 200 minutos al mes.</p>
           </div>
         </section>
 
-        {/* 5 · Preguntas frecuentes */}
-        <section id="preguntas" className="scroll-mt-20 border-t border-[var(--border)]" data-testid="funnel-faq">
-          <div className="max-w-3xl mx-auto px-4 sm:px-5 py-12 md:py-16">
-            <Eyebrow>Preguntas frecuentes</Eyebrow>
-            <h2 className="text-xl sm:text-2xl tracking-tight font-medium mb-6">Antes de empezar</h2>
-            <div className="border-t border-[var(--border)]">
-              {FAQ.map((f, i) => (
-                <details key={f.q} className="group border-b border-[var(--border)]" data-testid={`funnel-faq-${i}`}>
-                  <summary className="flex items-center justify-between gap-4 cursor-pointer list-none py-4 text-base font-medium [&::-webkit-details-marker]:hidden">
-                    {f.q}
-                    <CaretDown size={16} aria-hidden="true"
-                               className="shrink-0 text-[var(--text-muted)] transition-transform group-open:rotate-180" />
-                  </summary>
-                  <p className="pb-4 text-sm text-[var(--text-secondary)] leading-relaxed">{f.a}</p>
+        <section className="border-t border-zinc-800">
+          <div className="ini-wrap py-16 grid gap-8 md:grid-cols-3">
+            <div className="md:col-span-1">
+              <h2 className="ini-h2">No quedas solo</h2>
+              <p className="ini-lead mt-3">El soporte viene con cualquier plan.</p>
+            </div>
+            <div className="md:col-span-2 grid gap-6 sm:grid-cols-3">
+              <div><Lifebuoy size={22} className="text-cyan-300" /><h3 className="mt-3 font-semibold text-white">Ayuda en la app</h3><p className="mt-1 text-sm text-zinc-400">Escribes desde cualquier pantalla y una persona te responde ahí.</p></div>
+              <div><ChatsCircle size={22} className="text-cyan-300" /><h3 className="mt-3 font-semibold text-white">Lo arreglamos por ti</h3><p className="mt-1 text-sm text-zinc-400">Si quieres, das permiso por unas horas y entramos a tu cuenta. Tú ves quién entró.</p></div>
+              <div><UsersThree size={22} className="text-cyan-300" /><h3 className="mt-3 font-semibold text-white">Grupo VIP</h3><p className="mt-1 text-sm text-zinc-400">Comunidad de usuarios para resolver dudas y enterarte de lo nuevo.</p></div>
+            </div>
+          </div>
+        </section>
+
+        <section id="preguntas" className="border-t border-zinc-800">
+          <div className="ini-wrap py-16 max-w-3xl">
+            <h2 className="ini-h2">Antes de empezar</h2>
+            <div className="mt-8 divide-y divide-zinc-800 border-y border-zinc-800">
+              {FAQ.map((f) => (
+                <details key={f.q} className="ini-faq">
+                  <summary>{f.q}</summary>
+                  <p className="pb-4 text-sm text-zinc-400 ini-texto">{f.a}</p>
                 </details>
               ))}
             </div>
-            <div className="mt-8">
-              <PageHelp helpKey="funnel" linkAsk={false} />
-            </div>
           </div>
         </section>
 
-        {/* 6 · Cierre */}
-        <section className="border-t border-[var(--border)]" data-testid="funnel-cierre">
-          <div className="max-w-3xl mx-auto px-4 sm:px-5 py-14 md:py-20 text-center">
-            <h2 className="text-2xl sm:text-3xl tracking-tight font-semibold mb-3">Empieza por una frase</h2>
-            <p className="text-sm sm:text-base text-[var(--text-secondary)] leading-relaxed mb-6 max-w-xl mx-auto">
-              Crea tu cuenta, describe tu negocio y revisa la propuesta de tu primer agente.
-            </p>
-            <Cta testId="funnel-final-cta" />
+        <section className="border-t border-zinc-800">
+          <div className="ini-wrap py-20 text-center">
+            <h2 className="ini-h2">Conecta tu Dropi y mira tus pedidos hoy</h2>
+            <div className="mt-7 flex flex-wrap justify-center gap-3">
+              <Link to="/register" className="ini-btn ini-btn-1">Crear mi cuenta gratis <ArrowRight size={16} weight="bold" /></Link>
+              <a href={WHATSAPP_VENTAS} target="_blank" rel="noreferrer" className="ini-btn ini-btn-2"><WhatsappLogo size={16} weight="fill" /> Hablar con una persona</a>
+            </div>
           </div>
         </section>
       </main>
 
-      <footer className="relative z-10 border-t border-[var(--border)] py-8 text-sm text-[var(--text-muted)]">
-        <div className="max-w-6xl mx-auto px-4 sm:px-5 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <span>Zynex OS</span>
-          <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
-            <a href="mailto:zynexproai@gmail.com" data-testid="funnel-support-email"
-               className="inline-flex items-center gap-1.5 hover:text-[var(--text-primary)] transition">
-              <Envelope size={14} aria-hidden="true" /> zynexproai@gmail.com
-            </a>
-            <a href="https://wa.me/573144644054" target="_blank" rel="noreferrer" data-testid="funnel-support-whatsapp"
-               className="inline-flex items-center gap-1.5 hover:text-[var(--text-primary)] transition">
-              <WhatsappLogo size={14} aria-hidden="true" /> Soporte por WhatsApp
-            </a>
-            <Link to="/login" data-testid="funnel-footer-login" className="hover:text-[var(--text-primary)] transition">Entrar</Link>
-          </div>
+      <footer className="border-t border-zinc-800">
+        <div className="ini-wrap py-6 flex flex-wrap items-center justify-between gap-3 text-sm text-zinc-400">
+          <span>Zynex</span>
+          <span className="flex flex-wrap gap-4">
+            <a href="mailto:zynexproai@gmail.com" className="hover:text-white">zynexproai@gmail.com</a>
+            <Link to="/login" className="hover:text-white">Entrar</Link>
+          </span>
         </div>
       </footer>
     </div>
