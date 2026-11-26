@@ -110,7 +110,7 @@ function Cola({ proceso, onAbrir }) {
       && (!f.ciudad || r.ciudad === f.ciudad) && (!f.etiqueta || r.etiqueta === f.etiqueta) && (!f.canal || r.canal === f.canal)
       && (!f.producto || r.producto === f.producto)
       && (dmin === null || (r.dias != null && r.dias >= dmin && r.dias < dmax))
-      && (!desde || (r.creado && r.creado >= desde))
+      && (!desde || !r.creado || r.creado >= desde)
       && (!f.accion || r.accionable) && (!f.tel || (f.tel === "si" ? r.tiene_telefono : r.tiene_telefono === false)));
   }, [filas, f]);
   const activos = Object.entries(f).filter(([, v]) => v && v !== "").length;
@@ -204,7 +204,8 @@ function Tienda({ t, recargar }) {
   );
 }
 
-function Conocimiento() {
+function Conocimiento({ recargar }) {
+  const [proc, setProc] = useState("general");
   const [d, setD] = useState(null);
   const [titulo, setTitulo] = useState("");
   const [contenido, setContenido] = useState("");
@@ -214,15 +215,18 @@ function Conocimiento() {
   const guardar = async () => {
     if (titulo.trim().length < 3 || contenido.trim().length < 10) { toast.error("Escribe un título y al menos una frase."); return; }
     setG(true);
-    try { await api.post("/zcall/cerebro/conocimiento", { titulo, contenido }); toast.success("Nota guardada."); setTitulo(""); setContenido(""); await cargar(); }
+    try { await api.post("/zcall/cerebro/conocimiento", { titulo, contenido, proceso: proc }); toast.success("Nota guardada."); setTitulo(""); setContenido(""); await cargar(); recargar && recargar(); }
     catch (e) { toast.error(errorText(e)); } finally { setG(false); } };
-  const quitar = async (n) => { if (!window.confirm(`¿Quitar la nota «${n.titulo}»?`)) return; try { const r = await api.delete(`/zcall/cerebro/conocimiento/${n.id}`); setD(r.data); toast.success("Nota quitada."); } catch (e) { toast.error(errorText(e)); } };
+  const quitar = async (n) => { if (!window.confirm(`¿Quitar la nota «${n.titulo}»?`)) return; try { const r = await api.delete(`/zcall/cerebro/conocimiento/${n.id}`); setD(r.data); toast.success("Nota quitada."); recargar && recargar(); } catch (e) { toast.error(errorText(e)); } };
   return (
     <div className={`${caja} p-5 space-y-3`} data-testid="cm-conocimiento">
       <div className={rotulo}>Base de conocimiento{d ? ` · ${(d.tuyas || []).length} notas tuyas` : ""}</div>
       {d?.base_zynex && <p className="text-sm text-zinc-300 border border-zinc-700 rounded-sm p-3">{d.base_zynex.aviso} ({d.base_zynex.notas} notas de método).</p>}
       <label className="text-xs text-zinc-300 block">Título
         <Input value={titulo} onChange={(e) => setTitulo(e.target.value)} maxLength={120} placeholder="Ej.: Promoción de diciembre" className="mt-1 h-11 rounded-sm bg-zinc-950 border-zinc-700" /></label>
+      <label className="text-xs text-zinc-300 block">Para qué proceso
+        <select value={proc} onChange={(e) => setProc(e.target.value)} className="mt-1 h-11 w-full rounded-sm bg-zinc-950 border border-zinc-700 text-sm text-zinc-100 px-2">
+          {["general", "pendientes", "seguimiento", "novedades", "oficina", "postventa"].map((x) => <option key={x} value={x}>{x === "general" ? "Todos" : (NOMBRE[x] || x)}</option>)}</select></label>
       <label className="text-xs text-zinc-300 block">Qué debe saber el asistente (se usará cuando los asistentes se conecten a esta base)
         <textarea value={contenido} onChange={(e) => setContenido(e.target.value)} maxLength={4000} rows={3} className="mt-1 w-full rounded-sm bg-zinc-950 border border-zinc-700 text-sm text-zinc-100 p-2" /></label>
       <Button onClick={guardar} disabled={g} className="h-11 rounded-sm text-xs">{g ? "Guardando…" : "Agregar nota"}</Button>
@@ -439,7 +443,7 @@ export default function ControlMando() {
                   className={`text-left p-4 rounded-sm border min-h-[120px] ${cola === "postventa" ? "border-fuchsia-400/70 bg-fuchsia-500/10" : "border-zinc-800 bg-zinc-900/40 hover:border-zinc-600"}`}>
             <div className="text-xs text-zinc-200">Postventa</div>
             <div className="text-3xl font-semibold text-white tabular-nums mt-1">{d.extra?.postventa_hoy ?? 0}</div>
-            <div className="text-[11px] text-zinc-400">clientes con un paso de postventa hoy (gracias, encuesta, guía, referidos, segunda compra)</div>
+            <div className="text-[11px] text-zinc-400">clientes con un paso de postventa vigente (gracias, encuesta, guía, referidos, segunda compra)</div>
           </button>
           <button type="button" onClick={() => { setCola("proveedores"); setPedido(null); }} aria-pressed={cola === "proveedores"} data-testid="cm-proceso-proveedores"
                   className={`text-left p-4 rounded-sm border min-h-[120px] ${cola === "proveedores" ? "border-fuchsia-400/70 bg-fuchsia-500/10" : "border-zinc-800 bg-zinc-900/40 hover:border-zinc-600"}`}>
@@ -496,7 +500,7 @@ export default function ControlMando() {
           <div className={rotulo}>Reglas que faltan</div>
           <p className="mt-1">Estos estados no tienen regla y pasaron a una persona: {d.sin_regla.map((s) => `${s.estado} (${s.n})`).join(", ")}.</p>
         </div>)}
-      {cola === "lote" ? <Lote /> : cola === "tienda" ? <Tienda t={d.extra?.tienda} recargar={cargar} /> : cola === "conocimiento" ? <Conocimiento /> : cola === "catalogo" ? <Catalogo c={d.extra?.catalogo} fuente={d.extra?.catalogo_fuente} recargar={cargar} /> : cola === "secuencia" ? <Secuencia pasos={d.extra?.secuencia} /> : cola === "prompts" ? <Prompts /> : cola === "persona" ? <Persona onAbrir={setPedido} recargar={cargar} /> : cola ? <Cola proceso={cola} onAbrir={setPedido} /> : null}
+      {cola === "lote" ? <Lote /> : cola === "tienda" ? <Tienda t={d.extra?.tienda} recargar={cargar} /> : cola === "conocimiento" ? <Conocimiento recargar={cargar} /> : cola === "catalogo" ? <Catalogo c={d.extra?.catalogo} fuente={d.extra?.catalogo_fuente} recargar={cargar} /> : cola === "secuencia" ? <Secuencia pasos={d.extra?.secuencia} /> : cola === "prompts" ? <Prompts /> : cola === "persona" ? <Persona onAbrir={setPedido} recargar={cargar} /> : cola ? <Cola proceso={cola} onAbrir={setPedido} /> : null}
       {pedido && <Linea pedido={pedido} onCerrar={() => setPedido(null)} />}
     </div>
   );
