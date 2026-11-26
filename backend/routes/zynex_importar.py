@@ -260,3 +260,5 @@ async def solicitudes(request: Request):
 # Conexión directa con Dropi (inicio de sesión del cliente, solo lectura): /zcall/motor/operacion/dropi/...
 from routes.dropi_conexion import router as _dropi_router  # noqa: E402
 router.include_router(_dropi_router)
+from routes.soporte import router as _soporte_router  # noqa: E402
+router.include_router(_soporte_router)
