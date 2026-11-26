@@ -8,6 +8,7 @@ import { useLocation } from "react-router-dom";
 import { useInHub } from "./HubContext";
 import PageHelp from "./PageHelp";
 import InicioRapido from "./InicioRapido";
+import LyanDock from "./LyanDock";
 import { helpForRoute } from "../constants/help";
 
 /**
@@ -68,6 +69,7 @@ export default function Layout({ children, title, subtitle, actions, helpKey }) 
           {children}
         </main>
       </div>
+      <LyanDock />
       <Toaster position="top-right" richColors />
     </div>
   );
