@@ -207,3 +207,8 @@ async def lote(request: Request):
 async def lote_armar(request: Request):
     return _ok(await rpc("zc_api_cb_lote", {"p_org": get_org(request), "p_armar": True, "p_max": 20}),
                "No se pudo armar el lote de prueba.")
+
+
+@router.delete("/conocimiento/{nota_id}", dependencies=[Depends(require_api_key)])
+async def conocimiento_quitar(nota_id: int, request: Request):
+    return _ok(await rpc("zc_api_cb_conocimiento_quitar", {"p_org": get_org(request), "p_id": nota_id}), "No se pudo quitar la nota.")
