@@ -12,3 +12,5 @@ html.matrix-day .zx-hex span { background: var(--zx-fondo, #e9f1f8); }
 .zx-logo-s .zx-hex { width: 22px; height: 25px; } .zx-logo-s .zx-hex span { font-size: 11px; } .zx-logo-s .zx-palabra { font-size: 13px; }
 @keyframes zx-barrido { 0%, 70% { background-position: 100% 0; } 100% { background-position: 0 0; } }
 @media (prefers-reduced-motion: reduce) { .zx-palabra { animation: none; } .zx-hex, .zx-palabra { transition: none; } }
+/* En celular el aviso de Lyan va arriba, para no tapar el texto. */
+@media (max-width: 719px) { .tc .tc-hud { top: 68px; bottom: auto; right: auto; } }

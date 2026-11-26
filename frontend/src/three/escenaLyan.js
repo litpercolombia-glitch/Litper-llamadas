@@ -258,7 +258,9 @@ export function montar(canvas, { modelo = "/lyan3d.glb", modo = "inicio", onProg
     // Lyan mira a la cámara, o al pedido que está atendiendo.
     const haciaCamara = Math.atan2(camara.position.x - mira.x * 0.4, camara.position.z) * 0.85;
     if (caso && estado === "novedad") giroCaso = Math.atan2(pc.x, pc.z);
-    const meta = caso && estado === "novedad" ? giroCaso * 0.7 + haciaCamara * 0.3 : haciaCamara + suave.x * 0.5;
+    // Se voltea hacia el pedido, pero nunca le da la espalda a quien mira (máximo ~55° desde la cámara).
+    const desvio = Math.atan2(Math.sin(giroCaso - haciaCamara), Math.cos(giroCaso - haciaCamara));
+    const meta = caso && estado === "novedad" ? haciaCamara + Math.max(-0.95, Math.min(0.95, desvio)) : haciaCamara + suave.x * 0.5;
     lyan.rotation.y += (meta - lyan.rotation.y) * Math.min(1, dt * 4);
     lyan.rotation.x += ((suave.y * 0.1) - lyan.rotation.x) * Math.min(1, dt * 5);
     if (!mixer) lyan.position.y = quieto ? 0 : Math.sin(t * 1.6) * 0.035;
@@ -269,7 +271,7 @@ export function montar(canvas, { modelo = "/lyan3d.glb", modo = "inicio", onProg
     matLinea.color.copy(colorEstado); matLinea2.color.copy(colorEstado); matRuta.color.copy(colorEstado); base.color.copy(colorEstado);
     base.intensity = 14 + Math.sin(t * 2.2) * 3 + destello * 34;
     matLluvia.uniforms.uColor.value.set(colorEstado.r * (tema === DIA ? 0.6 : 1), colorEstado.g * (tema === DIA ? 0.6 : 1), colorEstado.b * (tema === DIA ? 0.6 : 1));
-    const fuerza = (estado === "vigila" ? 0.0 : 0.16) + destello * 0.22;       // tiñe los circuitos sin lavar el pelaje
+    const fuerza = (estado === "resuelto" ? 0.14 : estado === "novedad" ? 0.06 : 0.0) + destello * 0.18;       // tiñe los circuitos sin lavar el pelaje
     for (const m of brillo) { m.emissive.copy(colorEstado); m.emissiveIntensity += (fuerza - m.emissiveIntensity) * Math.min(1, dt * 4); }
 
     if (!quieto) { matLluvia.uniforms.uT.value = t; borde2.rotation.z += dt * (estado === "novedad" ? 0.5 : 0.08); }
