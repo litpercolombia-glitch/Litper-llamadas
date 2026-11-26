@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import MatrixRain from "../components/MatrixRain";
 import Constellation from "../components/Constellation";
@@ -8,10 +8,16 @@ import { Input } from "../components/ui/input";
 import { Toaster, toast } from "sonner";
 import { api } from "../lib/api";
 import PageHelp from "../components/PageHelp";
+import LogoZynex from "../components/LogoZynex";
+
 import { GOOGLE_LOGIN_ENABLED, startGoogleLogin } from "../lib/googleLogin";
 import { LockKey, ShieldCheck, ArrowRight, GoogleLogo, User, Envelope, Buildings } from "@phosphor-icons/react";
 
+const Lyan3D = lazy(() => import("../components/Lyan3D"));
+const COLOR = { vigila: "#19c8ff", novedad: "#ffb020", resuelto: "#34e3a0" };
+
 export default function RegisterPage() {
+  const [lyan, setLyan] = useState("vigila");
   const nav = useNavigate();
   const [nombre, setNombre] = useState("");
   const [org, setOrg] = useState("");
@@ -49,8 +55,9 @@ export default function RegisterPage() {
       <div className="absolute top-4 right-4"><ThemeToggle /></div>
 
       <div className="relative z-10 w-full max-w-md mx-auto px-6 py-10">
-        <div className="mascot-ring mx-auto mb-6" style={{ width: 88, height: 88 }}>
-          <Buildings size={34} weight="duotone" className="text-white" />
+        <div className="flex justify-center text-white mb-2" style={{ "--estado": COLOR[lyan] }}><LogoZynex /></div>
+        <div className="mx-auto mb-2" style={{ width: 280, height: 250, marginTop: -18 }}>
+          <Suspense fallback={null}><Lyan3D className="w-full h-full" onEstado={setLyan} /></Suspense>
         </div>
         <h1 className="text-3xl font-semibold text-center text-white mb-1"
             data-testid="register-title">

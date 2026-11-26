@@ -5,6 +5,7 @@ import {
   Envelope, WhatsappLogo, List, X, PhoneCall, Truck, UsersThree,
 } from "@phosphor-icons/react";
 import { api } from "../lib/api";
+import LogoZynex from "./LogoZynex";
 import { useAssistantName } from "../lib/assistant";
 import { usePacks } from "../lib/packs";
 
@@ -115,12 +116,7 @@ export default function Sidebar({ open = false, onClose }) {
                 className="md:hidden absolute top-4 right-3 h-9 w-9 grid place-items-center rounded-sm text-zinc-400 hover:text-white hover:bg-zinc-800">
           <X size={18} />
         </button>
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-md neon-glow grid place-items-center bg-gradient-to-br from-white/25 to-white/5 border border-white/25">
-            <House size={14} weight="fill" className="text-white" />
-          </div>
-          <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-zinc-500">Zynex</span>
-        </div>
+        <div className="text-white" style={{ "--estado": "var(--modulo, #19c8ff)", "--zx-fondo": "#09090b" }}><LogoZynex chico /></div>
         <h1 className="text-lg font-semibold text-white mt-1">Zynex OS</h1>
         <p className="text-[11px] font-mono text-zinc-500 mt-1">Agentes para tu negocio</p>
       </div>
