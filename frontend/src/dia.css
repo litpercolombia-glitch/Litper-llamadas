@@ -1,0 +1,38 @@
+/* MODO DÍA — colores de acento legibles sobre fondo claro.
+   El modo día ya convierte los grises (zinc) con variables en index.css. Los
+   colores de acento (verde, azul, ámbar, rojo…) se escribieron para fondo
+   oscuro: en día quedaban casi blancos sobre blanco. Aquí cada familia pasa
+   a un tono oscuro que cumple contraste 4.5:1 sobre las tarjetas claras. */
+html.matrix-day .text-emerald-200, html.matrix-day .text-emerald-300, html.matrix-day .text-emerald-400,
+html.matrix-day .text-green-300, html.matrix-day .text-green-400 { color: #047857 !important; }
+html.matrix-day .text-blue-200, html.matrix-day .text-blue-300, html.matrix-day .text-blue-400,
+html.matrix-day .hover\:text-blue-200:hover { color: #1D4ED8 !important; }
+html.matrix-day .text-cyan-100, html.matrix-day .text-cyan-200, html.matrix-day .text-cyan-300,
+html.matrix-day .hover\:text-cyan-200:hover, html.matrix-day .text-sky-300 { color: #0E7490 !important; }
+html.matrix-day .text-amber-200, html.matrix-day .text-amber-300, html.matrix-day .text-amber-400,
+html.matrix-day .text-yellow-100, html.matrix-day .text-yellow-200, html.matrix-day .text-yellow-300,
+html.matrix-day .text-yellow-400 { color: #92400E !important; }
+html.matrix-day .text-orange-300, html.matrix-day .text-orange-400 { color: #C2410C !important; }
+html.matrix-day .text-red-200, html.matrix-day .text-red-300, html.matrix-day .text-red-400,
+html.matrix-day .hover\:text-red-300:hover { color: #B91C1C !important; }
+html.matrix-day .text-violet-300, html.matrix-day .text-fuchsia-300 { color: #6D28D9 !important; }
+
+/* Texto de apoyo: en día el gris más claro no alcanzaba en letra pequeña. */
+html.matrix-day .text-zinc-500 { color: #5B616B !important; }
+html.matrix-day .text-zinc-600 { color: #6B7079 !important; }
+
+/* Botones que SIEMPRE son oscuros o de color: su texto se queda blanco. */
+html.matrix-day .how-it-works-btn, html.matrix-day .how-it-works-btn *,
+html.matrix-day .btn-cta-grad, html.matrix-day .btn-cta-grad * { color: #FFFFFF !important; }
+
+/* Botón flotante del asistente: en día es claro, con texto oscuro y borde visible. */
+html.matrix-day [data-testid="lyan-dock-abrir"] { background-color: #FFFFFF !important; border-color: #C4C8CE !important; }
+
+/* Campos de texto: fondo blanco y borde que se ve. */
+html.matrix-day .bg-black\/40 { background-color: #FFFFFF !important; }
+html.matrix-day input::placeholder, html.matrix-day textarea::placeholder { color: #6B7079 !important; opacity: 1; }
+
+/* Fondos tenues de aviso: un poco más de presencia para que el recuadro se distinga. */
+html.matrix-day .bg-emerald-500\/5, html.matrix-day .bg-emerald-500\/10 { background-color: #ECFDF5 !important; }
+html.matrix-day .bg-blue-500\/10 { background-color: #EFF6FF !important; }
+html.matrix-day .bg-red-950 { background-color: #FEE2E2 !important; }

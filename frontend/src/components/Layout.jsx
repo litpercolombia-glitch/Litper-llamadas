@@ -12,6 +12,7 @@ import LyanDock from "./LyanDock";
 import ConectarDropi from "./ConectarDropi";
 import DatosTienda from "./DatosTienda";
 import { helpForRoute } from "../constants/help";
+import "../dia.css";
 
 /**
  * Chrome común + instrucciones automáticas.
