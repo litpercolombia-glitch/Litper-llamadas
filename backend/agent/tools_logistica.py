@@ -13,6 +13,15 @@ from agent.tools import ToolError, UNTRUSTED_NATIVE, _org, register_tool
 
 ESTADO_RE = re.compile(r"^[A-Za-zÁÉÍÓÚÑáéíóúñ0-9_ ]{1,60}$")
 FILTROS = {"todos", "atencion", "activos", "recompra", "riesgo"}
+# Cómo lo dice la gente → grupo de envío. Así «novedades» trae también los intentos de entrega.
+GRUPOS = {"NOVEDAD": "NOVEDAD", "NOVEDADES": "NOVEDAD", "CON NOVEDAD": "NOVEDAD",
+          "POR CONFIRMAR": "CONFIRMAR", "CONFIRMAR": "CONFIRMAR", "SIN CONFIRMAR": "CONFIRMAR",
+          "SIN RECOLECTAR": "SIN_RECOLECTAR", "SIN_RECOLECTAR": "SIN_RECOLECTAR", "SIN DESPACHAR": "SIN_RECOLECTAR",
+          "EN CAMINO": "TRANSITO", "EN TRANSITO": "TRANSITO", "TRANSITO": "TRANSITO", "TRÁNSITO": "TRANSITO",
+          "REPARTO": "REPARTO", "EN OFICINA": "OFICINA", "OFICINA": "OFICINA",
+          "BODEGA DESTINO": "BODEGA_DESTINO", "BODEGA_DESTINO": "BODEGA_DESTINO",
+          "DEVOLUCIONES": "DEVOLUCION", "EN DEVOLUCION": "DEVOLUCION", "DEVUELTOS": "DEVUELTO", "DEVUELTO": "DEVUELTO",
+          "ENTREGADOS": "ENTREGADO", "CANCELADOS": "CERRADO", "CERRADO": "CERRADO", "CERRADOS": "CERRADO"}
 
 
 async def _rpc(fn: str, args: dict) -> Any:
@@ -30,7 +39,10 @@ async def tool_logistica_resumen(ctx, dias: int = 30) -> Any:
     panel = await _rpc("zc_api_panel", {"p_org": org}) or {}
     met = await _rpc("zc_api_metricas", {"p_org": org, "p_dias": dias}) or {}
     cli = await _rpc("zc_api_clientes", {"p_org": org, "p_q": "", "p_filtro": "atencion", "p_limite": 1}) or {}
-    return {"dias": dias, "modo": panel.get("modo"),
+    corte = await _rpc("zc_api_dias", {"p_org": org, "p_dias": 2}) or {}
+    return {"dias": dias, "modo": panel.get("modo"), "hoy": corte.get("hoy"),
+            "datos_al_corte": corte.get("ultima_actualizacion"), "total_pedidos": corte.get("total_pedidos"),
+            "creados_ultimos_dias": corte.get("dias") or [],
             "pedidos_por_estado": {t.get("titulo"): t.get("n") for t in panel.get("por_estado") or []},
             "metricas": {k.get("titulo"): k.get("valor") for k in met.get("kpis") or []},
             "transportadoras": met.get("transportadoras") or [],
@@ -41,11 +53,26 @@ async def tool_logistica_pedidos(ctx, estado: str, limite: int = 30) -> Any:
     estado = (estado or "").strip().upper()
     if not ESTADO_RE.match(estado):
         raise ToolError("Indica el estado tal cual aparece en el resumen, por ejemplo NOVEDAD.")
-    filas = await _rpc("zc_api_lista", {"p_org": _org(ctx), "p_clave": f"estado:{estado}",
-                                        "p_limite": max(1, min(int(limite or 30), 100))}) or []
-    return {"estado": estado, "total": len(filas), "ver_en": "/app/logistica",
-            "pedidos": [{k: f.get(k) for k in ("pedido", "ciudad", "valor", "transportadora", "guia", "dias", "accion")}
-                        for f in filas]}
+    org, lim = _org(ctx), max(1, min(int(limite or 30), 100))
+    filas = await _rpc("zc_api_lista", {"p_org": org, "p_clave": f"estado:{estado}", "p_limite": lim}) or []
+    grupo = None
+    if not filas or estado in GRUPOS:
+        grupo = GRUPOS.get(estado)
+        if grupo:
+            agrupadas = await _rpc("zc_api_lista_grupo", {"p_org": org, "p_grupo": grupo, "p_limite": lim}) or []
+            if len(agrupadas) >= len(filas):
+                filas = agrupadas
+    return {"estado": estado, **({"incluye_grupo": grupo} if grupo else {}), "total": len(filas),
+            "ver_en": "/app/logistica",
+            "pedidos": [{k: f.get(k) for k in ("pedido", "estado", "ciudad", "valor", "transportadora", "guia", "dias", "accion")
+                         if k in f} for f in filas]}
+
+
+async def tool_logistica_dias(ctx, dias: int = 7) -> Any:
+    d = await _rpc("zc_api_dias", {"p_org": _org(ctx), "p_dias": max(1, min(90, int(dias or 7)))}) or {}
+    return {"hoy": d.get("hoy"), "datos_al_corte": d.get("ultima_actualizacion"),
+            "ultimo_pedido_creado": d.get("ultimo_pedido_creado"), "total_pedidos": d.get("total_pedidos"),
+            "por_dia": d.get("dias") or [], "ver_en": "/app/logistica"}
 
 
 async def tool_logistica_pedido(ctx, pedido: str) -> Any:
@@ -105,9 +132,16 @@ register_tool("logistica_resumen", tool_logistica_resumen, {
     "args": {"dias": "int? (1-90, por defecto 30)"}})
 register_tool("logistica_pedidos", tool_logistica_pedidos, {
     "name": "logistica_pedidos",
-    "description": "Lista los pedidos que están en un estado de envío, escrito tal cual aparece en el resumen "
-                   "(ej. NOVEDAD, PENDIENTE CONFIRMACION, EN REPARTO), del más antiguo al más nuevo, con días en el estado.",
+    "description": "Lista los pedidos de envío en un estado (ej. PENDIENTE CONFIRMACION, EN REPARTO) o en un grupo "
+                   "(NOVEDAD incluye intentos de entrega; POR CONFIRMAR, SIN RECOLECTAR, EN CAMINO, OFICINA, "
+                   "DEVOLUCIONES, ENTREGADOS, CANCELADOS), del más antiguo al más nuevo, con días en el estado.",
     "args": {"estado": "str", "limite": "int? (máx. 100)"}})
+register_tool("logistica_dias", tool_logistica_dias, {
+    "name": "logistica_dias",
+    "description": "Cuántos pedidos se crearon cada día (hoy, ayer, la semana): pedidos, valor, entregados, cancelados "
+                   "y por confirmar por día, con la hora del último corte de datos. Úsala para «cuántos pedidos "
+                   "salieron, se hicieron, entraron o se vendieron hoy».",
+    "args": {"dias": "int? (1-90, por defecto 7)"}})
 register_tool("logistica_pedido", tool_logistica_pedido, {
     "name": "logistica_pedido",
     "description": "Todo sobre un pedido por su número: estado, cliente, dirección, productos, movimientos, "
@@ -130,3 +164,10 @@ register_tool("cliente_caso", tool_cliente_caso, {
 
 # Estos resultados traen texto de terceros (nombres, direcciones, notas): dato, no orden.
 UNTRUSTED_NATIVE.update({"logistica_pedidos", "logistica_pedido", "clientes_buscar"})
+
+# La herramienta antigua de registros no trae los pedidos de envío: que el modelo no la confunda.
+from agent.tools import TOOL_SCHEMAS  # noqa: E402
+for _s in TOOL_SCHEMAS:
+    if _s.get("name") == "get_orders":
+        _s["description"] = ("Lista los registros cargados a mano para llamar (citas, cobros, leads…). Filtros: "
+                             "status, limit. Para pedidos de envío usa las herramientas logistica_.")
